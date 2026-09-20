@@ -24,6 +24,7 @@ The build pipeline downloads and bundles uBlock Origin 1.74.0, verifies its SHA-
 - Upstream release commit: `6dd2d95`
 - License: GNU General Public License v3.0
 - Bundled Firefox package: https://addons.mozilla.org/firefox/addon/ublock-origin/
+- Download SHA-256: `175756d74468c9ba45863f7fc333d3be670f82d5b066314e915814dd547d1652`
 - ILYRO modifications are reproducible from `scripts/prepare_ublock.py` and `app/src/main/ubo/ilyro-native-bridge.js`.
 
 uBlock Origin filter lists and other assets may carry separate licenses. Their notices and source information must be preserved as required.
@@ -36,6 +37,7 @@ The build pipeline downloads and bundles Dark Reader 4.9.132, verifies its SHA-2
 - Exact upstream release: https://github.com/darkreader/darkreader/releases/tag/v4.9.132
 - License: MIT
 - Pinned package: `darkreader-firefox.xpi` from release `v4.9.132`
+- Download SHA-256: `969b7216228c0cff1c00fcdde2411525c6e0bd39c305f41f27e4b84c4a080edc`
 - ILYRO's add-on-ID rewrite is reproducible from `scripts/prepare_darkreader.py`.
 
 ## AndroidX and Jetpack Compose
