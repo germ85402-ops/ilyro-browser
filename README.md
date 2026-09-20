@@ -46,6 +46,7 @@ Release signing requires repository secrets and uses the permanent ILYRO signing
 - [Privacy policy](PRIVACY.md)
 - [Third-party notices](THIRD_PARTY_NOTICES.md)
 - [Release signing identity](docs/release-signing.md)
+- [Release checklist](docs/release-checklist.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 
