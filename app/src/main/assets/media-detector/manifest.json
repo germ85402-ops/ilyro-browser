@@ -1,11 +1,16 @@
 {
   "manifest_version": 2,
   "name": "ILYRO Media Detector",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "applications": {
     "gecko": {
       "id": "media-detector@ilyro"
     }
+  },
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
   },
   "content_scripts": [
     {
@@ -22,6 +27,8 @@
   "permissions": [
     "nativeMessaging",
     "nativeMessagingFromContent",
-    "geckoViewAddons"
+    "geckoViewAddons",
+    "webRequest",
+    "<all_urls>"
   ]
 }
