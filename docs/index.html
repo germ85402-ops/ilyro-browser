@@ -14,6 +14,8 @@
       content="Современный GeckoView-браузер для Android: быстро, гибко и без лишнего шума."
     />
     <meta property="og:type" content="website" />
+    <meta property="og:image" content="assets/ilyro-home.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
     <title>ILYRO — браузер в твоём ритме</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css?v=20260920-tablet" />
@@ -42,8 +44,9 @@
         <nav class="main-nav" id="main-nav" aria-label="Основная навигация">
           <a href="#features">Возможности</a>
           <a href="#experience">Интерфейс</a>
-          <a href="#privacy">Приватность</a>
-          <a href="#download">Проект</a>
+          <a href="#screenshots">Скриншоты</a>
+          <a href="#whats-new">Что нового</a>
+          <a href="#download">Скачать</a>
         </nav>
 
         <div class="header-actions">
@@ -56,7 +59,7 @@
               <path d="M20.3 15.1A8.6 8.6 0 0 1 8.9 3.7 8.6 8.6 0 1 0 20.3 15.1Z"></path>
             </svg>
           </button>
-          <a class="header-cta" href="#download">Открыть проект <span aria-hidden="true">↗</span></a>
+          <a class="header-cta" href="#download">Скачать APK <span aria-hidden="true">↓</span></a>
           <button class="icon-button menu-toggle" id="menu-toggle" type="button" aria-label="Открыть меню" aria-expanded="false" aria-controls="main-nav">
             <span></span><span></span>
           </button>
@@ -67,19 +70,19 @@
     <main>
       <section class="hero section-shell reveal" aria-labelledby="hero-title">
         <div class="hero-copy">
-          <div class="eyebrow"><span class="eyebrow-dot"></span> GeckoView · Android · 0.26 RC</div>
-          <h1 id="hero-title">Интернет,<br /><span>в твоём ритме.</span></h1>
+          <div class="eyebrow"><span class="eyebrow-dot"></span> GeckoView · Android · 0.26.0-rc2</div>
+          <h1 id="hero-title">ILYRO — браузер<br /><span>в твоём ритме.</span></h1>
           <p class="hero-lead">
             ILYRO — браузер для Android, который оставляет главное: быстрый Gecko-движок, контроль над интерфейсом и спокойный серфинг без лишнего шума.
           </p>
           <div class="hero-actions">
-            <a class="button button-primary" href="#download">Посмотреть проект <span aria-hidden="true">↗</span></a>
+            <a class="button button-primary" href="#download">Скачать APK <span aria-hidden="true">↓</span></a>
             <a class="button button-quiet" href="https://github.com/germ85402-ops/ilyro-browser" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a>
           </div>
           <div class="hero-meta" aria-label="Ключевые характеристики">
             <span><i></i> GeckoView, не WebView</span>
             <span><i></i> uBlock Origin</span>
-            <span><i></i> Android 16 ready</span>
+            <span><i></i> Android 8+</span>
           </div>
         </div>
 
@@ -231,15 +234,38 @@
         </div>
       </section>
 
-      <section class="project-section section-shell reveal" id="download" aria-labelledby="project-title">
-        <div class="project-kicker">ILYRO / OPEN PROJECT</div>
-        <h2 id="project-title">Это только<br /><span>первая версия.</span></h2>
-        <p>Сайт будет расти вместе с браузером: добавим реальные скриншоты, страницу загрузок, changelog и больше деталей о том, как устроен ILYRO.</p>
-        <div class="project-actions">
-          <a class="button button-primary" href="https://github.com/germ85402-ops/ilyro-browser" target="_blank" rel="noreferrer">Открыть GitHub <span aria-hidden="true">↗</span></a>
-          <a class="button button-outline" href="https://github.com/germ85402-ops/ilyro-browser/releases" target="_blank" rel="noreferrer">Релизы и APK <span aria-hidden="true">↗</span></a>
+      <section class="screenshots-section section-shell reveal" id="screenshots" aria-labelledby="screenshots-title">
+        <div class="section-heading compact-heading"><div><div class="eyebrow"><span class="eyebrow-dot"></span> Реальный интерфейс</div><h2 id="screenshots-title">ILYRO без<br /><span>постановочных макетов.</span></h2></div><p>Живые скриншоты текущего release candidate на планшете: главная, вкладки, защита и настройки.</p></div>
+        <div class="shot-grid">
+          <figure class="shot shot-wide"><img src="assets/ilyro-home.jpg" alt="Главная страница ILYRO с быстрым доступом" loading="lazy"><figcaption><strong>Новая вкладка</strong><span>Персональный старт и быстрый доступ</span></figcaption></figure>
+          <figure class="shot"><img src="assets/ilyro-shield.jpg" alt="Панель ILYRO Shield" loading="lazy"><figcaption><strong>ILYRO Shield</strong><span>uBlock Origin встроен в браузер</span></figcaption></figure>
+          <figure class="shot"><img src="assets/ilyro-menu.jpg" alt="Быстрое меню ILYRO" loading="lazy"><figcaption><strong>Быстрое меню</strong><span>Основные действия в одном месте</span></figcaption></figure>
+          <figure class="shot"><img src="assets/ilyro-tabs.jpg" alt="Экран вкладок ILYRO" loading="lazy"><figcaption><strong>Вкладки</strong><span>Обычные, приватные и группы</span></figcaption></figure>
+          <figure class="shot"><img src="assets/ilyro-settings.jpg" alt="Настройки ILYRO" loading="lazy"><figcaption><strong>Настройки</strong><span>Языки, поиск и поведение браузера</span></figcaption></figure>
+          <figure class="shot"><img src="assets/ilyro-appearance.jpg" alt="Персонализация ILYRO" loading="lazy"><figcaption><strong>Персонализация</strong><span>Иконки, темы и оформление</span></figcaption></figure>
+          <figure class="shot"><img src="assets/ilyro-sync.jpg" alt="Синхронизация ILYRO через Google" loading="lazy"><figcaption><strong>Синхронизация</strong><span>Данные браузера между устройствами</span></figcaption></figure>
         </div>
-        <div class="project-footnote"><span class="status-dot"></span> Основа сайта готова к следующему этапу</div>
+      </section>
+
+      <section class="whats-new section-shell reveal" id="whats-new" aria-labelledby="whats-new-title">
+        <div class="section-heading compact-heading"><div><div class="eyebrow"><span class="eyebrow-dot"></span> 0.26.0-rc2</div><h2 id="whats-new-title">Что нового.</h2></div><a class="text-link" href="https://github.com/germ85402-ops/ilyro-browser/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Полный changelog <span aria-hidden="true">↗</span></a></div>
+        <div class="update-grid">
+          <article><span>文</span><div><strong>Глобальные языки</strong><p>Язык интерфейса ILYRO и отдельные приоритеты языков сайтов.</p></div></article>
+          <article><span>↻</span><div><strong>Google Sync</strong><p>Более надёжная синхронизация настроек и данных между устройствами.</p></div></article>
+          <article><span>◉</span><div><strong>GeckoView 155</strong><p>Переход на закреплённую стабильную сборку движка Mozilla.</p></div></article>
+          <article><span>✦</span><div><strong>Release polish</strong><p>Обновлённые настройки, юридические ссылки и подготовка к публичному релизу.</p></div></article>
+        </div>
+      </section>
+
+      <section class="project-section download-panel section-shell reveal" id="download" aria-labelledby="project-title">
+        <div class="project-kicker">ILYRO / ANDROID</div>
+        <h2 id="project-title">Скачать<br /><span>ILYRO.</span></h2>
+        <p>Текущая публичная сборка — <strong>0.26.0-rc2</strong>. Release Candidate для ARM64, Android 8.0 и новее.</p>
+        <div class="project-actions">
+          <a class="button button-primary" href="https://github.com/germ85402-ops/ilyro-browser/releases/latest" target="_blank" rel="noreferrer">Скачать APK <span aria-hidden="true">↓</span></a>
+          <a class="button button-outline" href="https://github.com/germ85402-ops/ilyro-browser/releases" target="_blank" rel="noreferrer">Все релизы <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="project-footnote"><span class="status-dot"></span> Перед установкой сверяйте SHA-256 из GitHub Release</div>
       </section>
     </main>
 
