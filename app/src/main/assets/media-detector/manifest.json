@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "ILYRO Media Detector",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "applications": {
     "gecko": {
       "id": "media-detector@ilyro"
