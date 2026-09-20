@@ -4,6 +4,9 @@ package com.ilyro.browser.ui
 
 import android.content.Context
 import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import org.mozilla.geckoview.ContentBlocking
 import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.GeckoRuntimeSettings
@@ -39,6 +42,19 @@ internal object BrowserEngine {
     @Volatile
     private var pendingDarkReaderApplied: (() -> Unit)? = null
 
+    var mediaDetectorReady by mutableStateOf(false)
+        private set
+    var darkReaderReady by mutableStateOf(false)
+        private set
+
+    val startupExtensionsReady: Boolean
+        get() = mediaDetectorReady && darkReaderReady
+
+    fun prepareForSettings(settings: BrowserSettings) {
+        adBlockingEnabled = settings.adBlockingEnabled
+        darkWebsitesEnabled = settings.darkWebsitesEnabled
+    }
+
     fun getRuntime(context: Context, theme: BrowserTheme, requestedLocales: List<String>): GeckoRuntime {
         runtime?.let { existing ->
             // A process-wide runtime can outlive a theme change. Refresh the values before any
@@ -71,7 +87,7 @@ internal object BrowserEngine {
                 ).accept(
                     { extension ->
                         if (extension != null) {
-                            applyHelperExtensionState(controller, extension, true)
+                            prepareHelperExtension(controller, extension)
                         }
                     },
                     { error -> Log.e(ENGINE_LOG_TAG, "Failed to initialize YouTube performance helper", error) }
@@ -82,25 +98,32 @@ internal object BrowserEngine {
                 ).accept(
                     { extension ->
                         if (extension != null) {
-                            applyHelperExtensionState(controller, extension, true)
-                            PageGestureBridge.attach(extension)
-                            controller.setAllowedInPrivateBrowsing(extension, true)
+                            prepareHelperExtension(controller, extension) { stableExtension ->
+                                PageGestureBridge.attach(stableExtension)
+                            }
                         }
                     },
                     { error -> Log.e(ENGINE_LOG_TAG, "Failed to initialize media fullscreen helper", error) }
                 )
+                mediaDetectorReady = false
                 controller.ensureBuiltIn(
                     MEDIA_DETECTOR_EXTENSION_URI,
                     MEDIA_DETECTOR_EXTENSION_ID
                 ).accept(
                     { extension ->
                         if (extension != null) {
-                            applyHelperExtensionState(controller, extension, true)
-                            MediaDetectorBridge.attach(extension)
-                            controller.setAllowedInPrivateBrowsing(extension, true)
+                            prepareHelperExtension(controller, extension) { stableExtension ->
+                                MediaDetectorBridge.attach(stableExtension)
+                                mediaDetectorReady = true
+                            }
+                        } else {
+                            mediaDetectorReady = true
                         }
                     },
-                    { error -> Log.e(ENGINE_LOG_TAG, "Failed to initialize media detector helper", error) }
+                    { error ->
+                        Log.e(ENGINE_LOG_TAG, "Failed to initialize media detector helper", error)
+                        mediaDetectorReady = true
+                    }
                 )
                 controller.ensureBuiltIn(
                     AD_BLOCK_EXTENSION_URI,
@@ -108,35 +131,47 @@ internal object BrowserEngine {
                 ).accept(
                     { extension ->
                         if (extension != null) {
-                            adBlockExtension = extension
-                            controller.setAllowedInPrivateBrowsing(extension, true)
-                            // Attach the native bridge only after uBO has reached the requested
-                            // enabled state. Attaching before controller.enable()/disable() can
-                            // leave the already-connected native port orphaned until app restart.
-                            applyAdBlockState(controller, extension, adBlockingEnabled)
+                            withPrivateBrowsingAllowed(controller, extension) { stableExtension ->
+                                adBlockExtension = stableExtension
+                                // Attach the native bridge only after uBO has reached the requested
+                                // enabled state. Attaching before controller.enable()/disable() can
+                                // leave the already-connected native port orphaned until app restart.
+                                applyAdBlockState(controller, stableExtension, adBlockingEnabled)
+                            }
                         }
                     },
                     { error -> Log.e(ENGINE_LOG_TAG, "Failed to initialize bundled ad blocker", error) }
                 )
+                darkReaderReady = false
                 controller.ensureBuiltIn(
                     DARK_READER_EXTENSION_URI,
                     DARK_READER_EXTENSION_ID
                 ).accept(
                     { extension ->
                         if (extension != null) {
-                            darkReaderExtension = extension
-                            controller.setAllowedInPrivateBrowsing(extension, true)
-                            val pendingCallback = pendingDarkReaderApplied
-                            pendingDarkReaderApplied = null
-                            applyDarkReaderState(
-                                controller,
-                                extension,
-                                darkWebsitesEnabled,
-                                pendingCallback
-                            )
+                            withPrivateBrowsingAllowed(controller, extension) { stableExtension ->
+                                darkReaderExtension = stableExtension
+                                val pendingCallback = pendingDarkReaderApplied
+                                pendingDarkReaderApplied = null
+                                applyDarkReaderState(
+                                    controller,
+                                    stableExtension,
+                                    darkWebsitesEnabled
+                                ) {
+                                    darkReaderReady = true
+                                    pendingCallback?.invoke()
+                                }
+                            }
+                        } else {
+                            darkReaderReady = true
                         }
                     },
-                    { error -> Log.e(ENGINE_LOG_TAG, "Failed to initialize dark websites helper", error) }
+                    { error ->
+                        Log.e(ENGINE_LOG_TAG, "Failed to initialize dark websites helper", error)
+                        darkReaderReady = true
+                        pendingDarkReaderApplied?.invoke()
+                        pendingDarkReaderApplied = null
+                    }
                 )
                 runtime = created
             }
@@ -148,6 +183,7 @@ internal object BrowserEngine {
     }
 
     fun prewarm(context: Context, settings: BrowserSettings) {
+        prepareForSettings(settings)
         val currentRuntime = getRuntime(context, settings.theme, settings.preferredSiteLanguages)
         applyRuntimeSettings(settings)
         currentRuntime.warmUp()
@@ -177,20 +213,56 @@ internal object BrowserEngine {
             )
     }
 
+    private fun withPrivateBrowsingAllowed(
+        controller: WebExtensionController,
+        extension: WebExtension,
+        onReady: (WebExtension) -> Unit
+    ) {
+        if (extension.metaData.allowedInPrivateBrowsing) {
+            onReady(extension)
+            return
+        }
+        controller.setAllowedInPrivateBrowsing(extension, true).accept(
+            { updated -> onReady(updated ?: extension) },
+            { error ->
+                Log.e(ENGINE_LOG_TAG, "Failed to allow helper extension in private browsing", error)
+                onReady(extension)
+            }
+        )
+    }
+
     private fun applyHelperExtensionState(
         controller: WebExtensionController,
         extension: WebExtension,
-        enabled: Boolean
+        enabled: Boolean,
+        onReady: (WebExtension) -> Unit
     ) {
+        if (extension.metaData.enabled == enabled) {
+            onReady(extension)
+            return
+        }
         val result = if (enabled) {
             controller.enable(extension, WebExtensionController.EnableSource.USER)
         } else {
             controller.disable(extension, WebExtensionController.EnableSource.USER)
         }
         result.accept(
-            { _ -> },
-            { error -> Log.e(ENGINE_LOG_TAG, "Failed to change helper extension state", error) }
+            { updated -> onReady(updated ?: extension) },
+            { error ->
+                Log.e(ENGINE_LOG_TAG, "Failed to change helper extension state", error)
+                onReady(extension)
+            }
         )
+    }
+
+    private fun prepareHelperExtension(
+        controller: WebExtensionController,
+        extension: WebExtension,
+        onReady: (WebExtension) -> Unit = {}
+    ) {
+        withPrivateBrowsingAllowed(controller, extension) { privateReady ->
+            applyHelperExtensionState(controller, privateReady, true, onReady)
+        }
     }
 
     fun setAdBlockingEnabled(enabled: Boolean) {
@@ -223,6 +295,11 @@ internal object BrowserEngine {
         enabled: Boolean,
         onApplied: (() -> Unit)? = null
     ) {
+        if (extension.metaData.enabled == enabled) {
+            darkReaderExtension = extension
+            onApplied?.invoke()
+            return
+        }
         val result = if (enabled) {
             controller.enable(extension, WebExtensionController.EnableSource.USER)
         } else {
@@ -230,7 +307,7 @@ internal object BrowserEngine {
         }
         result.accept(
             { updated ->
-                if (updated != null) darkReaderExtension = updated
+                darkReaderExtension = updated ?: extension
                 onApplied?.invoke()
             },
             { error ->
