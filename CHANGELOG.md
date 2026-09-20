@@ -6,6 +6,7 @@
 - Show background sync failures, retry recoverable errors with exponential backoff, and add a confirmed action to delete the Google Drive backup.
 - Move the browser engine from GeckoView Nightly to Mozilla's stable GeckoView 155 release.
 - Refresh the public third-party notice so it matches the stable GeckoView dependency used by the app.
+- Add direct Privacy Policy and Terms of Service links to the About screen.
 
 ## 0.26.0-rc1 — release candidate
 

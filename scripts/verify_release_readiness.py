@@ -98,6 +98,7 @@ def main() -> int:
     require("Buy Me a Coffee" in settings, "About screen is missing the support entry")
     require("Alex Agapitov" in settings and "Habet Hayrapetyan" in settings, "About screen is missing both developers")
     require("BUY_ME_A_COFFEE_URL" in settings, "support URL placeholder is missing")
+    require("privacy.html" in settings and "terms.html" in settings, "About screen is missing public legal links")
 
     release_workflow = read(".github/workflows/release.yml")
     for secret in (

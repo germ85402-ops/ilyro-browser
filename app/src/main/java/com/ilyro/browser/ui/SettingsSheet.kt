@@ -71,6 +71,8 @@ import androidx.compose.ui.window.DialogProperties
  * Filled with the creator page URL after the Buy Me a Coffee registration is complete.
  */
 private const val BUY_ME_A_COFFEE_URL = ""
+private const val PRIVACY_POLICY_URL = "https://germ85402-ops.github.io/ilyro-browser/privacy.html"
+private const val TERMS_OF_SERVICE_URL = "https://germ85402-ops.github.io/ilyro-browser/terms.html"
 
 private data class ClearAction(
     val title: String,
@@ -673,6 +675,34 @@ private fun SettingsCategoryContent(
                         }
                     },
                     enabled = BUY_ME_A_COFFEE_URL.isNotBlank()
+                )
+            }
+
+            SettingsCard(title = tr("Legal", "Юридическая информация")) {
+                ActionRow(
+                    tr("Privacy Policy", "Политика конфиденциальности"),
+                    tr(
+                        "How ILYRO handles browser data and optional sync.",
+                        "Как ILYRO обрабатывает данные браузера и синхронизацию."
+                    ),
+                    onClick = {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_POLICY_URL))
+                        )
+                    }
+                )
+                SettingsRowDivider()
+                ActionRow(
+                    tr("Terms of Service", "Условия использования"),
+                    tr(
+                        "Rules for using the browser and project services.",
+                        "Правила использования браузера и сервисов проекта."
+                    ),
+                    onClick = {
+                        context.startActivity(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(TERMS_OF_SERVICE_URL))
+                        )
+                    }
                 )
             }
 
