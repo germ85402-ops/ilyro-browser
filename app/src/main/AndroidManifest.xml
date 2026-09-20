@@ -18,6 +18,7 @@
     <application
         android:name=".IlyroApplication"
         android:allowBackup="false"
+        android:fullBackupContent="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher_deer"
         android:roundIcon="@mipmap/ic_launcher_deer"
@@ -76,7 +77,6 @@
             android:exported="true"
             android:icon="@mipmap/ic_launcher_deer"
             android:roundIcon="@mipmap/ic_launcher_deer"
-            android:theme="@style/Theme.ILYRO.Starting.Deer"
             android:label="${appLabel}"
             android:targetActivity=".MainActivity">
             <intent-filter>
@@ -91,7 +91,6 @@
             android:exported="true"
             android:icon="@mipmap/ic_launcher"
             android:roundIcon="@mipmap/ic_launcher"
-            android:theme="@style/Theme.ILYRO.Starting.Classic"
             android:label="${appLabel}"
             android:targetActivity=".MainActivity">
             <intent-filter>
@@ -106,7 +105,6 @@
             android:exported="true"
             android:icon="@mipmap/ic_launcher_monochrome"
             android:roundIcon="@mipmap/ic_launcher_monochrome"
-            android:theme="@style/Theme.ILYRO.Starting.Monochrome"
             android:label="${appLabel}"
             android:targetActivity=".MainActivity">
             <intent-filter>
@@ -121,7 +119,6 @@
             android:exported="true"
             android:icon="@mipmap/ic_launcher_pink_light"
             android:roundIcon="@mipmap/ic_launcher_pink_light"
-            android:theme="@style/Theme.ILYRO.Starting.PinkLight"
             android:label="${appLabel}"
             android:targetActivity=".MainActivity">
             <intent-filter>
@@ -136,7 +133,6 @@
             android:exported="true"
             android:icon="@mipmap/ic_launcher_pink_dark"
             android:roundIcon="@mipmap/ic_launcher_pink_dark"
-            android:theme="@style/Theme.ILYRO.Starting.PinkDark"
             android:label="${appLabel}"
             android:targetActivity=".MainActivity">
             <intent-filter>

@@ -16,6 +16,7 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.ilyro.browser.ACTION_OPEN_DOWNLOADS
 import com.ilyro.browser.R
+import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
 
 class DownloadKeepAliveService : Service() {
@@ -31,8 +32,7 @@ class DownloadKeepAliveService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        instance = this
-        notificationContext = applicationContext
+        instanceRef = WeakReference(this)
         ensureChannel(this)
     }
 
@@ -114,7 +114,7 @@ class DownloadKeepAliveService : Service() {
     }
 
     override fun onDestroy() {
-        if (instance === this) instance = null
+        if (liveService() === this) instanceRef = null
         val manager = getSystemService(NotificationManager::class.java)
         activeDownloads.keys.forEach { manager.cancel(individualNotificationId(it)) }
         activeDownloads.clear()
@@ -363,13 +363,13 @@ class DownloadKeepAliveService : Service() {
         private const val EXTRA_NAME = "download_name"
 
         @Volatile
-        private var instance: DownloadKeepAliveService? = null
+        private var instanceRef: WeakReference<DownloadKeepAliveService>? = null
         @Volatile
         private var controlHandler: ((Long, Boolean) -> Boolean)? = null
         @Volatile
         private var cancelHandler: ((Long) -> Boolean)? = null
-        @Volatile
-        private var notificationContext: Context? = null
+
+        private fun liveService(): DownloadKeepAliveService? = instanceRef?.get()
 
         private const val MAX_FINISHED_BEFORE_START_IDS = 128
         private const val MAX_FOREGROUND_UNAVAILABLE_IDS = 128
@@ -390,7 +390,6 @@ class DownloadKeepAliveService : Service() {
 
         fun track(context: Context, id: Long, fileName: String): Boolean {
             val appContext = context.applicationContext
-            notificationContext = appContext
             finishedBeforeStart.remove(id)
             foregroundUnavailableIds.remove(id)
             activeIds.add(id)
@@ -432,7 +431,6 @@ class DownloadKeepAliveService : Service() {
         fun replace(context: Context, oldId: Long, newId: Long, fileName: String) {
             if (oldId == newId) return
             val appContext = context.applicationContext
-            notificationContext = appContext
             val foregroundWasUnavailable = foregroundUnavailableIds.remove(oldId)
             activeIds.remove(oldId)
 
@@ -453,7 +451,7 @@ class DownloadKeepAliveService : Service() {
 
             activeIds.add(newId)
 
-            val live = instance
+            val live = liveService()
             val oldStartAlreadyDelivered = startedIds.remove(oldId)
             if (oldStartAlreadyDelivered || live != null) {
                 startedIds.add(newId)
@@ -480,14 +478,14 @@ class DownloadKeepAliveService : Service() {
         }
 
         fun updateProgress(id: Long, fileName: String, downloaded: Long, total: Long) {
-            instance?.updateTracked(id, fileName, downloaded, total)
+            liveService()?.updateTracked(id, fileName, downloaded, total)
         }
 
         fun setPaused(id: Long, paused: Boolean) {
-            instance?.setPausedTracked(id, paused)
+            liveService()?.setPausedTracked(id, paused)
         }
 
-        fun finish(id: Long) {
+        fun finish(context: Context, id: Long) {
             activeIds.remove(id)
             foregroundUnavailableIds.remove(id)
             val serviceAlreadyStartedThisId = startedIds.remove(id)
@@ -496,13 +494,14 @@ class DownloadKeepAliveService : Service() {
             } else {
                 markFinishedBeforeStart(id)
             }
-            instance?.finishTracked(id)
-            val context = notificationContext
-            if (context != null) {
-                val manager = context.getSystemService(NotificationManager::class.java)
-                manager.cancel(individualNotificationId(id))
-                if (activeIds.isEmpty() && instance == null) manager.cancel(NOTIFICATION_ID)
-            }
+            liveService()?.finishTracked(id)
+
+            // Use the caller's application context only for this operation instead of retaining a
+            // process-wide Context/Service reference in the companion object.
+            val appContext = context.applicationContext
+            val manager = appContext.getSystemService(NotificationManager::class.java)
+            manager.cancel(individualNotificationId(id))
+            if (activeIds.isEmpty() && liveService() == null) manager.cancel(NOTIFICATION_ID)
         }
 
         private fun markFinishedBeforeStart(id: Long) {
@@ -524,7 +523,7 @@ class DownloadKeepAliveService : Service() {
         }
 
         private fun ensureChannel(context: Context) {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+            // minSdk is 26, so notification channels are always available.
             val manager = context.getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(
                 NotificationChannel(

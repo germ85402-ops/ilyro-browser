@@ -37,6 +37,7 @@ import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
+import java.lang.ref.WeakReference
 import java.util.zip.ZipInputStream
 import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
@@ -305,32 +306,39 @@ internal class DownloadController(
     )
 
     init {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            notificationManager.createNotificationChannel(
-                NotificationChannel(
-                    DOWNLOAD_CHANNEL_ID,
-                    "Downloads",
-                    NotificationManager.IMPORTANCE_LOW
-                ).apply {
-                    description = "ILYRO download progress"
-                    setSound(null, null)
-                    enableVibration(false)
-                }
-            )
-        }
+        // minSdk is 26, so the downloads notification channel is always available.
+        notificationManager.createNotificationChannel(
+            NotificationChannel(
+                DOWNLOAD_CHANNEL_ID,
+                "Downloads",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "ILYRO download progress"
+                setSound(null, null)
+                enableVibration(false)
+            }
+        )
+
+        // The foreground-service companion is process-wide. Keep only a weak reference here so
+        // recreating BrowserScreen/DownloadController cannot pin an obsolete controller/runtime.
+        val controllerRef = WeakReference(this)
         DownloadKeepAliveService.setControlHandler { id, pauseRequested ->
-            if (pauseRequested) pause(id) else resume(id)
+            controllerRef.get()?.let { controller ->
+                if (pauseRequested) controller.pause(id) else controller.resume(id)
+            } ?: false
         }
         DownloadKeepAliveService.setCancelHandler { id ->
-            val item = runCatching {
-                snapshot().firstOrNull { it.record.id == id }
-            }.getOrNull()
-            if (item != null) {
-                cancel(item)
-                true
-            } else {
-                false
-            }
+            controllerRef.get()?.let { controller ->
+                val item = runCatching {
+                    controller.snapshot().firstOrNull { it.record.id == id }
+                }.getOrNull()
+                if (item != null) {
+                    controller.cancel(item)
+                    true
+                } else {
+                    false
+                }
+            } ?: false
         }
     }
 
@@ -632,7 +640,7 @@ internal class DownloadController(
             if (record != null) {
                 DownloadKeepAliveService.replace(appContext, provisionalId, record.id, record.fileName)
             } else {
-                DownloadKeepAliveService.finish(provisionalId)
+                DownloadKeepAliveService.finish(appContext, provisionalId)
             }
             onRecordsChanged?.invoke()
         }
@@ -669,7 +677,7 @@ internal class DownloadController(
                             fallbackRecord.fileName
                         )
                     } else {
-                        DownloadKeepAliveService.finish(provisionalId)
+                        DownloadKeepAliveService.finish(appContext, provisionalId)
                     }
                     onRecordsChanged?.invoke()
                 }
@@ -1172,7 +1180,7 @@ internal class DownloadController(
                 }
                 temporarySegments.forEach { file -> runCatching { file.delete() } }
                 temporarySegments.clear()
-                DownloadKeepAliveService.finish(createdRecord?.id ?: keepAliveToken)
+                DownloadKeepAliveService.finish(appContext, createdRecord?.id ?: keepAliveToken)
             }
         }, "ILYRO-hls-download-${System.nanoTime()}").start()
         return true
@@ -1656,7 +1664,7 @@ internal class DownloadController(
                     notifyDownloadFailed(id, completedFileName)
                 }
             } finally {
-                DownloadKeepAliveService.finish(id)
+                DownloadKeepAliveService.finish(appContext, id)
                 activeBodies.remove(id)
                 wakePaused(id)
                 pauseLocks.remove(id)
@@ -2341,7 +2349,7 @@ internal class DownloadController(
             liveTransfers.remove(record.id)
             pauseLocks.remove(record.id)
             cancelDownloadNotification(record.id)
-            DownloadKeepAliveService.finish(record.id)
+            DownloadKeepAliveService.finish(appContext, record.id)
             runCatching { resolver.delete(Uri.parse(record.localUri), null, null) }
         } else if (record.id >= 0L) {
             manager.remove(record.id)
@@ -2489,7 +2497,7 @@ internal class DownloadController(
     }
 
     private fun cleanupDirectRecord(id: Long, destination: Uri) {
-        DownloadKeepAliveService.finish(id)
+        DownloadKeepAliveService.finish(appContext, id)
         runCatching { resolver.delete(destination, null, null) }
         synchronized(recordLock) {
             saveRecordsUnsafe(restoreRecordsUnsafe().filterNot { it.id == id })
