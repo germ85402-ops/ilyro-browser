@@ -25,11 +25,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -60,7 +62,8 @@ private const val BROWSER_PREFS_NAME = "ilyro_browser"
 private enum class SettingsSyncAction {
     BACKUP,
     RESTORE,
-    ENABLE_AUTO
+    ENABLE_AUTO,
+    DELETE_REMOTE
 }
 
 /**
@@ -95,6 +98,7 @@ internal fun AccountSettingsSection() {
     var lastSyncAtEpochMs by remember {
         mutableStateOf(syncManager.lastSyncAtEpochMs())
     }
+    var showDeleteRemoteConfirmation by remember { mutableStateOf(false) }
 
     // Resolve localized strings while in composition, not from callbacks/coroutines.
     val signInUnavailableMessage = tr(
@@ -157,6 +161,25 @@ internal fun AccountSettingsSection() {
         "Automatic sync could not be enabled on this device.",
         "Не удалось включить автосинхронизацию на этом устройстве."
     )
+    val localChangesPreservedMessage = tr(
+        "Local settings and tabs were preserved because they changed on this device.",
+        "Локальные настройки и вкладки сохранены: на этом устройстве были изменения."
+    )
+    val deleteRemoteTitle = tr(
+        "Delete cloud backup?",
+        "Удалить облачную копию?"
+    )
+    val deleteRemoteMessage = tr(
+        "This removes the ILYRO backup from Google Drive. Data stored on this device will not be deleted.",
+        "Это удалит резервную копию ILYRO из Google Drive. Данные на этом устройстве удалены не будут."
+    )
+    val deleteRemoteConfirm = tr("Delete backup", "Удалить копию")
+    val deleteRemoteCancel = tr("Cancel", "Отмена")
+    val deleteRemoteSuccessMessage = tr(
+        "Cloud backup deleted. Automatic sync was disabled.",
+        "Облачная копия удалена. Автосинхронизация выключена."
+    )
+    val automaticSyncError = BrowserAutoSyncScheduler.lastError(appContext)
 
     fun automaticSyncFailureMessage(): String =
         BrowserAutoSyncScheduler.lastError(appContext)
@@ -177,7 +200,7 @@ internal fun AccountSettingsSection() {
                     }
 
                     is SyncResult.Failure -> {
-                        statusMessage = "$syncFailedMessage${result.message}"
+                        statusMessage = "$syncFailedMessage${result.message?.let { "\n$it" }.orEmpty()}"
                         false
                     }
 
@@ -205,7 +228,7 @@ internal fun AccountSettingsSection() {
                     }
 
                     is SyncResult.Failure -> {
-                        statusMessage = "$syncFailedMessage${result.message}"
+                        statusMessage = "$syncFailedMessage${result.message?.let { "\n$it" }.orEmpty()}"
                         false
                     }
 
@@ -223,7 +246,11 @@ internal fun AccountSettingsSection() {
                         if (BrowserAutoSyncScheduler.setEnabled(appContext, true)) {
                             autoSyncEnabled = true
                             lastSyncAtEpochMs = syncManager.lastSyncAtEpochMs()
-                            statusMessage = automaticSyncEnabledMessage
+                            statusMessage = if (result.value.preservedLocalChanges) {
+                                "$automaticSyncEnabledMessage\n$localChangesPreservedMessage"
+                            } else {
+                                automaticSyncEnabledMessage
+                            }
                             if (result.value.appliedRemoteSettings || result.value.appliedRemoteTabs) {
                                 context.findActivity()?.recreate()
                             }
@@ -235,7 +262,28 @@ internal fun AccountSettingsSection() {
                     }
 
                     is SyncResult.Failure -> {
-                        statusMessage = "$syncFailedMessage${result.message.orEmpty()}"
+                        statusMessage = "$syncFailedMessage${result.message?.let { "\n$it" }.orEmpty()}"
+                        false
+                    }
+
+                    SyncResult.NotAuthorized -> {
+                        statusMessage = driveAuthorizationFailedMessage
+                        false
+                    }
+                }
+            }
+
+            SettingsSyncAction.DELETE_REMOTE -> {
+                BrowserAutoSyncScheduler.setEnabled(appContext, false)
+                autoSyncEnabled = false
+                when (val result = provider.deleteRemoteData()) {
+                    is SyncResult.Success -> {
+                        statusMessage = deleteRemoteSuccessMessage
+                        true
+                    }
+
+                    is SyncResult.Failure -> {
+                        statusMessage = "$syncFailedMessage${result.message?.let { "\n$it" }.orEmpty()}"
                         false
                     }
 
@@ -378,8 +426,10 @@ internal fun AccountSettingsSection() {
                     busy = busy,
                     onBackup = { requestSync(SettingsSyncAction.BACKUP) },
                     onRestore = { requestSync(SettingsSyncAction.RESTORE) },
+                    onDeleteRemote = { showDeleteRemoteConfirmation = true },
                     autoSyncEnabled = autoSyncEnabled,
                     lastSyncAtEpochMs = lastSyncAtEpochMs,
+                    automaticSyncError = automaticSyncError,
                     onAutoSyncChanged = { enabled ->
                         if (enabled) {
                             requestSync(SettingsSyncAction.ENABLE_AUTO)
@@ -429,8 +479,8 @@ internal fun AccountSettingsSection() {
 
             Text(
                 tr(
-                    "Automatic sync merges history, bookmarks, and quick links. Settings and open tabs use the latest saved version. Passwords, cookies, private tabs, downloads, and custom wallpaper files stay on this device.",
-                    "Автосинхронизация объединяет историю, закладки и быстрые ссылки. Настройки и открытые вкладки используют последнюю сохранённую версию. Пароли, cookie, приватные вкладки, загрузки и файлы пользовательских обоев остаются на этом устройстве."
+                    "Automatic sync merges history, bookmarks, and quick links. Newer settings and open tabs are applied unless both devices changed them; then local changes are preserved. Passwords, cookies, private tabs, downloads, and custom wallpaper files stay on this device.",
+                    "Автосинхронизация объединяет историю, закладки и быстрые ссылки. Новые настройки и открытые вкладки применяются, если оба устройства не меняли их; иначе сохраняются локальные изменения. Пароли, cookie, приватные вкладки, загрузки и файлы пользовательских обоев остаются на этом устройстве."
                 ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -445,6 +495,29 @@ internal fun AccountSettingsSection() {
                 Text(tr("Passwords & import", "Пароли и импорт"))
             }
         }
+    }
+
+    if (showDeleteRemoteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteRemoteConfirmation = false },
+            title = { Text(deleteRemoteTitle) },
+            text = { Text(deleteRemoteMessage) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteRemoteConfirmation = false
+                        requestSync(SettingsSyncAction.DELETE_REMOTE)
+                    }
+                ) {
+                    Text(deleteRemoteConfirm)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteRemoteConfirmation = false }) {
+                    Text(deleteRemoteCancel)
+                }
+            }
+        )
     }
 }
 
@@ -515,8 +588,10 @@ private fun SignedInAccountContent(
     busy: Boolean,
     onBackup: () -> Unit,
     onRestore: () -> Unit,
+    onDeleteRemote: () -> Unit,
     autoSyncEnabled: Boolean,
     lastSyncAtEpochMs: Long,
+    automaticSyncError: String?,
     onAutoSyncChanged: (Boolean) -> Unit,
     onSignOut: () -> Unit
 ) {
@@ -586,6 +661,14 @@ private fun SignedInAccountContent(
         }
     }
 
+    OutlinedButton(
+        onClick = onDeleteRemote,
+        enabled = !busy,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(tr("Delete cloud backup", "Удалить облачную копию"))
+    }
+
     if (busy) {
         Box(
             modifier = Modifier
@@ -635,6 +718,14 @@ private fun SignedInAccountContent(
             text = lastSyncLabel,
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+
+    automaticSyncError?.takeIf { it.isNotBlank() }?.let { error ->
+        Text(
+            text = tr("Last automatic sync error: $error", "Ошибка автосинхронизации: $error"),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error
         )
     }
 

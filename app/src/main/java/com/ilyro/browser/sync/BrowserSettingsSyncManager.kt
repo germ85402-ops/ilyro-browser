@@ -15,7 +15,8 @@ import java.util.UUID
 
 internal data class SyncOutcome(
     val appliedRemoteSettings: Boolean = false,
-    val appliedRemoteTabs: Boolean = false
+    val appliedRemoteTabs: Boolean = false,
+    val preservedLocalChanges: Boolean = false
 )
 
 /**
@@ -32,21 +33,24 @@ internal class BrowserSettingsSyncManager(context: Context) {
         provider: SyncProvider
     ): SyncResult<Unit> {
         val revision = prefs.getLong(KEY_REVISION, 0L) + 1L
+        val tabSession = TabSessionStore.restore(browserPrefs, FALLBACK_HOME_URL)
         val snapshot = buildSnapshot(
             settings = settings,
             revision = revision,
             history = HistoryStore.restore(browserPrefs),
             bookmarks = BookmarkStore.restore(browserPrefs),
             quickLinks = QuickLinkStore.restore(browserPrefs),
-            tabSession = TabSessionStore.restore(browserPrefs, FALLBACK_HOME_URL)
+            tabSession = tabSession
         )
-        return upload(snapshot, provider)
+        return upload(snapshot, provider, controlFingerprint(settings, tabSession))
     }
 
     /**
      * Background-safe synchronization. Collections are merged by stable identity so a second
-     * device does not silently erase local bookmarks or history. Local settings and open tabs
-     * remain authoritative because changing them remotely while the browser is open is surprising.
+     * device does not silently erase local bookmarks or history. Settings and open tabs use
+     * last-write-wins only when this device has not changed them since its last successful sync.
+     * If both devices changed those controls, local values are kept and uploaded instead of being
+     * silently overwritten.
      */
     suspend fun sync(
         settings: BrowserSettings,
@@ -57,6 +61,11 @@ internal class BrowserSettingsSyncManager(context: Context) {
         val localQuickLinks = QuickLinkStore.restore(browserPrefs)
         val localTabs = TabSessionStore.restore(browserPrefs, FALLBACK_HOME_URL)
         val lastSyncAt = prefs.getLong(KEY_LAST_SYNC_AT, 0L)
+        val localControlFingerprint = controlFingerprint(settings, localTabs)
+        val localHasUnsyncedControlChanges = SyncConflictPolicy.hasLocalChanges(
+            lastSyncedFingerprint = prefs.getString(KEY_LAST_SYNCED_CONTROL_HASH, null),
+            currentFingerprint = localControlFingerprint
+        )
 
         val remote = when (val result = provider.downloadLatest()) {
             is SyncResult.Success -> result.value
@@ -69,10 +78,12 @@ internal class BrowserSettingsSyncManager(context: Context) {
             ?.let { runCatching { BrowserDataSyncCodec.decode(it.payload) }.getOrNull() }
         val remoteUpdatedAt = remote?.updatedAtEpochMs ?: 0L
         val remoteIsNewer = remoteData != null && remoteUpdatedAt > lastSyncAt
+        val applyRemoteControl = remoteIsNewer && !localHasUnsyncedControlChanges
 
-        // Last-write-wins: a newer snapshot from another device supplies settings and normal
-        // tabs. Custom wallpaper URIs stay local because their files are device-specific.
-        val effectiveSettings = if (remoteIsNewer) {
+        // A newer snapshot supplies settings and normal tabs only when this device has no
+        // unuploaded local changes to those values. Custom wallpaper URIs stay local because
+        // their files are device-specific.
+        val effectiveSettings = if (applyRemoteControl) {
             remoteData!!.settings.copy(
                 customWallpaperUri = settings.customWallpaperUri,
                 darkCustomWallpaperUri = settings.darkCustomWallpaperUri
@@ -80,14 +91,14 @@ internal class BrowserSettingsSyncManager(context: Context) {
         } else {
             settings
         }
-        val effectiveTabs = if (remoteIsNewer) {
+        val effectiveTabs = if (applyRemoteControl) {
             remoteData!!.tabs?.let(::toRestoredTabSession) ?: localTabs
         } else {
             localTabs
         }
-        val appliedRemoteTabs = remoteIsNewer && remoteData!!.tabs != null
+        val appliedRemoteTabs = applyRemoteControl && remoteData!!.tabs != null
 
-        if (remoteIsNewer) {
+        if (applyRemoteControl) {
             BrowserSettingsStore.save(browserPrefs, effectiveSettings)
             if (appliedRemoteTabs) {
                 TabSessionStore.saveNow(
@@ -116,11 +127,18 @@ internal class BrowserSettingsSyncManager(context: Context) {
             tabSession = effectiveTabs
         )
 
-        return when (val uploadResult = upload(snapshot, provider)) {
+        return when (
+            val uploadResult = upload(
+                snapshot = snapshot,
+                provider = provider,
+                controlFingerprint = controlFingerprint(effectiveSettings, effectiveTabs)
+            )
+        ) {
             is SyncResult.Success -> SyncResult.Success(
                 SyncOutcome(
-                    appliedRemoteSettings = remoteIsNewer,
-                    appliedRemoteTabs = appliedRemoteTabs
+                    appliedRemoteSettings = applyRemoteControl,
+                    appliedRemoteTabs = appliedRemoteTabs,
+                    preservedLocalChanges = remoteIsNewer && localHasUnsyncedControlChanges
                 )
             )
 
@@ -177,10 +195,15 @@ internal class BrowserSettingsSyncManager(context: Context) {
                         customWallpaperUri = localSettings.customWallpaperUri,
                         darkCustomWallpaperUri = localSettings.darkCustomWallpaperUri
                     )
+                    val restoredTabs = TabSessionStore.restore(browserPrefs, FALLBACK_HOME_URL)
 
                     prefs.edit()
                         .putLong(KEY_REVISION, maxOf(prefs.getLong(KEY_REVISION, 0L), snapshot.revision))
                         .putLong(KEY_LAST_SYNC_AT, System.currentTimeMillis())
+                        .putString(
+                            KEY_LAST_SYNCED_CONTROL_HASH,
+                            controlFingerprint(restoredSettings, restoredTabs)
+                        )
                         .apply()
                     SyncResult.Success<BrowserSettings?>(restoredSettings)
                 } catch (error: Exception) {
@@ -219,7 +242,12 @@ internal class BrowserSettingsSyncManager(context: Context) {
             updatedAtEpochMs = now,
             deviceId = deviceId(),
             payload = BrowserDataSyncCodec.encode(
-                settings = settings,
+                // Wallpaper files live in app-private storage and cannot be resolved on another
+                // device. Keep the preference itself local while syncing the rest of the settings.
+                settings = settings.copy(
+                    customWallpaperUri = null,
+                    darkCustomWallpaperUri = null
+                ),
                 history = history,
                 bookmarks = bookmarks,
                 quickLinks = quickLinks,
@@ -228,13 +256,20 @@ internal class BrowserSettingsSyncManager(context: Context) {
         )
     }
 
-    private suspend fun upload(snapshot: SyncSnapshot, provider: SyncProvider): SyncResult<Unit> {
+    private suspend fun upload(
+        snapshot: SyncSnapshot,
+        provider: SyncProvider,
+        controlFingerprint: String? = null
+    ): SyncResult<Unit> {
         return when (val result = provider.upload(snapshot)) {
             is SyncResult.Success -> {
-                prefs.edit()
+                val editor = prefs.edit()
                     .putLong(KEY_REVISION, snapshot.revision)
                     .putLong(KEY_LAST_SYNC_AT, snapshot.updatedAtEpochMs)
-                    .apply()
+                if (controlFingerprint != null) {
+                    editor.putString(KEY_LAST_SYNCED_CONTROL_HASH, controlFingerprint)
+                }
+                editor.apply()
                 result
             }
 
@@ -242,6 +277,22 @@ internal class BrowserSettingsSyncManager(context: Context) {
             SyncResult.NotAuthorized -> result
         }
     }
+
+    private fun controlFingerprint(
+        settings: BrowserSettings,
+        tabSession: RestoredTabSession
+    ): String = SyncPayloadFingerprint.of(
+        BrowserDataSyncCodec.encode(
+            settings = settings.copy(
+                customWallpaperUri = null,
+                darkCustomWallpaperUri = null
+            ),
+            history = emptyList(),
+            bookmarks = emptyList(),
+            quickLinks = emptyList(),
+            tabSession = tabSession
+        )
+    )
 
     private fun mergeHistory(local: List<HistoryItem>, remote: List<HistoryItem>): List<HistoryItem> =
         (local + remote)
@@ -286,6 +337,7 @@ internal class BrowserSettingsSyncManager(context: Context) {
         const val KEY_DEVICE_ID = "device_id"
         const val KEY_REVISION = "revision"
         const val KEY_LAST_SYNC_AT = "last_sync_at"
+        const val KEY_LAST_SYNCED_CONTROL_HASH = "last_synced_control_hash_v1"
         const val MAX_HISTORY_ITEMS = 1000
         const val MAX_BOOKMARKS = 5000
         const val MAX_QUICK_LINKS = 12

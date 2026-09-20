@@ -26,7 +26,7 @@ ILYRO is an independent Android browser built with Kotlin, Jetpack Compose, and 
 - ARM64 release APK
 - Kotlin 2.4.20
 - Jetpack Compose BOM 2026.08.00
-- GeckoView Nightly 158, pinned to build `158.0.20260911092915`
+- GeckoView stable 155, pinned to build `155.0.20260903215306`
 - Android Gradle Plugin 9.4
 - Gradle 9.6
 

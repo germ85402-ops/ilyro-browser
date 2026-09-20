@@ -1,6 +1,7 @@
 package com.ilyro.browser.sync
 
 import android.content.Context
+import androidx.work.BackoffPolicy
 import androidx.work.Configuration
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -28,6 +29,22 @@ internal object BrowserAutoSyncScheduler {
         context.applicationContext
             .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .getString(KEY_LAST_ERROR, null)
+
+    fun recordWorkerFailure(context: Context, message: String?) {
+        context.applicationContext
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .putString(KEY_LAST_ERROR, message?.trim()?.take(240) ?: "Automatic sync failed")
+            .apply()
+    }
+
+    fun recordWorkerSuccess(context: Context) {
+        context.applicationContext
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit()
+            .remove(KEY_LAST_ERROR)
+            .apply()
+    }
 
     suspend fun setEnabled(context: Context, enabled: Boolean): Boolean =
         withContext(Dispatchers.Default) {
@@ -107,6 +124,11 @@ internal object BrowserAutoSyncScheduler {
             TimeUnit.HOURS
         )
             .setConstraints(constraints)
+            .setBackoffCriteria(
+                BackoffPolicy.EXPONENTIAL,
+                30L,
+                TimeUnit.SECONDS
+            )
             .build()
 
         workManager(context).enqueueUniquePeriodicWork(

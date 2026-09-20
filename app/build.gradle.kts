@@ -82,7 +82,8 @@ dependencies {
     implementation("com.google.android.libraries.identity.googleid:googleid:1.2.0")
     implementation("com.google.android.gms:play-services-auth:21.5.0")
     implementation("androidx.work:work-runtime-ktx:2.11.2")
-    implementation("org.mozilla.geckoview:geckoview-nightly:158.0.20260911092915")
+    // Stable GeckoView release published by Mozilla's Maven repository.
+    implementation("org.mozilla.geckoview:geckoview:155.0.20260903215306")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20260814")
     androidTestImplementation("androidx.test:core:1.7.0")

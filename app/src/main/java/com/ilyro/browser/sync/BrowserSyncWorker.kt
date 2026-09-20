@@ -16,14 +16,32 @@ class BrowserSyncWorker(
         }
 
         val account = GoogleAccountManager(applicationContext).currentProfile()
-            ?: return Result.success()
+            ?: run {
+                BrowserAutoSyncScheduler.recordWorkerFailure(
+                    applicationContext,
+                    "Google account is not signed in."
+                )
+                return Result.failure()
+            }
 
         val authorization = GoogleDriveAuthorizationManager(applicationContext)
             .authorize(account.email)
         val accessToken = when (authorization) {
             is DriveAuthorizationResult.Authorized -> authorization.accessToken
-            is DriveAuthorizationResult.ResolutionRequired -> return Result.retry()
-            is DriveAuthorizationResult.Failure -> return Result.retry()
+            is DriveAuthorizationResult.ResolutionRequired -> {
+                BrowserAutoSyncScheduler.recordWorkerFailure(
+                    applicationContext,
+                    "Google Drive authorization is required."
+                )
+                return Result.failure()
+            }
+            is DriveAuthorizationResult.Failure -> {
+                BrowserAutoSyncScheduler.recordWorkerFailure(
+                    applicationContext,
+                    authorization.message ?: "Google Drive authorization failed."
+                )
+                return Result.failure()
+            }
         }
 
         val browserPrefs = applicationContext.getSharedPreferences(
@@ -31,15 +49,29 @@ class BrowserSyncWorker(
             Context.MODE_PRIVATE
         )
         val settings = BrowserSettingsStore.restore(browserPrefs)
-        return when (
-            BrowserSettingsSyncManager(applicationContext).sync(
-                settings = settings,
-                provider = GoogleDriveSyncProvider(accessToken)
-            )
-        ) {
-            is SyncResult.Success -> Result.success()
-            is SyncResult.NotAuthorized -> return Result.retry()
-            is SyncResult.Failure -> Result.retry()
+        val syncResult = BrowserSettingsSyncManager(applicationContext).sync(
+            settings = settings,
+            provider = GoogleDriveSyncProvider(accessToken)
+        )
+        return when (syncResult) {
+            is SyncResult.Success -> {
+                BrowserAutoSyncScheduler.recordWorkerSuccess(applicationContext)
+                Result.success()
+            }
+            is SyncResult.NotAuthorized -> {
+                BrowserAutoSyncScheduler.recordWorkerFailure(
+                    applicationContext,
+                    "Google Drive authorization expired."
+                )
+                Result.failure()
+            }
+            is SyncResult.Failure -> {
+                BrowserAutoSyncScheduler.recordWorkerFailure(
+                    applicationContext,
+                    syncResult.message ?: "Automatic sync failed."
+                )
+                if (syncResult.recoverable) Result.retry() else Result.failure()
+            }
         }
     }
 }

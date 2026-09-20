@@ -30,9 +30,11 @@ class GoogleDriveSyncProvider(
                 url = "$DRIVE_API/files/${latest.id}?alt=media"
             )
             if (!response.isSuccessful) {
-                return@withContext response.asFailure()
+                return@withContext response.asSyncResult()
             }
             SyncResult.Success(SyncSnapshotCodec.decode(response.body))
+        } catch (error: DriveApiException) {
+            error.toSyncResult()
         } catch (error: Exception) {
             SyncResult.Failure(error.message)
         }
@@ -57,7 +59,7 @@ class GoogleDriveSyncProvider(
                 contentType = "multipart/related; boundary=$boundary"
             )
             if (!response.isSuccessful) {
-                return@withContext response.asFailure()
+                return@withContext response.asSyncResult()
             }
 
             // The new snapshot is already safely stored. Old duplicates can now be removed.
@@ -68,6 +70,8 @@ class GoogleDriveSyncProvider(
                 )
             }
             SyncResult.Success(Unit)
+        } catch (error: DriveApiException) {
+            error.toSyncResult()
         } catch (error: Exception) {
             SyncResult.Failure(error.message)
         }
@@ -82,10 +86,15 @@ class GoogleDriveSyncProvider(
                     url = "$DRIVE_API/files/${file.id}"
                 )
                 if (!response.isSuccessful && firstFailure == null) {
+                    if (response.code == HttpURLConnection.HTTP_UNAUTHORIZED) {
+                        return@withContext SyncResult.NotAuthorized
+                    }
                     firstFailure = response.asFailure()
                 }
             }
             firstFailure ?: SyncResult.Success(Unit)
+        } catch (error: DriveApiException) {
+            error.toSyncResult()
         } catch (error: Exception) {
             SyncResult.Failure(error.message)
         }
@@ -94,24 +103,39 @@ class GoogleDriveSyncProvider(
     private fun listFiles(): List<RemoteFile> {
         val query = "name='$FILE_NAME' and trashed=false"
         val encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8.name())
-        val encodedFields = URLEncoder.encode("files(id,modifiedTime)", StandardCharsets.UTF_8.name())
-        val response = requestBlocking(
-            method = "GET",
-            url = "$DRIVE_API/files?spaces=appDataFolder&q=$encodedQuery&orderBy=modifiedTime%20desc&pageSize=100&fields=$encodedFields"
+        val encodedFields = URLEncoder.encode(
+            "nextPageToken,files(id,modifiedTime)",
+            StandardCharsets.UTF_8.name()
         )
-        if (!response.isSuccessful) {
-            throw DriveApiException(response.code, response.body)
-        }
-
-        val files = JSONObject(response.body).optJSONArray("files") ?: return emptyList()
+        var pageToken: String? = null
         return buildList {
-            for (index in 0 until files.length()) {
-                val item = files.getJSONObject(index)
-                val fileId = item.optString("id")
-                if (fileId.isNotBlank()) {
-                    add(RemoteFile(fileId))
+            do {
+                val encodedPageToken = pageToken
+                    ?.let { URLEncoder.encode(it, StandardCharsets.UTF_8.name()) }
+                val pageParameter = encodedPageToken?.let { "&pageToken=$it" }.orEmpty()
+                val response = requestBlocking(
+                    method = "GET",
+                    url = "$DRIVE_API/files?spaces=appDataFolder&q=$encodedQuery" +
+                        "&orderBy=modifiedTime%20desc&pageSize=100&fields=$encodedFields$pageParameter"
+                )
+                if (!response.isSuccessful) {
+                    throw DriveApiException(response.code, response.body)
                 }
-            }
+
+                val root = JSONObject(response.body)
+                val files = root.optJSONArray("files")
+                if (files != null) {
+                    for (index in 0 until files.length()) {
+                        val item = files.getJSONObject(index)
+                        val fileId = item.optString("id")
+                        if (fileId.isNotBlank()) {
+                            add(RemoteFile(fileId))
+                        }
+                    }
+                }
+                pageToken = root.optString("nextPageToken")
+                    .takeIf { it.isNotBlank() }
+            } while (pageToken != null)
         }
     }
 
@@ -179,11 +203,28 @@ class GoogleDriveSyncProvider(
             message = "Google Drive API error $code${body.takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty()}",
             recoverable = code == 401 || code == 403 || code == 429 || code >= 500
         )
+
+        fun asSyncResult(): SyncResult<Nothing> =
+            if (code == HttpURLConnection.HTTP_UNAUTHORIZED) {
+                SyncResult.NotAuthorized
+            } else {
+                asFailure()
+            }
     }
 
-    private class DriveApiException(code: Int, body: String) : RuntimeException(
+    private class DriveApiException(val code: Int, body: String) : RuntimeException(
         "Google Drive API error $code${body.takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty()}"
-    )
+    ) {
+        fun toSyncResult(): SyncResult<Nothing> =
+            if (code == HttpURLConnection.HTTP_UNAUTHORIZED) {
+                SyncResult.NotAuthorized
+            } else {
+                SyncResult.Failure(
+                    message = message,
+                    recoverable = code == 403 || code == 429 || code >= 500
+                )
+            }
+        }
 
     private companion object {
         const val DRIVE_API = "https://www.googleapis.com/drive/v3"

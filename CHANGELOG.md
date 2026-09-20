@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Protect local settings and open tabs from being silently overwritten when another device changes them at the same time.
+- Show background sync failures, retry recoverable errors with exponential backoff, and add a confirmed action to delete the Google Drive backup.
+- Move the browser engine from GeckoView Nightly to Mozilla's stable GeckoView 155 release.
+
 ## 0.26.0-rc1 — release candidate
 
 First 0.26 release candidate. This cycle adds a first-party password manager and browser-data migration tools, with device-tested save/autofill flows and a final migration UI polish pass.
