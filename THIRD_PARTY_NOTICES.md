@@ -20,8 +20,11 @@ Mozilla trademarks are not granted by the MPL. ILYRO is independent and is not p
 The build pipeline downloads and bundles uBlock Origin 1.74.0, verifies its SHA-256 digest, and applies a minimal ILYRO GeckoView bridge.
 
 - Upstream: https://github.com/gorhill/uBlock
+- Exact upstream release: https://github.com/gorhill/uBlock/releases/tag/1.74.0
+- Upstream release commit: `6dd2d95`
 - License: GNU General Public License v3.0
-- Bundled source package: https://addons.mozilla.org/firefox/addon/ublock-origin/
+- Bundled Firefox package: https://addons.mozilla.org/firefox/addon/ublock-origin/
+- ILYRO modifications are reproducible from `scripts/prepare_ublock.py` and `app/src/main/ubo/ilyro-native-bridge.js`.
 
 uBlock Origin filter lists and other assets may carry separate licenses. Their notices and source information must be preserved as required.
 
@@ -30,8 +33,10 @@ uBlock Origin filter lists and other assets may carry separate licenses. Their n
 The build pipeline downloads and bundles Dark Reader 4.9.132, verifies its SHA-256 digest, and assigns an ILYRO-specific Gecko add-on ID.
 
 - Upstream: https://github.com/darkreader/darkreader
+- Exact upstream release: https://github.com/darkreader/darkreader/releases/tag/v4.9.132
 - License: MIT
 - Pinned package: `darkreader-firefox.xpi` from release `v4.9.132`
+- ILYRO's add-on-ID rewrite is reproducible from `scripts/prepare_darkreader.py`.
 
 ## AndroidX and Jetpack Compose
 

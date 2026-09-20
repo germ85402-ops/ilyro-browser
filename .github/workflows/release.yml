@@ -134,6 +134,8 @@ jobs:
           mkdir -p dist
           name="ILYRO-${{ steps.version.outputs.version }}-arm64.apk"
           cp app/build/outputs/apk/release/app-release.apk "dist/$name"
+          cp LICENSE dist/LICENSE
+          cp THIRD_PARTY_NOTICES.md dist/THIRD_PARTY_NOTICES.md
           (cd dist && sha256sum "$name" > "$name.sha256")
           gradle :app:dependencies --configuration releaseRuntimeClasspath > dist/release-dependencies.txt
 

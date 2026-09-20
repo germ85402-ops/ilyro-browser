@@ -62,9 +62,10 @@ jobs:
           set +e
           gradle :app:lintDebug --stacktrace
           lint_status=$?
-          if [ -f app/build/reports/lint-results-debug.txt ]; then
+          lint_report="$(find app/build -type f -name 'lint-results-debug.txt' -print -quit)"
+          if [ -n "$lint_report" ]; then
             echo "::group::Android lint report"
-            cat app/build/reports/lint-results-debug.txt
+            cat "$lint_report"
             echo "::endgroup::"
           fi
           exit "$lint_status"
