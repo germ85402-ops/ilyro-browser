@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.26.0-rc3 — release candidate
+
+- Add a page-level YouTube fallback powered by the Android yt-dlp wrapper when GeckoView does not expose signed media subrequests to the bundled detector.
+- Resolve public YouTube video metadata from the current page and download adaptive video/audio streams with local FFmpeg merging.
+- Keep the existing direct media detector as the fast path and add cancellation-aware extraction progress in the downloads screen.
+
 ## 0.26.0-rc2 — release candidate
 
 - Complete the production-readiness pass for Google account synchronization without changing the existing OAuth client, package identity, signing identity, or Drive app-data scope.
