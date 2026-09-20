@@ -72,8 +72,7 @@ internal fun loadReaderArticle(
 ) {
     val mainHandler = Handler(Looper.getMainLooper())
     val options = PageExtractionController.ContentParams(
-        true,  // remove boilerplate with Gecko's reader extraction
-        false  // keep markdown annotations; existing cleanup below handles them
+        true // remove boilerplate with Gecko's reader extraction
     )
     session.sessionPageExtractor.getPageContent(options).accept(
         { content ->
