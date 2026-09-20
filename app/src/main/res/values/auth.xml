@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Public OAuth Web client ID used by Credential Manager for Sign in with Google. -->
+    <string name="google_web_client_id" translatable="false">712241617042-jcl5a3u01tpe0h4gnsg234d8ls0rgs6t.apps.googleusercontent.com</string>
+</resources>

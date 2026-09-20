@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Reserve the adaptive layer's 18/108 overscan plus an 8/72 visible inset.
+     Fractions keep the artwork stable at launcher, menu and recents sizes. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/ilyro_pink_light"
+    android:insetLeft="24.074074%"
+    android:insetTop="24.074074%"
+    android:insetRight="24.074074%"
+    android:insetBottom="24.074074%" />

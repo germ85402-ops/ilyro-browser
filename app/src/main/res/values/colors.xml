@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ilyro_icon_background">#FFFFFF</color>
+    <color name="ilyro_deer_icon_background">#020B1B</color>
+    <color name="ilyro_monochrome_icon_background">#050505</color>
+</resources>

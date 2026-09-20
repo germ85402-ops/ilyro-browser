@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ILYRO" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowDisablePreview">true</item>
+        <item name="android:windowBackground">#F4F6F8</item>
+    </style>
+
+    <style name="Theme.ILYRO.Starting" parent="Theme.SplashScreen">
+        <item name="android:windowDisablePreview">true</item>
+        <item name="windowSplashScreenBackground">#FBFCFE</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ilyro_logo_deer</item>
+        <item name="windowSplashScreenAnimationDuration">170</item>
+        <item name="postSplashScreenTheme">@style/Theme.ILYRO</item>
+    </style>
+
+    <style name="Theme.ILYRO.Starting.Deer" parent="Theme.SplashScreen">
+        <item name="android:windowDisablePreview">true</item>
+        <item name="windowSplashScreenBackground">#020B1B</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_deer</item>
+        <item name="windowSplashScreenAnimationDuration">170</item>
+        <item name="postSplashScreenTheme">@style/Theme.ILYRO</item>
+    </style>
+
+    <style name="Theme.ILYRO.Starting.Classic" parent="Theme.SplashScreen">
+        <item name="android:windowDisablePreview">true</item>
+        <item name="windowSplashScreenBackground">#FFFFFF</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="windowSplashScreenAnimationDuration">170</item>
+        <item name="postSplashScreenTheme">@style/Theme.ILYRO</item>
+    </style>
+
+    <style name="Theme.ILYRO.Starting.Monochrome" parent="Theme.SplashScreen">
+        <item name="android:windowDisablePreview">true</item>
+        <item name="windowSplashScreenBackground">#050505</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_monochrome</item>
+        <item name="windowSplashScreenAnimationDuration">170</item>
+        <item name="postSplashScreenTheme">@style/Theme.ILYRO</item>
+    </style>
+
+    <style name="Theme.ILYRO.Starting.PinkLight" parent="Theme.SplashScreen">
+        <item name="android:windowDisablePreview">true</item>
+        <item name="windowSplashScreenBackground">#FFFFFF</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_pink_light</item>
+        <item name="windowSplashScreenAnimationDuration">170</item>
+        <item name="postSplashScreenTheme">@style/Theme.ILYRO</item>
+    </style>
+
+    <style name="Theme.ILYRO.Starting.PinkDark" parent="Theme.SplashScreen">
+        <item name="android:windowDisablePreview">true</item>
+        <item name="windowSplashScreenBackground">#000000</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_pink_dark</item>
+        <item name="windowSplashScreenAnimationDuration">170</item>
+        <item name="postSplashScreenTheme">@style/Theme.ILYRO</item>
+    </style>
+</resources>

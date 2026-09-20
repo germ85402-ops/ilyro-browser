@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#080a0f" />
+    <meta
+      name="description"
+      content="ILYRO — современный Android-браузер на Mozilla GeckoView с защитой, гибкой настройкой и вниманием к деталям."
+    />
+    <meta property="og:title" content="ILYRO — браузер в твоём ритме" />
+    <meta
+      property="og:description"
+      content="Современный GeckoView-браузер для Android: быстро, гибко и без лишнего шума."
+    />
+    <meta property="og:type" content="website" />
+    <title>ILYRO — браузер в твоём ритме</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+    <script>
+      document.documentElement.classList.add('js');
+    </script>
+  </head>
+  <body>
+    <div class="site-noise" aria-hidden="true"></div>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+
+    <header class="site-header" id="top">
+      <div class="header-inner">
+        <a class="brand" href="#top" aria-label="ILYRO, на главную">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 48 48" role="img">
+              <path d="M24 38.9c-4.4-1.4-7.5-5.2-7.5-10.1 0-3.6 1.4-6.6 4-8.9-2.7-3.4-3.4-7-1.8-10.7 2.1 1.2 3.9 2.8 5.3 4.9 1.4-2.1 3.2-3.7 5.3-4.9 1.6 3.7.9 7.3-1.8 10.7 2.6 2.3 4 5.3 4 8.9 0 4.9-3.1 8.7-7.5 10.1Z" />
+              <path class="mark-line" d="M20.7 12.7 16 8.4l-3.2-4.2M27.3 12.7 32 8.4l3.2-4.2M16 8.4l.2-4.8M32 8.4l-.2-4.8" />
+              <path class="mark-cut" d="M20.5 25.2c1.1 1.2 2.3 1.8 3.5 1.8s2.4-.6 3.5-1.8" />
+            </svg>
+          </span>
+          <span class="brand-name">ILYRO</span>
+        </a>
+
+        <nav class="main-nav" id="main-nav" aria-label="Основная навигация">
+          <a href="#features">Возможности</a>
+          <a href="#experience">Интерфейс</a>
+          <a href="#privacy">Приватность</a>
+          <a href="#download">Проект</a>
+        </nav>
+
+        <div class="header-actions">
+          <button class="icon-button theme-toggle" id="theme-toggle" type="button" aria-label="Включить светлую тему">
+            <svg class="icon icon-sun" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="3.6"></circle>
+              <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path>
+            </svg>
+            <svg class="icon icon-moon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M20.3 15.1A8.6 8.6 0 0 1 8.9 3.7 8.6 8.6 0 1 0 20.3 15.1Z"></path>
+            </svg>
+          </button>
+          <a class="header-cta" href="#download">Открыть проект <span aria-hidden="true">↗</span></a>
+          <button class="icon-button menu-toggle" id="menu-toggle" type="button" aria-label="Открыть меню" aria-expanded="false" aria-controls="main-nav">
+            <span></span><span></span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero section-shell reveal" aria-labelledby="hero-title">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="eyebrow-dot"></span> GeckoView · Android · 0.25 RC</div>
+          <h1 id="hero-title">Интернет,<br /><span>в твоём ритме.</span></h1>
+          <p class="hero-lead">
+            ILYRO — браузер для Android, который оставляет главное: быстрый Gecko-движок, контроль над интерфейсом и спокойный серфинг без лишнего шума.
+          </p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#download">Посмотреть проект <span aria-hidden="true">↗</span></a>
+            <a class="button button-quiet" href="https://github.com/germ85402-ops/ilyro-browser-new" target="_blank" rel="noreferrer">GitHub <span aria-hidden="true">↗</span></a>
+          </div>
+          <div class="hero-meta" aria-label="Ключевые характеристики">
+            <span><i></i> GeckoView, не WebView</span>
+            <span><i></i> uBlock Origin</span>
+            <span><i></i> Android 16 ready</span>
+          </div>
+        </div>
+
+        <div class="hero-visual" aria-label="Макет интерфейса браузера ILYRO">
+          <div class="hero-glow hero-glow-left" aria-hidden="true"></div>
+          <div class="hero-glow hero-glow-right" aria-hidden="true"></div>
+          <div class="browser-device">
+            <div class="device-topline">
+              <div class="window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+              <span class="device-label">ILYRO / BROWSER</span>
+              <span class="device-signal">● 100%</span>
+            </div>
+            <div class="browser-tabs" role="tablist" aria-label="Открытые вкладки">
+              <button class="browser-tab is-active" type="button" role="tab" aria-selected="true" data-tab="start"><span class="tab-favicon">I</span><span>New tab</span><b>×</b></button>
+              <button class="browser-tab" type="button" role="tab" aria-selected="false" data-tab="video"><span class="tab-favicon tab-favicon-blue">▶</span><span>Video</span><b>×</b></button>
+              <button class="browser-tab-add" type="button" aria-label="Новая вкладка">+</button>
+            </div>
+            <div class="browser-toolbar">
+              <button class="toolbar-icon" type="button" aria-label="Назад">‹</button>
+              <button class="toolbar-icon toolbar-icon-muted" type="button" aria-label="Вперёд">›</button>
+              <div class="omnibox"><span class="lock-icon" aria-hidden="true">⌁</span><span id="address-text">ilyro.dev</span><span class="omnibox-star" aria-hidden="true">☆</span></div>
+              <button class="toolbar-icon" type="button" aria-label="Меню">•••</button>
+            </div>
+            <div class="browser-page" id="browser-page">
+              <div class="page-orbit page-orbit-one" aria-hidden="true"></div>
+              <div class="page-orbit page-orbit-two" aria-hidden="true"></div>
+              <div class="page-topline"><span>ILYRO / START</span><span class="private-label"><i></i> PRIVATE TAB</span></div>
+              <div class="page-content">
+                <div class="page-kicker" id="mockup-kicker">A CALMER WAY TO BROWSE</div>
+                <h2 id="mockup-title">Всё нужное.<br /><em>Ничего лишнего.</em></h2>
+                <p id="mockup-copy">Твои вкладки, загрузки и настройки — собраны вокруг реального использования.</p>
+                <div class="mockup-cards">
+                  <div class="mockup-card mockup-card-main"><span class="mockup-card-icon">◒</span><span>Focus mode</span><strong>On</strong></div>
+                  <div class="mockup-card"><span class="mockup-card-icon icon-purple">↯</span><span>Blocked today</span><strong>1,248</strong></div>
+                </div>
+              </div>
+              <div class="browser-bottomline"><span>Secure connection</span><span>3 tabs open</span></div>
+            </div>
+          </div>
+          <div class="floating-card floating-shield"><span class="floating-icon">⌁</span><div><strong>ILYRO Shield</strong><small>Protection is active</small></div><span class="status-pill">ON</span></div>
+          <div class="floating-card floating-tabs"><span class="floating-number">03</span><div><strong>Live tabs</strong><small>Ready when you are</small></div></div>
+        </div>
+      </section>
+
+      <section class="signal-band section-shell reveal" aria-label="Технологическая база">
+        <span class="signal-title">Собран на базе</span>
+        <div class="signal-items">
+          <span><b>GECKOVIEW</b><small>154 stable</small></span>
+          <span><b>JETPACK COMPOSE</b><small>Native Android UI</small></span>
+          <span><b>UBLOCK ORIGIN</b><small>Built-in protection</small></span>
+          <span><b>ARM64</b><small>Release builds</small></span>
+        </div>
+      </section>
+
+      <section class="content-section section-shell reveal" id="features" aria-labelledby="features-title">
+        <div class="section-heading">
+          <div>
+            <div class="eyebrow"><span class="eyebrow-dot"></span> Возможности</div>
+            <h2 id="features-title">Собран вокруг<br /><span>реального использования.</span></h2>
+          </div>
+          <p>Не набор громких обещаний, а функции, которые ощущаются каждый день: от вкладок и загрузок до плавного видео и своего порядка на экране.</p>
+        </div>
+        <div class="feature-grid">
+          <article class="feature-card feature-card-wide">
+            <div class="feature-number">01</div>
+            <div class="feature-icon feature-icon-blue">⌁</div>
+            <h3>Полноценный Gecko</h3>
+            <p>Mozilla GeckoView вместо WebView — для настоящей совместимости с современным интернетом.</p>
+            <div class="feature-visual engine-visual" aria-hidden="true"><span class="engine-line line-one"></span><span class="engine-line line-two"></span><span class="engine-line line-three"></span><span class="engine-core">GECKO</span></div>
+          </article>
+          <article class="feature-card">
+            <div class="feature-number">02</div>
+            <div class="feature-icon feature-icon-purple">◈</div>
+            <h3>Тише и безопаснее</h3>
+            <p>Встроенная поддержка uBlock Origin и отдельные приватные сессии для личных задач.</p>
+            <div class="mini-stat"><strong>1,248</strong><span>элементов заблокировано</span></div>
+          </article>
+          <article class="feature-card">
+            <div class="feature-number">03</div>
+            <div class="feature-icon feature-icon-pink">▤</div>
+            <h3>Вкладки, которые помнят</h3>
+            <p>История, прокрутка, масштаб и состояние форм возвращаются вместе с сессией.</p>
+            <div class="tab-stack" aria-hidden="true"><span>Work</span><span>Watch later</span><span>New tab</span></div>
+          </article>
+          <article class="feature-card feature-card-dark">
+            <div class="feature-number">04</div>
+            <div class="feature-icon feature-icon-white">◉</div>
+            <h3>Видео без лишнего</h3>
+            <p>Fullscreen, Picture-in-Picture и оптимизации для медиа, когда экран должен работать на тебя.</p>
+            <div class="play-orbit" aria-hidden="true"><span>▶</span></div>
+          </article>
+          <article class="feature-card feature-card-wide feature-card-downloads">
+            <div class="feature-number">05</div>
+            <div class="feature-icon feature-icon-cyan">↓</div>
+            <h3>Загрузки под контролем</h3>
+            <p>Прогресс, пауза и продолжение, уведомления Android и проверка файлов — без серых экранов и потерянных загрузок.</p>
+            <div class="download-progress" aria-hidden="true"><span></span><em>78%</em></div>
+          </article>
+          <article class="feature-card">
+            <div class="feature-number">06</div>
+            <div class="feature-icon feature-icon-yellow">✦</div>
+            <h3>Твой порядок</h3>
+            <p>Темы, обои, положение адресной строки и набор иконок — интерфейс подстраивается под тебя.</p>
+            <div class="theme-dots" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="experience-section section-shell reveal" id="experience" aria-labelledby="experience-title">
+        <div class="experience-visual">
+          <div class="experience-backdrop" aria-hidden="true"></div>
+          <div class="tablet-frame">
+            <div class="tablet-toolbar"><span class="tablet-brand">ILYRO</span><span class="tablet-address">search or enter address</span><span class="tablet-menu">•••</span></div>
+            <div class="tablet-tabs"><span class="tablet-tab-active">New tab</span><span>Design reference</span><span>+ New tab</span></div>
+            <div class="tablet-body">
+              <div class="tablet-copy"><small>QUICK ACTIONS / PERSONAL</small><h3>Твой браузер,<br /><span>твоё пространство.</span></h3><p>Короткий путь к тому, что ты открываешь чаще всего.</p></div>
+              <div class="quick-actions" aria-hidden="true"><span>Bookmarks</span><span>Downloads</span><span>History</span><span>Shield</span></div>
+            </div>
+            <div class="tablet-bottom"><span>◀</span><span>Home</span><span>Tabs 03</span><span>⋮</span></div>
+          </div>
+          <div class="control-chip control-chip-top"><span class="chip-dot"></span> Quick menu</div>
+          <div class="control-chip control-chip-bottom">Swipe down to close <span>↓</span></div>
+        </div>
+        <div class="experience-copy">
+          <div class="eyebrow"><span class="eyebrow-dot"></span> Интерфейс</div>
+          <h2 id="experience-title">Одинаково удобно<br /><span>на телефоне и планшете.</span></h2>
+          <p>ILYRO развивается не только вокруг движка. Мы собираем браузер так, чтобы адресная строка, вкладки и быстрые действия оставались понятными на маленьком экране и раскрывались на большом.</p>
+          <div class="experience-list">
+            <div><span>01</span><p><strong>Компактная навигация</strong><small>Главное всегда под большим пальцем.</small></p></div>
+            <div><span>02</span><p><strong>Настраиваемая оболочка</strong><small>Панели, темы и фон без жёстких рамок.</small></p></div>
+            <div><span>03</span><p><strong>Живые вкладки</strong><small>Быстрое переключение и восстановление сессии.</small></p></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="privacy-section section-shell reveal" id="privacy" aria-labelledby="privacy-title">
+        <div class="privacy-panel">
+          <div class="privacy-copy">
+            <div class="eyebrow eyebrow-light"><span class="eyebrow-dot"></span> Спокойный интернет</div>
+            <h2 id="privacy-title">Контроль —<br /><span>по умолчанию в руках.</span></h2>
+            <p>Приватные вкладки с отдельной сессией, локальные настройки и блокировка контента помогают оставить браузер своим личным пространством.</p>
+            <a class="text-link" href="https://github.com/germ85402-ops/ilyro-browser-new/blob/main/PRIVACY.md" target="_blank" rel="noreferrer">Читать о приватности <span aria-hidden="true">↗</span></a>
+          </div>
+          <div class="privacy-orbit" aria-hidden="true">
+            <div class="orbit-ring orbit-ring-one"></div><div class="orbit-ring orbit-ring-two"></div><div class="orbit-ring orbit-ring-three"></div>
+            <div class="privacy-core"><span>⌁</span><small>ILYRO<br />SHIELD</small></div>
+            <span class="orbit-label orbit-label-one">Private session</span><span class="orbit-label orbit-label-two">Content control</span><span class="orbit-label orbit-label-three">Your settings</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="project-section section-shell reveal" id="download" aria-labelledby="project-title">
+        <div class="project-kicker">ILYRO / OPEN PROJECT</div>
+        <h2 id="project-title">Это только<br /><span>первая версия.</span></h2>
+        <p>Сайт будет расти вместе с браузером: добавим реальные скриншоты, страницу загрузок, changelog и больше деталей о том, как устроен ILYRO.</p>
+        <div class="project-actions">
+          <a class="button button-primary" href="https://github.com/germ85402-ops/ilyro-browser-new" target="_blank" rel="noreferrer">Открыть GitHub <span aria-hidden="true">↗</span></a>
+          <a class="button button-outline" href="https://github.com/germ85402-ops/ilyro-browser-new/releases" target="_blank" rel="noreferrer">Релизы и APK <span aria-hidden="true">↗</span></a>
+        </div>
+        <div class="project-footnote"><span class="status-dot"></span> Основа сайта готова к следующему этапу</div>
+      </section>
+    </main>
+
+    <footer class="site-footer section-shell">
+      <a class="brand footer-brand" href="#top" aria-label="ILYRO, наверх"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 38.9c-4.4-1.4-7.5-5.2-7.5-10.1 0-3.6 1.4-6.6 4-8.9-2.7-3.4-3.4-7-1.8-10.7 2.1 1.2 3.9 2.8 5.3 4.9 1.4-2.1 3.2-3.7 5.3-4.9 1.6 3.7.9 7.3-1.8 10.7 2.6 2.3 4 5.3 4 8.9 0 4.9-3.1 8.7-7.5 10.1Z" /><path class="mark-line" d="M20.7 12.7 16 8.4l-3.2-4.2M27.3 12.7 32 8.4l3.2-4.2M16 8.4l.2-4.8M32 8.4l-.2-4.8" /><path class="mark-cut" d="M20.5 25.2c1.1 1.2 2.3 1.8 3.5 1.8s2.4-.6 3.5-1.8" /></svg></span><span class="brand-name">ILYRO</span></a>
+      <div class="footer-links"><a href="https://github.com/germ85402-ops/ilyro-browser-new" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/germ85402-ops/ilyro-browser-new/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Changelog</a><a href="https://github.com/germ85402-ops/ilyro-browser-new/blob/main/PRIVACY.md" target="_blank" rel="noreferrer">Privacy</a></div>
+      <div class="footer-copy">© <span id="year"></span> ILYRO. Built for Android.</div>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>

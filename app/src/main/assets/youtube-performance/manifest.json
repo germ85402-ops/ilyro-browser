@@ -1,0 +1,21 @@
+{
+  "manifest_version": 2,
+  "name": "ILYRO YouTube Performance",
+  "version": "1.0.1",
+  "description": "Smooths YouTube rendering and removes oversized Community/Post feed cards.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "youtube-performance@ilyro"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://www.youtube.com/*",
+        "*://m.youtube.com/*"
+      ],
+      "css": ["youtube-performance.css"],
+      "run_at": "document_start"
+    }
+  ]
+}

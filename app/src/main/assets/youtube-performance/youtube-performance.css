@@ -1,0 +1,25 @@
+/*
+ * ILYRO YouTube Performance Mode
+ *
+ * Gecko/WebRender has known scroll-jank cases when backdrop-filter is used
+ * on large/fixed YouTube surfaces. Disable only that expensive visual effect
+ * on YouTube; layout, video playback, interaction and other sites are untouched.
+ */
+html *,
+body * {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+
+/* ILYRO: hide oversized Community/Post feed cards. */
+/* Video and Shorts renderers are intentionally not matched. */
+ytm-post-renderer,
+ytm-backstage-post-renderer,
+ytm-rich-item-renderer:has(ytm-post-renderer),
+ytd-post-renderer,
+ytd-backstage-post-thread-renderer,
+ytd-rich-item-renderer:has(ytd-post-renderer),
+ytd-rich-item-renderer:has(ytd-backstage-post-thread-renderer) {
+    display: none !important;
+}

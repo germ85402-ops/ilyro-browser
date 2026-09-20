@@ -1,0 +1,33 @@
+{
+  "manifest_version": 2,
+  "name": "ILYRO Media Detector",
+  "version": "1.0.2",
+  "applications": {
+    "gecko": {
+      "id": "media-detector@ilyro"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "exclude_matches": [
+        "*://youtube.com/*",
+        "*://*.youtube.com/*",
+        "*://youtu.be/*",
+        "*://*.youtu.be/*"
+      ],
+      "js": [
+        "detector.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "permissions": [
+    "nativeMessaging",
+    "nativeMessagingFromContent",
+    "geckoViewAddons"
+  ]
+}
