@@ -95,7 +95,7 @@ internal fun MediaSheet(
                                 "Latest stream · checking quality",
                                 "Последний поток · определяю качество"
                             )
-                            latestMedia?.height ?: 0 > 0 -> tr(
+                            (latestMedia?.height ?: 0) > 0 -> tr(
                                 "Latest detected stream · ${latestMedia?.qualityLabel.orEmpty()}",
                                 "Последний обнаруженный поток · ${latestMedia?.qualityLabel.orEmpty()}"
                             )
