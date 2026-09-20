@@ -1174,7 +1174,18 @@ internal class DownloadController(
             val sampleTime = extractor.sampleTime
             if (sampleTime < 0L) break
 
-            info.set(0, size, sampleTime, extractor.sampleFlags)
+            val extractorFlags = extractor.sampleFlags
+            if (extractorFlags and MediaExtractor.SAMPLE_FLAG_ENCRYPTED != 0) {
+                error("Encrypted YouTube media tracks cannot be muxed")
+            }
+            var codecFlags = 0
+            if (extractorFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) {
+                codecFlags = codecFlags or MediaCodec.BUFFER_FLAG_KEY_FRAME
+            }
+            if (extractorFlags and MediaExtractor.SAMPLE_FLAG_PARTIAL_FRAME != 0) {
+                codecFlags = codecFlags or MediaCodec.BUFFER_FLAG_PARTIAL_FRAME
+            }
+            info.set(0, size, sampleTime, codecFlags)
             muxer.writeSampleData(outputTrack, buffer, info)
             extractor.advance()
         }
