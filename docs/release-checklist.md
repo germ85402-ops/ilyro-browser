@@ -5,6 +5,7 @@ Use this checklist before publishing a public release or release candidate.
 ## Repository
 
 - [ ] Android CI is green for the code revision being released.
+- [ ] The Gradle Wrapper JAR/distribution validation passes with the pinned Gradle version and checksum.
 - [ ] Only intended long-lived branches and workflows remain.
 - [ ] No APKs, keystores, signing passwords, local.properties, service-account files, or other private build material are committed.
 - [ ] Commit metadata is suitable for a public repository (use a GitHub noreply address if the maintainer's personal email should remain private).

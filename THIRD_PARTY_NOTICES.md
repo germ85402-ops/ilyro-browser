@@ -48,7 +48,7 @@ ILYRO uses Google Identity, Credential Manager, and Google Play Services authent
 
 ## Kotlin and build tooling
 
-ILYRO is written in Kotlin and built with the Android Gradle Plugin and Gradle. Build-time and runtime components may contain additional third-party notices.
+ILYRO is written in Kotlin and built with the Android Gradle Plugin and Gradle. The repository includes the official Gradle Wrapper for Gradle 9.6.0, distributed by the Gradle project under the Apache License 2.0. Build-time and runtime components may contain additional third-party notices.
 
 ## Verification
 

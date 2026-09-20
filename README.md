@@ -36,7 +36,7 @@ Signed builds are published on the [GitHub Releases](https://github.com/germ8540
 
 ## Build
 
-The project is built in GitHub Actions. Pull requests and pushes to `main` run lint, unit tests, helper JavaScript checks, and debug APK compilation. Version tags such as `v0.26.0-rc1` start the signed release workflow.
+The repository includes the verified Gradle 9.6.0 Wrapper. Run `./gradlew :app:assembleDebug` for a local debug build. GitHub Actions runs lint, unit tests, helper JavaScript checks, and debug APK compilation for code changes on `main` and pull requests. Version tags such as `v0.26.0-rc1` start the signed release workflow.
 
 Release signing requires repository secrets and uses the permanent ILYRO signing identity documented in [docs/release-signing.md](docs/release-signing.md). Never commit a keystore or signing password.
 
