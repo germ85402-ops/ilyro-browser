@@ -860,6 +860,49 @@ internal class DownloadController(
     }
 
     /**
+     * Progressive YouTube formats already contain both tracks. Use the same Gecko network stack
+     * as adaptive downloads so the signed googlevideo URL keeps its referrer/private context and
+     * does not depend on a hidden navigation session deciding whether to expose an external
+     * response.
+     */
+    fun enqueueYouTubeProgressiveDownload(
+        video: DetectedMedia,
+        suggestedTitle: String?,
+        referrer: String?,
+        isPrivate: Boolean,
+        allowMetered: Boolean,
+        onRecordsChanged: (() -> Unit)? = null
+    ): Boolean {
+        if (!video.isYouTubeStream ||
+            video.kind != DetectedMediaKind.VIDEO ||
+            video.requiresSeparateAudio
+        ) {
+            return false
+        }
+
+        val mimeType = video.mimeType
+            ?.substringBefore(';')
+            ?.trim()
+            ?.lowercase()
+            ?.takeIf { it == "video/mp4" || it == "video/webm" }
+            ?: "video/mp4"
+        val extension = if (mimeType == "video/webm") "webm" else "mp4"
+        val fileName = buildHlsFileName(suggestedTitle, video.url, extension)
+        val record = enqueueGeckoFetch(
+            url = video.url,
+            fileName = fileName,
+            mimeType = mimeType,
+            expectedBytes = -1L,
+            allowMetered = allowMetered,
+            referrer = referrer,
+            isPrivate = isPrivate
+        ) ?: return false
+
+        onRecordsChanged?.invoke()
+        return record.id != 0L
+    }
+
+    /**
      * YouTube commonly delivers higher qualities as separate signed video/audio resources.
      * ILYRO captures the URLs Gecko is already using, downloads both tracks and muxes them
      * locally without transcoding.

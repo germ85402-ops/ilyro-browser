@@ -35,20 +35,26 @@
     const frames = portsByTab.get(details.tabId);
     if (!frames || frames.size === 0) return;
 
+    const message = {
+      type: "ilyro-network-media",
+      url: details.url
+    };
     const preferredFrame = Number.isInteger(details.frameId) ? details.frameId : 0;
-    const port =
-      frames.get(preferredFrame) ||
-      frames.get(0) ||
-      frames.values().next().value;
-    if (!port) return;
+    const orderedPorts = [
+      frames.get(preferredFrame),
+      frames.get(0),
+      ...frames.values()
+    ].filter((port, index, ports) => port && ports.indexOf(port) === index);
 
-    try {
-      port.postMessage({
-        type: "ilyro-network-media",
-        url: details.url
-      });
-    } catch (_) {
-    }
+    // A YouTube player can move between the main document and an embed frame during SPA
+    // navigation. Broadcast to every live content-script port in this tab; the native bridge
+    // deduplicates the same signed URL, while choosing a single frame can silently lose audio.
+    orderedPorts.forEach(port => {
+      try {
+        port.postMessage(message);
+      } catch (_) {
+      }
+    });
   }
 
   browser.webRequest.onBeforeRequest.addListener(

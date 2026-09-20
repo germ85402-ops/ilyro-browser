@@ -4,7 +4,10 @@
   let networkWatcherStarted = false;
   let performanceObserver = null;
   const seen = new Map();
+  const pendingReports = new Map();
+  let nativeRetryTimer = null;
   const MAX_SEEN = 256;
+  const MAX_PENDING_REPORTS = 64;
   const MEDIA_URL_RE = /\.(m3u8|mpd|mp4|webm|m4v|mov|ogv|mp3|m4a|aac|flac|wav|oga|opus)(?:$|[?#])/i;
   const STREAM_HINT_RE = /(?:[?&](?:format|type|mime)=(?:m3u8|application%2F(?:vnd\.apple\.mpegurl|dash\+xml))|\/(?:hls|dash)\/[^?#]*(?:master|manifest|playlist|index))/i;
   const YOUTUBE_PROGRESSIVE_ITAGS = new Set([17, 18, 22, 36, 43, 44, 45, 46]);
@@ -33,11 +36,56 @@
       port = browser.runtime.connectNative('ilyro_media');
       port.onDisconnect.addListener(() => {
         port = null;
+        scheduleNativeRetry();
       });
+      flushPendingReports();
     } catch (_) {
       port = null;
+      scheduleNativeRetry();
     }
     return port;
+  }
+
+  function scheduleNativeRetry() {
+    if (nativeRetryTimer !== null) return;
+    nativeRetryTimer = setTimeout(() => {
+      nativeRetryTimer = null;
+      connect();
+      if (pendingReports.size > 0) scheduleNativeRetry();
+    }, 250);
+  }
+
+  function flushPendingReports() {
+    if (!port || pendingReports.size === 0) return;
+    for (const [key, message] of pendingReports) {
+      try {
+        port.postMessage(message);
+        pendingReports.delete(key);
+      } catch (_) {
+        port = null;
+        scheduleNativeRetry();
+        return;
+      }
+    }
+  }
+
+  function sendReport(key, message) {
+    const targetPort = connect();
+    if (!targetPort) {
+      pendingReports.set(key, message);
+      while (pendingReports.size > MAX_PENDING_REPORTS) {
+        pendingReports.delete(pendingReports.keys().next().value);
+      }
+      return;
+    }
+
+    try {
+      targetPort.postMessage(message);
+    } catch (_) {
+      pendingReports.set(key, message);
+      port = null;
+      scheduleNativeRetry();
+    }
   }
 
   function normalizedUrl(value) {
@@ -193,28 +241,21 @@
     const key = kind + '|' + url;
     if (!remember(key, effectiveMime, effectiveSource, mediaWidth, mediaHeight)) return;
 
-    const targetPort = connect();
-    if (!targetPort) return;
-
-    try {
-      targetPort.postMessage({
-        type: 'media',
-        url,
-        kind,
-        mime: effectiveMime,
-        source: effectiveSource,
-        pageUrl: location.href,
-        title: cleanMediaTitle(titleOverride) || cleanMediaTitle(document.title),
-        width: Math.max(0, mediaWidth),
-        height: Math.max(0, mediaHeight),
-        bitrate: youtube ? youtube.bitrate : 0,
-        frameRate: youtube ? youtube.frameRate : 0,
-        codecs: youtube ? youtube.codecs : '',
-        separateAudio: youtube ? youtube.requiresSeparateAudio === true : false
-      });
-    } catch (_) {
-      port = null;
-    }
+    sendReport(key, {
+      type: 'media',
+      url,
+      kind,
+      mime: effectiveMime,
+      source: effectiveSource,
+      pageUrl: location.href,
+      title: cleanMediaTitle(titleOverride) || cleanMediaTitle(document.title),
+      width: Math.max(0, mediaWidth),
+      height: Math.max(0, mediaHeight),
+      bitrate: youtube ? youtube.bitrate : 0,
+      frameRate: youtube ? youtube.frameRate : 0,
+      codecs: youtube ? youtube.codecs : '',
+      separateAudio: youtube ? youtube.requiresSeparateAudio === true : false
+    });
   }
 
   function connectNetworkPort() {

@@ -124,6 +124,42 @@ internal object MediaDetectorBridge {
             )
     }
 
+    /**
+     * YouTube changes the visible URL during SPA navigation and can use www, m, youtu.be or an
+     * embed host for the same player. Keep audio pairing attached to the video id instead of the
+     * full, often-changing page URL.
+     */
+    internal fun youtubePageIdentity(rawUrl: String?): String? {
+        if (rawUrl.isNullOrBlank()) return null
+        return runCatching {
+            val uri = Uri.parse(rawUrl)
+            val host = uri.host.orEmpty().lowercase().trimEnd('.')
+            val isYouTubeHost = host == "youtu.be" ||
+                host.endsWith(".youtube.com") ||
+                host == "youtube.com" ||
+                host.endsWith(".youtube-nocookie.com") ||
+                host == "youtube-nocookie.com"
+            if (!isYouTubeHost) return@runCatching null
+
+            val segments = uri.pathSegments
+            val videoId = when {
+                host == "youtu.be" -> segments.firstOrNull()
+                uri.path.equals("/watch", ignoreCase = true) -> uri.getQueryParameter("v")
+                segments.size >= 2 && segments.first().lowercase() in setOf("shorts", "embed", "live") ->
+                    segments[1]
+                else -> null
+            }?.trim()?.takeIf { it.isNotEmpty() }
+
+            videoId?.let { "video:$it" } ?: "page:${host}|${uri.path.orEmpty()}"
+        }.getOrNull()
+    }
+
+    internal fun sameYoutubePage(firstUrl: String?, secondUrl: String?): Boolean {
+        val first = youtubePageIdentity(firstUrl)
+        val second = youtubePageIdentity(secondUrl)
+        return if (first != null && second != null) first == second else firstUrl == secondUrl
+    }
+
     // Media detection is enabled on YouTube too.
     fun isExcludedUrl(url: String): Boolean = false
 

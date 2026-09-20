@@ -2079,7 +2079,8 @@ private fun BrowserScreen(
                                 .filter {
                                     it.kind == DetectedMediaKind.AUDIO &&
                                         it.isYouTubeStream &&
-                                        (item.pageUrl == null || it.pageUrl == item.pageUrl)
+                                        (item.pageUrl == null || it.pageUrl == null ||
+                                            MediaDetectorBridge.sameYoutubePage(item.pageUrl, it.pageUrl))
                                 }
                                 .sortedWith(
                                     compareByDescending<DetectedMedia> {
@@ -2103,7 +2104,14 @@ private fun BrowserScreen(
                                 }
                             )
                         } else {
-                            downloadController.enqueueNavigationWithSession(
+                            downloadController.enqueueYouTubeProgressiveDownload(
+                                video = item,
+                                suggestedTitle = activeTab.title.takeIf { it.isNotBlank() } ?: item.title,
+                                allowMetered = currentSettings.downloadsOverMetered,
+                                referrer = item.pageUrl ?: activeTab.url,
+                                isPrivate = activeTab.isPrivate,
+                                onRecordsChanged = refreshDownloads
+                            ) || downloadController.enqueueNavigationWithSession(
                                 url = item.url,
                                 sourceSettings = activeTab.session.settings,
                                 suggestedName = activeTab.title.takeIf { it.isNotBlank() } ?: item.title,
