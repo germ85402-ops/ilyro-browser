@@ -1031,22 +1031,24 @@ internal class DownloadController(
                 }
 
                 notifyDownloadProgress(record.id, fileName, 0L, -1L)
-                videoFile = downloadTrack(video, "video")
-                audioFile = downloadTrack(audio, "audio")
+                val downloadedVideoFile = downloadTrack(video, "video")
+                videoFile = downloadedVideoFile
+                val downloadedAudioFile = downloadTrack(audio, "audio")
+                audioFile = downloadedAudioFile
 
                 if (cancelledIds.contains(record.id)) {
                     throw java.io.InterruptedIOException("Download cancelled")
                 }
 
                 muxYouTubeTracks(
-                    videoFile = videoFile,
-                    audioFile = audioFile,
+                    videoFile = downloadedVideoFile,
+                    audioFile = downloadedAudioFile,
                     destination = destination,
                     outputFormat = output.third
                 )
 
                 val copied = mediaSize(destination.toString()).takeIf { it > 0L }
-                    ?: (videoFile.length() + audioFile.length())
+                    ?: (downloadedVideoFile.length() + downloadedAudioFile.length())
                 resolver.update(
                     destination,
                     ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) },
