@@ -85,4 +85,4 @@ This policy must be updated when ILYRO adds or materially changes data collectio
 
 ## Contact
 
-A public support/privacy contact should be added here before public store distribution.
+For privacy questions or support requests, open an issue at https://github.com/germ85402-ops/ilyro-browser/issues. Do not include passwords, authentication codes, browsing history, or other sensitive personal data in a public issue.
