@@ -14,7 +14,7 @@ android {
     compileSdk { version = release(37) { minorApiLevel = 2 } }
     defaultConfig {
         applicationId = "com.ilyro.browser"; minSdk = 26; targetSdk = 36
-        versionCode = 140; versionName = "0.26.0-rc2"
+        versionCode = 141; versionName = "0.26.0-rc3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["appLabel"] = "ILYRO"
         ndk { abiFilters += "arm64-v8a" }
@@ -84,6 +84,10 @@ dependencies {
     implementation("androidx.work:work-runtime-ktx:2.11.2")
     // Stable GeckoView release published by Mozilla's Maven repository.
     implementation("org.mozilla.geckoview:geckoview:155.0.20260903215306")
+    // Mature Android wrapper around yt-dlp. It is used only as the YouTube fallback when
+    // GeckoView does not expose the site's signed media subrequests to the WebExtension.
+    implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
+    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20260814")
     androidTestImplementation("androidx.test:core:1.7.0")

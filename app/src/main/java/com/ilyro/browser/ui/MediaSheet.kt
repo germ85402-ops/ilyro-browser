@@ -121,8 +121,8 @@ internal fun MediaSheet(
                     )
                     Text(
                         text = tr(
-                            "Reading HLS manifests and available variants…",
-                            "Читаю HLS-потоки и доступные варианты качества…"
+                            "Preparing available download options…",
+                            "Готовлю доступные варианты загрузки…"
                         ),
                         modifier = Modifier.padding(top = 6.dp),
                         style = MaterialTheme.typography.bodySmall,

@@ -877,8 +877,14 @@ private fun BrowserScreen(
         MediaDetectorBridge.itemsFor(activeTab.session)
     }
     val mediaEnabledForPage = !isHome && !MediaDetectorBridge.isExcludedUrl(activeTab.url)
-    val latestDetectedMedia = remember(detectedMedia) {
-        MediaDetectorBridge.selectPrimaryCandidate(detectedMedia)
+    val youtubeFallbackMedia = remember(activeTab.url, activeTab.title) {
+        MediaDetectorBridge.youtubePageCandidate(activeTab.url, activeTab.title)
+    }
+    val mediaCandidates = remember(detectedMedia, youtubeFallbackMedia) {
+        if (detectedMedia.isEmpty()) listOfNotNull(youtubeFallbackMedia) else detectedMedia
+    }
+    val latestDetectedMedia = remember(mediaCandidates) {
+        MediaDetectorBridge.selectPrimaryCandidate(mediaCandidates)
     }
     val detectedVideoCount = if (
         mediaEnabledForPage &&
@@ -896,17 +902,18 @@ private fun BrowserScreen(
         !isHome && activeHost.isNotBlank() &&
         ProtectionBridge.siteEnabled("https://$activeHost/")
 
-    LaunchedEffect(showMedia, activeTab.id, mediaRevision) {
+    LaunchedEffect(showMedia, activeTab.id, mediaRevision, youtubeFallbackMedia?.url) {
         if (!showMedia || !mediaEnabledForPage) {
             resolvingMediaQualities = false
             return@LaunchedEffect
         }
-        val candidate = MediaDetectorBridge.selectPrimaryCandidate(detectedMedia)
+        val candidate = MediaDetectorBridge.selectPrimaryCandidate(mediaCandidates)
         val requestId = mediaResolveRequest + 1
         mediaResolveRequest = requestId
         val tabId = activeTab.id
         resolvedMedia = listOfNotNull(candidate)
-        resolvingMediaQualities = candidate?.kind == DetectedMediaKind.HLS
+        resolvingMediaQualities = candidate?.kind == DetectedMediaKind.HLS ||
+            candidate?.isYouTubeExtractor == true
         if (candidate == null) return@LaunchedEffect
 
         downloadController.resolveMediaQualities(
@@ -2047,10 +2054,10 @@ private fun BrowserScreen(
         val mediaOpenLabel = tr("View download", "Показать загрузку")
         val mediaDownloadFailedMessage = tr("Couldn't start media download", "Не удалось начать загрузку медиа")
         MediaSheet(
-            media = if (resolvedMedia.isNotEmpty() || detectedMedia.isEmpty()) {
+            media = if (resolvedMedia.isNotEmpty() || mediaCandidates.isEmpty()) {
                 resolvedMedia
             } else {
-                listOfNotNull(latestDetectedMedia)
+                listOfNotNull(MediaDetectorBridge.selectPrimaryCandidate(mediaCandidates))
             },
             resolvingQualities = resolvingMediaQualities,
             onDismiss = { showMedia = false },
@@ -2069,7 +2076,18 @@ private fun BrowserScreen(
                         }
                     )
                     DetectedMediaKind.VIDEO -> {
-                        if (item.isYouTubeStream && item.requiresSeparateAudio) {
+                        if (item.isYouTubeExtractor) {
+                            downloadController.enqueueYouTubeExtractorDownload(
+                                video = item,
+                                suggestedTitle = activeTab.title.takeIf { it.isNotBlank() } ?: item.title,
+                                referrer = item.pageUrl ?: activeTab.url,
+                                isPrivate = activeTab.isPrivate,
+                                onRecordsChanged = refreshDownloads,
+                                onError = { message ->
+                                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                }
+                            )
+                        } else if (item.isYouTubeStream && item.requiresSeparateAudio) {
                             val videoContainer = item.mimeType
                                 ?.substringBefore(';')
                                 ?.substringAfter('/')

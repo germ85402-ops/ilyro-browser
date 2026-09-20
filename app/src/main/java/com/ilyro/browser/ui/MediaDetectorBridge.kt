@@ -36,6 +36,9 @@ internal data class DetectedMedia(
     val isYouTubeStream: Boolean
         get() = source.startsWith("youtube-")
 
+    val isYouTubeExtractor: Boolean
+        get() = source == "youtube-extractor"
+
     val canDownload: Boolean
         get() = (kind == DetectedMediaKind.VIDEO &&
             (!requiresSeparateAudio || isYouTubeStream)) ||
@@ -158,6 +161,28 @@ internal object MediaDetectorBridge {
         val first = youtubePageIdentity(firstUrl)
         val second = youtubePageIdentity(secondUrl)
         return if (first != null && second != null) first == second else firstUrl == secondUrl
+    }
+
+    /**
+     * A page-level YouTube candidate keeps the media action useful when GeckoView does not expose
+     * the signed googlevideo requests to the bundled detector. The actual stream is resolved by
+     * [YouTubeExtractor] only when the media sheet is opened or the user starts a download.
+     */
+    internal fun youtubePageCandidate(pageUrl: String?, title: String?): DetectedMedia? {
+        val identity = youtubePageIdentity(pageUrl) ?: return null
+        if (!identity.startsWith("video:")) return null
+        val normalizedUrl = pageUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        return DetectedMedia(
+            url = normalizedUrl,
+            kind = DetectedMediaKind.VIDEO,
+            mimeType = "video/mp4",
+            pageUrl = normalizedUrl,
+            title = title?.trim()?.takeIf { it.isNotBlank() },
+            source = "youtube-extractor",
+            width = 0,
+            height = 0,
+            variantLabel = "Best available"
+        )
     }
 
     // Media detection is enabled on YouTube too.

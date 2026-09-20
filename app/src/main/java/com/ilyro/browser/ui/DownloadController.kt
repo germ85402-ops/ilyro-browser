@@ -300,6 +300,7 @@ internal class DownloadController(
     private val activeBodies = ConcurrentHashMap<Long, InputStream>()
     private val activeHlsBodies = ConcurrentHashMap<Long, MutableSet<InputStream>>()
     private val activeHlsPools = ConcurrentHashMap<Long, java.util.concurrent.ExecutorService>()
+    private val activeYouTubeProcesses = ConcurrentHashMap<Long, String>()
     private val cancelledIds = ConcurrentHashMap.newKeySet<Long>()
     private val pausedIds = ConcurrentHashMap.newKeySet<Long>()
     private val pauseLocks = ConcurrentHashMap<Long, java.lang.Object>()
@@ -724,6 +725,30 @@ internal class DownloadController(
         isPrivate: Boolean,
         onResolved: (List<DetectedMedia>) -> Unit
     ) {
+        if (media.any { it.isYouTubeExtractor }) {
+            Thread({
+                val resolved = media.map { item ->
+                    if (!item.isYouTubeExtractor) {
+                        enrichMediaQualityFromUrl(item)
+                    } else {
+                        runCatching {
+                            val info = YouTubeExtractor.resolve(appContext, item.url)
+                            item.copy(
+                                title = info.title ?: item.title,
+                                width = info.width,
+                                height = info.height,
+                                bitrate = info.bitrate,
+                                variantLabel = info.formatLabel ?: item.variantLabel,
+                                lastSeenAt = System.currentTimeMillis()
+                            )
+                        }.getOrElse { item }
+                    }
+                }.distinctBy(::mediaQualityIdentity)
+                mainHandler.post { onResolved(resolved) }
+            }, "ILYRO-youtube-resolver").start()
+            return
+        }
+
         if (media.none { it.kind == DetectedMediaKind.HLS }) {
             mainHandler.post {
                 onResolved(
@@ -857,6 +882,135 @@ internal class DownloadController(
 
     private fun mediaQualityIdentity(item: DetectedMedia): String {
         return "${item.kind}|${MediaDetectorBridge.canonicalMediaIdentity(item.url)}"
+    }
+
+    /**
+     * Downloads a YouTube page through the Android yt-dlp wrapper when GeckoView's media
+     * subrequest observer has no usable stream candidate. This is intentionally page-based: the
+     * extractor resolves the current signed URL itself and handles adaptive video/audio merging.
+     */
+    fun enqueueYouTubeExtractorDownload(
+        video: DetectedMedia,
+        suggestedTitle: String?,
+        referrer: String?,
+        isPrivate: Boolean,
+        onRecordsChanged: (() -> Unit)? = null,
+        onError: ((String) -> Unit)? = null
+    ): Boolean {
+        if (!video.isYouTubeExtractor || video.kind != DetectedMediaKind.VIDEO) return false
+
+        val fileName = buildHlsFileName(
+            suggestedTitle ?: video.title,
+            video.url,
+            "mp4"
+        )
+        val destination = createDestination(fileName, "video/mp4") ?: return false
+        val record = newDirectRecord(
+            url = video.url,
+            fileName = fileName,
+            mimeType = "video/mp4",
+            expectedBytes = -1L,
+            destination = destination,
+            referrer = referrer,
+            isPrivate = isPrivate
+        )
+        addRecord(record)
+        DownloadKeepAliveService.track(appContext, record.id, fileName)
+        mainHandler.post { onRecordsChanged?.invoke() }
+
+        val processId = "ilyro-youtube-extractor-${record.id}"
+        activeYouTubeProcesses[record.id] = processId
+        Thread({
+            var temporaryFile: File? = null
+            var handedToWriter = false
+            var lastPublishedAt = 0L
+
+            fun publishExtractorProgress(progress: Float) {
+                val now = android.os.SystemClock.elapsedRealtime()
+                val fileBytes = temporaryFile?.length()?.coerceAtLeast(0L) ?: 0L
+                val estimatedBytes = if (fileBytes > 0L) {
+                    fileBytes
+                } else {
+                    (progress.coerceIn(0f, 100f) * 1024L).toLong()
+                }
+                liveTransfers[record.id] = LiveTransfer(estimatedBytes, -1L, 0L)
+                if (now - lastPublishedAt >= 500L) {
+                    lastPublishedAt = now
+                    notifyDownloadProgress(record.id, fileName, estimatedBytes, -1L)
+                    mainHandler.post { onRecordsChanged?.invoke() }
+                }
+            }
+
+            try {
+                if (cancelledIds.contains(record.id)) {
+                    throw java.io.InterruptedIOException("Download cancelled")
+                }
+                temporaryFile = File.createTempFile(
+                    "ilyro-youtube-extractor-",
+                    ".mp4",
+                    appContext.cacheDir
+                ).also { it.delete() }
+                notifyDownloadProgress(record.id, fileName, 0L, -1L)
+                YouTubeExtractor.download(
+                    context = appContext,
+                    pageUrl = video.url,
+                    outputFile = temporaryFile!!,
+                    processId = processId,
+                    onProgress = ::publishExtractorProgress
+                )
+                if (cancelledIds.contains(record.id)) {
+                    throw java.io.InterruptedIOException("Download cancelled")
+                }
+                val completedFile = temporaryFile!!
+                if (!completedFile.isFile || completedFile.length() <= 0L) {
+                    error("YouTube extractor returned an empty video")
+                }
+
+                activeYouTubeProcesses.remove(record.id, processId)
+                updateExpectedBytes(record.id, completedFile.length())
+                writeBody(
+                    id = record.id,
+                    destination = destination,
+                    body = completedFile.inputStream().buffered(),
+                    fileName = fileName,
+                    totalBytes = completedFile.length(),
+                    onFinished = {
+                        runCatching { completedFile.delete() }
+                        mainHandler.post { onRecordsChanged?.invoke() }
+                    },
+                    onFailure = {
+                        markDirectFailed(record.id, destination)
+                        notifyDownloadFailed(record.id, fileName)
+                        mainHandler.post {
+                            onRecordsChanged?.invoke()
+                            onError?.invoke("Could not save the extracted YouTube video")
+                        }
+                    }
+                )
+                handedToWriter = true
+            } catch (error: Throwable) {
+                activeYouTubeProcesses.remove(record.id, processId)
+                val wasCancelled = cancelledIds.remove(record.id)
+                if (wasCancelled) {
+                    runCatching { resolver.delete(destination, null, null) }
+                    mainHandler.post { onRecordsChanged?.invoke() }
+                } else {
+                    markDirectFailed(record.id, destination)
+                    notifyDownloadFailed(record.id, fileName)
+                    mainHandler.post {
+                        onRecordsChanged?.invoke()
+                        onError?.invoke(YouTubeExtractor.errorMessage(error))
+                    }
+                }
+                DownloadKeepAliveService.finish(appContext, record.id)
+            } finally {
+                if (!handedToWriter) {
+                    temporaryFile?.let { runCatching { it.delete() } }
+                }
+            }
+        }, "ILYRO-youtube-extractor-${kotlin.math.abs(record.id)}").start()
+
+        return true
     }
 
     /**
@@ -2080,6 +2234,7 @@ internal class DownloadController(
     }
 
     private fun pause(id: Long): Boolean {
+        if (activeYouTubeProcesses.containsKey(id)) return false
         val record = synchronized(recordLock) {
             restoreRecordsUnsafe().firstOrNull { it.id == id }
         } ?: return false
@@ -2723,6 +2878,7 @@ internal class DownloadController(
             cancelledIds.add(record.id)
             pausedIds.remove(record.id)
             wakePaused(record.id)
+            activeYouTubeProcesses.remove(record.id)?.let(YouTubeExtractor::cancel)
             activeBodies.remove(record.id)?.let { stream -> runCatching { stream.close() } }
             activeHlsPools.remove(record.id)?.shutdownNow()
             activeHlsBodies.remove(record.id)?.forEach { stream -> runCatching { stream.close() } }
