@@ -11,6 +11,10 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.media.MediaCodec
+import android.media.MediaExtractor
+import android.media.MediaFormat
+import android.media.MediaMuxer
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -38,6 +42,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
 import java.lang.ref.WeakReference
+import java.nio.ByteBuffer
 import java.util.zip.ZipInputStream
 import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
@@ -852,6 +857,325 @@ internal class DownloadController(
 
     private fun mediaQualityIdentity(item: DetectedMedia): String {
         return "${item.kind}|${MediaDetectorBridge.canonicalMediaIdentity(item.url)}"
+    }
+
+    /**
+     * YouTube commonly delivers higher qualities as separate signed video/audio resources.
+     * ILYRO captures the URLs Gecko is already using, downloads both tracks and muxes them
+     * locally without transcoding.
+     */
+    fun enqueueYouTubeDownload(
+        video: DetectedMedia,
+        audio: DetectedMedia?,
+        suggestedTitle: String?,
+        referrer: String?,
+        isPrivate: Boolean,
+        onRecordsChanged: (() -> Unit)? = null,
+        onError: ((String) -> Unit)? = null
+    ): Boolean {
+        if (!video.isYouTubeStream ||
+            video.kind != DetectedMediaKind.VIDEO ||
+            !video.requiresSeparateAudio
+        ) {
+            return false
+        }
+        if (audio == null || !audio.isYouTubeStream || audio.kind != DetectedMediaKind.AUDIO) {
+            onError?.invoke(
+                "Play the YouTube video for a few seconds so ILYRO can detect its audio track"
+            )
+            return false
+        }
+
+        val videoMime = video.mimeType?.substringBefore(';')?.trim()?.lowercase().orEmpty()
+        val audioMime = audio.mimeType?.substringBefore(';')?.trim()?.lowercase().orEmpty()
+        val output = when {
+            videoMime == "video/mp4" && audioMime == "audio/mp4" ->
+                Triple("mp4", "video/mp4", MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            videoMime == "video/webm" && audioMime == "audio/webm" ->
+                Triple("webm", "video/webm", MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM)
+            else -> {
+                onError?.invoke(
+                    "ILYRO detected YouTube video and audio in incompatible containers. Play the video a little longer and try again."
+                )
+                return false
+            }
+        }
+
+        val keepAliveToken = -System.nanoTime()
+        DownloadKeepAliveService.track(
+            appContext,
+            keepAliveToken,
+            suggestedTitle?.takeIf { it.isNotBlank() } ?: "YouTube video"
+        )
+
+        Thread({
+            var createdRecord: DownloadRecord? = null
+            var videoFile: File? = null
+            var audioFile: File? = null
+
+            fun reportError(message: String) {
+                mainHandler.post {
+                    onRecordsChanged?.invoke()
+                    onError?.invoke(message)
+                }
+            }
+
+            try {
+                val fileName = buildHlsFileName(suggestedTitle, video.url, output.first)
+                val destination = createDestination(fileName, output.second)
+                    ?: error("Could not create a Downloads destination")
+                val record = newDirectRecord(
+                    url = video.url,
+                    fileName = fileName,
+                    mimeType = output.second,
+                    expectedBytes = -1L,
+                    destination = destination,
+                    referrer = referrer,
+                    isPrivate = isPrivate
+                )
+                createdRecord = record
+                addRecord(record)
+                DownloadKeepAliveService.replace(appContext, keepAliveToken, record.id, fileName)
+                mainHandler.post { onRecordsChanged?.invoke() }
+
+                val receivedBytes = AtomicLong(0L)
+                var lastNotificationAt = 0L
+                var lastSpeedAt = android.os.SystemClock.elapsedRealtime()
+                var lastSpeedBytes = 0L
+                var speedBytesPerSecond = 0L
+
+                fun publishProgress(delta: Int) {
+                    val downloaded = receivedBytes.addAndGet(delta.toLong())
+                    val now = android.os.SystemClock.elapsedRealtime()
+                    val elapsed = now - lastSpeedAt
+                    if (elapsed >= 500L) {
+                        val instant = ((downloaded - lastSpeedBytes).coerceAtLeast(0L) * 1000L /
+                            elapsed.coerceAtLeast(1L))
+                        speedBytesPerSecond = if (speedBytesPerSecond <= 0L) {
+                            instant
+                        } else {
+                            (speedBytesPerSecond * 3L + instant) / 4L
+                        }
+                        lastSpeedAt = now
+                        lastSpeedBytes = downloaded
+                    }
+                    liveTransfers[record.id] = LiveTransfer(downloaded, -1L, speedBytesPerSecond)
+                    if (now - lastNotificationAt >= 500L) {
+                        notifyDownloadProgress(record.id, fileName, downloaded, -1L)
+                        lastNotificationAt = now
+                    }
+                }
+
+                fun downloadTrack(item: DetectedMedia, suffix: String): File {
+                    if (cancelledIds.contains(record.id)) {
+                        throw java.io.InterruptedIOException("Download cancelled")
+                    }
+                    val request = WebRequest.Builder(item.url).apply {
+                        val requestReferrer = item.pageUrl ?: referrer
+                        if (!requestReferrer.isNullOrBlank() &&
+                            (requestReferrer.startsWith("http://") ||
+                                requestReferrer.startsWith("https://"))
+                        ) {
+                            this.referrer(requestReferrer)
+                        }
+                        addHeader("Accept", "*/*")
+                    }.build()
+                    val flags = if (isPrivate) {
+                        GeckoWebExecutor.FETCH_FLAGS_PRIVATE
+                    } else {
+                        GeckoWebExecutor.FETCH_FLAGS_NONE
+                    }
+                    val response = executor.fetch(request, flags).poll(YOUTUBE_FETCH_TIMEOUT_MS)
+                        ?: error("No response from YouTube media server")
+                    if (response.statusCode !in 200..299) {
+                        runCatching { response.body?.close() }
+                        error("YouTube media server returned HTTP " + response.statusCode)
+                    }
+                    val body = response.body ?: error("YouTube media response has no body")
+                    response.setReadTimeoutMillis(BODY_READ_TIMEOUT_MS)
+                    activeBodies[record.id] = body
+                    val temp = File.createTempFile(
+                        "ilyro-youtube-" + suffix + "-",
+                        ".part",
+                        appContext.cacheDir
+                    )
+                    try {
+                        temp.outputStream().buffered(YOUTUBE_COPY_BUFFER_BYTES).use { outputStream ->
+                            body.use { input ->
+                                val buffer = ByteArray(YOUTUBE_COPY_BUFFER_BYTES)
+                                while (true) {
+                                    if (cancelledIds.contains(record.id) ||
+                                        Thread.currentThread().isInterrupted
+                                    ) {
+                                        throw java.io.InterruptedIOException("Download cancelled")
+                                    }
+                                    if (!waitUntilResumed(record.id)) {
+                                        throw java.io.InterruptedIOException("Download cancelled")
+                                    }
+                                    val count = input.read(buffer)
+                                    if (count < 0) break
+                                    if (count == 0) continue
+                                    outputStream.write(buffer, 0, count)
+                                    publishProgress(count)
+                                }
+                            }
+                        }
+                    } finally {
+                        activeBodies.remove(record.id, body)
+                    }
+                    if (temp.length() <= 0L) {
+                        runCatching { temp.delete() }
+                        error("YouTube returned an empty media track")
+                    }
+                    return temp
+                }
+
+                notifyDownloadProgress(record.id, fileName, 0L, -1L)
+                videoFile = downloadTrack(video, "video")
+                audioFile = downloadTrack(audio, "audio")
+
+                if (cancelledIds.contains(record.id)) {
+                    throw java.io.InterruptedIOException("Download cancelled")
+                }
+
+                muxYouTubeTracks(
+                    videoFile = videoFile,
+                    audioFile = audioFile,
+                    destination = destination,
+                    outputFormat = output.third
+                )
+
+                val copied = mediaSize(destination.toString()).takeIf { it > 0L }
+                    ?: (videoFile.length() + audioFile.length())
+                resolver.update(
+                    destination,
+                    ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) },
+                    null,
+                    null
+                )
+                markDirectSuccess(record.id, copied)
+                liveTransfers[record.id] = LiveTransfer(copied, copied, 0L)
+                notifyDownloadComplete(record.id, fileName, copied)
+                cancelledIds.remove(record.id)
+                mainHandler.post { onRecordsChanged?.invoke() }
+            } catch (error: Throwable) {
+                val record = createdRecord
+                if (record != null) {
+                    activeBodies.remove(record.id)?.let { body -> runCatching { body.close() } }
+                    liveTransfers.remove(record.id)
+                    cancelDownloadNotification(record.id)
+                    record.localUri?.let {
+                        runCatching { resolver.delete(Uri.parse(it), null, null) }
+                    }
+                    synchronized(recordLock) {
+                        saveRecordsUnsafe(restoreRecordsUnsafe().filterNot { it.id == record.id })
+                    }
+                    val wasCancelled = cancelledIds.remove(record.id)
+                    if (wasCancelled) {
+                        mainHandler.post { onRecordsChanged?.invoke() }
+                        return@Thread
+                    }
+                }
+                reportError(
+                    error.message?.takeIf { it.isNotBlank() }
+                        ?: "YouTube video download failed"
+                )
+            } finally {
+                runCatching { videoFile?.delete() }
+                runCatching { audioFile?.delete() }
+                DownloadKeepAliveService.finish(
+                    appContext,
+                    createdRecord?.id ?: keepAliveToken
+                )
+            }
+        }, "ILYRO-youtube-download-" + System.nanoTime()).start()
+
+        return true
+    }
+
+    private fun muxYouTubeTracks(
+        videoFile: File,
+        audioFile: File,
+        destination: Uri,
+        outputFormat: Int
+    ) {
+        val videoExtractor = MediaExtractor()
+        val audioExtractor = MediaExtractor()
+        var muxer: MediaMuxer? = null
+        var muxerStarted = false
+
+        try {
+            videoExtractor.setDataSource(videoFile.absolutePath)
+            audioExtractor.setDataSource(audioFile.absolutePath)
+
+            fun findTrack(extractor: MediaExtractor, prefix: String): Int {
+                for (index in 0 until extractor.trackCount) {
+                    val mime = extractor.getTrackFormat(index)
+                        .getString(MediaFormat.KEY_MIME)
+                        .orEmpty()
+                    if (mime.startsWith(prefix)) return index
+                }
+                return -1
+            }
+
+            val videoTrack = findTrack(videoExtractor, "video/")
+            val audioTrack = findTrack(audioExtractor, "audio/")
+            if (videoTrack < 0 || audioTrack < 0) {
+                error("Could not read YouTube video/audio tracks")
+            }
+            videoExtractor.selectTrack(videoTrack)
+            audioExtractor.selectTrack(audioTrack)
+            val videoFormat = videoExtractor.getTrackFormat(videoTrack)
+            val audioFormat = audioExtractor.getTrackFormat(audioTrack)
+
+            resolver.openFileDescriptor(destination, "rw")?.use { descriptor ->
+                val writer = MediaMuxer(descriptor.fileDescriptor, outputFormat)
+                muxer = writer
+                val outputVideoTrack = writer.addTrack(videoFormat)
+                val outputAudioTrack = writer.addTrack(audioFormat)
+                writer.start()
+                muxerStarted = true
+
+                copyExtractorTrack(videoExtractor, videoFormat, writer, outputVideoTrack)
+                copyExtractorTrack(audioExtractor, audioFormat, writer, outputAudioTrack)
+
+                writer.stop()
+                muxerStarted = false
+            } ?: error("Could not open Downloads destination")
+        } finally {
+            if (muxerStarted) runCatching { muxer?.stop() }
+            runCatching { muxer?.release() }
+            runCatching { videoExtractor.release() }
+            runCatching { audioExtractor.release() }
+        }
+    }
+
+    private fun copyExtractorTrack(
+        extractor: MediaExtractor,
+        format: MediaFormat,
+        muxer: MediaMuxer,
+        outputTrack: Int
+    ) {
+        val formatBufferSize = if (format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) {
+            runCatching { format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE) }.getOrDefault(0)
+        } else {
+            0
+        }
+        val bufferSize = maxOf(formatBufferSize, 1024 * 1024).coerceAtMost(8 * 1024 * 1024)
+        val buffer = ByteBuffer.allocateDirect(bufferSize)
+        val info = MediaCodec.BufferInfo()
+
+        while (true) {
+            buffer.clear()
+            val size = extractor.readSampleData(buffer, 0)
+            if (size < 0) break
+            val sampleTime = extractor.sampleTime
+            if (sampleTime < 0L) break
+
+            info.set(0, size, sampleTime, extractor.sampleFlags)
+            muxer.writeSampleData(outputTrack, buffer, info)
+            extractor.advance()
+        }
     }
 
     /**
@@ -2611,8 +2935,10 @@ internal class DownloadController(
         const val NAVIGATION_DEDUPE_WINDOW_MS = 2_000L
         const val NAVIGATION_DEDUPE_RETENTION_MS = 15_000L
         const val HLS_FETCH_TIMEOUT_MS = 45_000L
+        const val YOUTUBE_FETCH_TIMEOUT_MS = 45_000L
         const val HLS_MAX_PLAYLIST_BYTES = 2 * 1024 * 1024
         const val HLS_PARALLEL_FETCHES = 4
+        const val YOUTUBE_COPY_BUFFER_BYTES = 512 * 1024
         const val DIRECT_COPY_BUFFER_BYTES = 1024 * 1024
         const val HLS_COPY_BUFFER_BYTES = 512 * 1024
         const val MAX_HLS_QUALITY_VARIANTS = 12
