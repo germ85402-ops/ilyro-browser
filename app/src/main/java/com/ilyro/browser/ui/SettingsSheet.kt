@@ -1,5 +1,8 @@
 package com.ilyro.browser.ui
 
+import android.content.Intent
+import android.net.Uri
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -57,11 +60,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+
+/**
+ * Filled with the creator page URL after the Buy Me a Coffee registration is complete.
+ */
+private const val BUY_ME_A_COFFEE_URL = ""
 
 private data class ClearAction(
     val title: String,
@@ -628,6 +637,8 @@ private fun SettingsCategoryContent(
         }
 
         SettingsCategory.ABOUT -> {
+            val context = LocalContext.current
+
             SettingsCard(title = tr("Application", "Приложение")) {
                 InfoRow("ILYRO")
                 SettingsRowDivider()
@@ -635,6 +646,40 @@ private fun SettingsCategoryContent(
                     tr("Version $versionName · GeckoView", "Версия $versionName · GeckoView"),
                     emphasis = false
                 )
+            }
+
+            SettingsCard(title = tr("Support ILYRO", "Поддержать ILYRO")) {
+                ActionRow(
+                    tr("Buy Me a Coffee", "Buy Me a Coffee"),
+                    if (BUY_ME_A_COFFEE_URL.isBlank()) {
+                        tr(
+                            "The support page will be added after registration.",
+                            "Ссылка поддержки появится после регистрации."
+                        )
+                    } else {
+                        tr(
+                            "Support the browser and its future updates.",
+                            "Поддержать развитие браузера и будущие обновления."
+                        )
+                    },
+                    onClick = {
+                        if (BUY_ME_A_COFFEE_URL.isNotBlank()) {
+                            context.startActivity(
+                                Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse(BUY_ME_A_COFFEE_URL)
+                                )
+                            )
+                        }
+                    },
+                    enabled = BUY_ME_A_COFFEE_URL.isNotBlank()
+                )
+            }
+
+            SettingsCard(title = tr("Developers", "Разработчики")) {
+                InfoRow("Alex Agapitov")
+                SettingsRowDivider()
+                InfoRow("Habet Hayrapetyan", emphasis = false)
             }
         }
     }
@@ -818,12 +863,17 @@ private fun ToggleRow(
 }
 
 @Composable
-private fun ActionRow(title: String, subtitle: String, onClick: () -> Unit) {
+private fun ActionRow(
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true
+) {
     val dense = LocalIlyroUiDensity.current == UiDensity.COMPACT
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 14.dp, vertical = if (dense) 10.dp else 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -833,14 +883,14 @@ private fun ActionRow(title: String, subtitle: String, onClick: () -> Unit) {
                 subtitle,
                 modifier = Modifier.padding(top = 3.dp),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.52f)
             )
         }
         Spacer(modifier = Modifier.width(12.dp))
         Icon(
             Icons.AutoMirrored.Rounded.KeyboardArrowRight,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.52f)
         )
     }
 }
