@@ -64,7 +64,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          gradle :app:lintDebug --stacktrace
+          ./gradlew :app:lintDebug --stacktrace
           lint_status=$?
           lint_report="$(find app/build -type f -name 'lint-results-debug.txt' -print -quit)"
           if [ -n "$lint_report" ]; then
