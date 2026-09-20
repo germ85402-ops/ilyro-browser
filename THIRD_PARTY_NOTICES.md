@@ -1,57 +1,52 @@
 # ILYRO Browser — Third-Party Notices
 
-_Last reviewed: September 15, 2026_
+_Last reviewed: September 20, 2026_
 
-ILYRO Browser incorporates or depends on third-party software. This notice is an RC/release-preparation inventory and should be reviewed against the exact dependency graph and packaged artifacts before public distribution.
+ILYRO Browser incorporates or depends on third-party software. Each component remains subject to its own license and trademark terms.
 
 ## Mozilla GeckoView
 
-ILYRO uses Mozilla GeckoView as its browser engine.
+ILYRO uses a pinned Mozilla GeckoView Nightly build as its browser engine.
 
 - Project: Mozilla GeckoView / Gecko
+- Pinned artifact: `org.mozilla.geckoview:geckoview-nightly:158.0.20260911092915`
 - License family: Mozilla Public License 2.0 for Mozilla-covered source code
-- License text: https://www.mozilla.org/MPL/2.0/
+- License: https://www.mozilla.org/MPL/2.0/
 
-Mozilla trademarks are not granted by the MPL. ILYRO is an independent browser project and is not presented as a Mozilla product.
+Mozilla trademarks are not granted by the MPL. ILYRO is independent and is not presented as a Mozilla product.
 
 ## uBlock Origin
 
-ILYRO's build pipeline downloads and bundles uBlock Origin 1.74.0 and applies a minimal ILYRO integration bridge for GeckoView.
+The build pipeline downloads and bundles uBlock Origin 1.74.0, verifies its SHA-256 digest, and applies a minimal ILYRO GeckoView bridge.
 
-- Project: uBlock Origin
 - Upstream: https://github.com/gorhill/uBlock
-- License: GNU General Public License v3.0 (GPL-3.0)
+- License: GNU General Public License v3.0
+- Bundled source package: https://addons.mozilla.org/firefox/addon/ublock-origin/
 
-uBlock Origin also uses filter lists and other assets that can have their own licenses. The exact bundled/default filter-list notices should be preserved or made available as required by their respective licenses.
+uBlock Origin filter lists and other assets may carry separate licenses. Their notices and source information must be preserved as required.
 
-## AndroidX / Jetpack Compose
+## Dark Reader
 
-ILYRO uses AndroidX libraries including Core, Activity, SplashScreen, Credentials, Compose UI, Foundation and Material components.
+The build pipeline downloads and bundles Dark Reader 4.9.132, verifies its SHA-256 digest, and assigns an ILYRO-specific Gecko add-on ID.
 
-AndroidX is an Android Open Source Project component set. Individual artifacts and source files carry their own license notices, commonly Apache License 2.0. Distribution should preserve notices required by the exact packaged artifacts.
+- Upstream: https://github.com/darkreader/darkreader
+- License: MIT
+- Pinned package: `darkreader-firefox.xpi` from release `v4.9.132`
+
+## AndroidX and Jetpack Compose
+
+ILYRO uses AndroidX components including Core, Activity, SplashScreen, Credentials, Compose UI, Foundation, and Material. Individual artifacts commonly use the Apache License 2.0. Required notices distributed inside upstream artifacts must be preserved.
 
 ## Google authentication libraries
 
-ILYRO uses Google Identity / Credential Manager integration and Google Play Services authentication libraries for optional Google account authorization.
-
-These components are distributed under Google's applicable SDK/library terms. Their inclusion does not imply endorsement of ILYRO by Google.
+ILYRO uses Google Identity, Credential Manager, and Google Play Services authentication libraries for optional Google account authorization and Drive app-data synchronization. These components are governed by Google's applicable SDK and service terms. Their inclusion does not imply endorsement by Google.
 
 ## Kotlin and build tooling
 
-ILYRO is written in Kotlin and built with the Android Gradle Plugin and Gradle. Build-time and runtime components can include additional third-party libraries with their own licenses.
+ILYRO is written in Kotlin and built with the Android Gradle Plugin and Gradle. Build-time and runtime components may contain additional third-party notices.
 
-## Test-only dependencies
+## Verification
 
-The repository uses test dependencies including JUnit and `org.json`. Test-only dependencies are not necessarily shipped in the release APK, but their licenses should remain documented in development/source distributions where applicable.
+The release workflow records the resolved Gradle dependency graph for the exact release build and publishes it with the workflow artifacts. Maintainers must review material dependency or bundled-extension changes before publishing a stable release.
 
-## Distribution checklist
-
-Before publishing a public release:
-
-1. Generate the final resolved dependency list for the exact release build.
-2. Verify the license/notice requirements of every runtime dependency included in the APK/AAB.
-3. Preserve required license texts and copyright notices.
-4. Verify the exact uBlock Origin package and bundled filter-list licenses used by CI.
-5. Re-check any modified or redistributed third-party source/code for source-offer or attribution obligations.
-
-This file is an engineering inventory, not legal advice or a substitute for reviewing the licenses themselves.
+This file is an engineering notice, not legal advice.
