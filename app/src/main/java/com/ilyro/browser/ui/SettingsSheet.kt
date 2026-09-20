@@ -707,7 +707,7 @@ private fun SettingsCategoryContent(
             }
 
             SettingsCard(title = tr("Developers", "Разработчики")) {
-                InfoRow("Alex Agapitov")
+                InfoRow("Alex Agapitov", emphasis = false)
                 SettingsRowDivider()
                 InfoRow("Habet Hayrapetyan", emphasis = false)
             }
