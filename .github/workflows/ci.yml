@@ -56,9 +56,22 @@ jobs:
           node --check app/src/main/ubo/ilyro-native-bridge.js
           node app/src/test/js/gesture-policy.test.js
 
-      - name: Lint, test, and build debug APK
+      - name: Run Android lint
+        shell: bash
         run: |
-          gradle :app:lintDebug :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
+          set +e
+          gradle :app:lintDebug --stacktrace
+          lint_status=$?
+          if [ -f app/build/reports/lint-results-debug.txt ]; then
+            echo "::group::Android lint report"
+            cat app/build/reports/lint-results-debug.txt
+            echo "::endgroup::"
+          fi
+          exit "$lint_status"
+
+      - name: Test and build debug APK
+        run: |
+          gradle :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
 
       - name: Upload debug APK
         if: github.event_name != 'pull_request'
