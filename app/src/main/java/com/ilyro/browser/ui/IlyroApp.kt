@@ -405,9 +405,24 @@ private fun BrowserScreen(
     val focusManager = LocalFocusManager.current
     val browserScope = rememberCoroutineScope()
     val showTabletTabStrip = configuration.smallestScreenWidthDp >= 600
-    val runtime = remember { BrowserEngine.getRuntime(context, settings.theme, settings.preferredSiteLanguages) }
+    val runtime = remember {
+        BrowserEngine.prepareForSettings(settings)
+        BrowserEngine.getRuntime(context, settings.theme, settings.preferredSiteLanguages)
+    }
     SideEffect {
         BrowserEngine.applyPreferredColorScheme(settings.theme)
+    }
+
+    // Do not restore/open web sessions until bundled extensions have reached their requested
+    // startup state. This prevents a previously-enabled Dark Reader from touching pages for a
+    // moment before the saved "off" setting is applied, and guarantees the media detector is
+    // attached to the final WebExtension instance before YouTube starts loading.
+    if (!BrowserEngine.startupExtensionsReady) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {}
+        return
     }
     val prefs = remember { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
     val downloadController = remember(runtime) { DownloadController(context, prefs, runtime) }
