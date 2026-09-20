@@ -155,4 +155,8 @@ jobs:
           if [[ "$RELEASE_VERSION" == *-* ]]; then
             release_flags+=(--prerelease)
           fi
-          gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes --title "ILYRO $RELEASE_VERSION" "${release_flags[@]}"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes --title "ILYRO $RELEASE_VERSION" "${release_flags[@]}"
+          fi
