@@ -56,7 +56,7 @@ Stability and release-readiness milestone. RC3 passed the manual P0 regression g
 ### Repository / CI
 
 - Removed obsolete one-shot migration/fix workflows from the RC branch.
-- Retained the long-lived primary Android build workflow and Actions cleanup workflow.
+- Retained the long-lived primary Android build workflow and removed obsolete one-shot/cleanup workflows before public preparation.
 - Added an RC stability checklist and release exit criteria.
 - Added privacy-policy and third-party-notice drafts for public-beta preparation.
 
