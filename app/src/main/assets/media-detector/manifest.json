@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "ILYRO Media Detector",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "applications": {
     "gecko": {
       "id": "media-detector@ilyro"
@@ -11,12 +11,6 @@
     {
       "matches": [
         "<all_urls>"
-      ],
-      "exclude_matches": [
-        "*://youtube.com/*",
-        "*://*.youtube.com/*",
-        "*://youtu.be/*",
-        "*://*.youtu.be/*"
       ],
       "js": [
         "detector.js"
