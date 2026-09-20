@@ -52,7 +52,7 @@ class DownloadKeepAliveService : Service() {
                 val id = intent.getLongExtra(EXTRA_ID, Long.MIN_VALUE)
                 if (id != Long.MIN_VALUE) {
                     val changed = cancelHandler?.invoke(id) == true
-                    if (changed) Companion.finish(id)
+                    if (changed) Companion.finish(this, id)
                 }
                 if (activeDownloads.isEmpty()) stopSelf(startId)
                 return START_NOT_STICKY
