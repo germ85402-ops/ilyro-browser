@@ -1,5 +1,6 @@
 (() => {
   let port = null;
+  let networkPort = null;
   let networkWatcherStarted = false;
   let performanceObserver = null;
   const seen = new Map();
@@ -216,14 +217,30 @@
     }
   }
 
-  browser.runtime.onMessage.addListener(message => {
-    if (!message || message.type !== 'ilyro-network-media' || typeof message.url !== 'string') {
-      return;
+  function connectNetworkPort() {
+    if (networkPort) return;
+    try {
+      const connected = browser.runtime.connect({ name: 'ilyro-media-network' });
+      networkPort = connected;
+      connected.onMessage.addListener(message => {
+        if (!message ||
+            message.type !== 'ilyro-network-media' ||
+            typeof message.url !== 'string') {
+          return;
+        }
+        // The background page sees the actual googlevideo network request even when Gecko does
+        // not expose it through PerformanceObserver.
+        report(message.url, '', 'youtube-webrequest', 0, 0);
+      });
+      connected.onDisconnect.addListener(() => {
+        if (networkPort === connected) networkPort = null;
+        setTimeout(connectNetworkPort, 250);
+      });
+    } catch (_) {
+      networkPort = null;
+      setTimeout(connectNetworkPort, 500);
     }
-    // PerformanceObserver does not reliably expose media subrequests on every Gecko/YouTube
-    // combination. The background webRequest observer forwards the actual googlevideo request.
-    report(message.url, '', 'youtube-webrequest', 0, 0);
-  });
+  }
 
   function inspectPerformanceEntry(entry) {
     const name = typeof entry?.name === 'string' ? entry.name : '';
@@ -296,6 +313,7 @@
     document.querySelectorAll('video, audio').forEach(inspectMediaElement);
   }
 
+  connectNetworkPort();
   startNetworkWatcher();
   scanMediaElements();
 
