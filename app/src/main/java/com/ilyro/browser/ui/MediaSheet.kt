@@ -185,17 +185,7 @@ internal fun MediaSheet(
                     )
                 }
 
-                if (latestMedia?.requiresSeparateAudio == true && latestMedia.isYouTubeStream) {
-                    Text(
-                        text = tr(
-                            "YouTube provides this quality as separate video and audio. ILYRO will combine the detected tracks while downloading.",
-                            "YouTube отдаёт это качество отдельными видео- и аудиодорожками. При скачивании ILYRO объединит найденные дорожки."
-                        ),
-                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else if (latestMedia?.kind == DetectedMediaKind.DASH || latestMedia?.hlsHasSeparateAudio == true) {
+                if (latestMedia?.kind == DetectedMediaKind.DASH || latestMedia?.hlsHasSeparateAudio == true) {
                     Text(
                         text = tr(
                             "This adaptive stream keeps video and audio separately and cannot be saved as one file yet.",
@@ -263,11 +253,7 @@ private fun MediaCard(
     onOpenExternal: () -> Unit
 ) {
     val uri = runCatching { Uri.parse(item.url) }.getOrNull()
-    val host = if (item.isYouTubeStream) {
-        "YouTube"
-    } else {
-        uri?.host.orEmpty().removePrefix("www.")
-    }
+    val host = uri?.host.orEmpty().removePrefix("www.")
     val dimensions = if (item.width > 0 && item.height > 0) {
         "${item.width}×${item.height}"
     } else null

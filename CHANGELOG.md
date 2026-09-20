@@ -2,11 +2,11 @@
 
 ## Unreleased
 
-## 0.26.0-rc3 — release candidate
+## 0.26.0-rc4 — release candidate
 
-- Add a page-level YouTube fallback powered by the Android yt-dlp wrapper when GeckoView does not expose signed media subrequests to the bundled detector.
-- Resolve public YouTube video metadata from the current page and download adaptive video/audio streams with local FFmpeg merging.
-- Keep the existing direct media detector as the fast path and add cancellation-aware extraction progress in the downloads screen.
+- Remove YouTube media detection and downloading so the media sheet remains focused on other websites.
+- Remove the unused yt-dlp/FFmpeg fallback and its native runtime payload from the APK.
+- Keep direct video/audio and supported HLS downloads for non-YouTube sites.
 
 ## 0.26.0-rc2 — release candidate
 

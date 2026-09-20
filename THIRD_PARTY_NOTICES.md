@@ -48,15 +48,6 @@ ILYRO uses AndroidX components including Core, Activity, SplashScreen, Credentia
 
 ILYRO uses Google Identity, Credential Manager, and Google Play Services authentication libraries for optional Google account authorization and Drive app-data synchronization. These components are governed by Google's applicable SDK and service terms. Their inclusion does not imply endorsement by Google.
 
-## yt-dlp Android wrapper
-
-ILYRO uses the `youtubedl-android` library 0.18.1 as a YouTube fallback extractor and downloader.
-
-- Upstream: https://github.com/yausername/youtubedl-android
-- Maven artifacts: `io.github.junkfood02.youtubedl-android:library:0.18.1` and `ffmpeg:0.18.1`
-- License: GNU General Public License v3.0
-- The library bundles yt-dlp, Python, QuickJS, and FFmpeg runtime components; their upstream notices remain part of the distributed artifacts.
-
 ## Kotlin and build tooling
 
 ILYRO is written in Kotlin and built with the Android Gradle Plugin and Gradle. The repository includes the official Gradle Wrapper for Gradle 9.6.0, distributed by the Gradle project under the Apache License 2.0. Build-time and runtime components may contain additional third-party notices.

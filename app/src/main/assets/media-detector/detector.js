@@ -1,6 +1,12 @@
 (() => {
+  const host = (location.hostname || '').toLowerCase().replace(/\.$/, '');
+  if (host === 'youtube.com' || host.endsWith('.youtube.com') ||
+      host === 'youtube-nocookie.com' || host.endsWith('.youtube-nocookie.com') ||
+      host === 'youtu.be' || host.endsWith('.youtu.be')) {
+    return;
+  }
+
   let port = null;
-  let networkPort = null;
   let networkWatcherStarted = false;
   let performanceObserver = null;
   const seen = new Map();
@@ -10,26 +16,6 @@
   const MAX_PENDING_REPORTS = 64;
   const MEDIA_URL_RE = /\.(m3u8|mpd|mp4|webm|m4v|mov|ogv|mp3|m4a|aac|flac|wav|oga|opus)(?:$|[?#])/i;
   const STREAM_HINT_RE = /(?:[?&](?:format|type|mime)=(?:m3u8|application%2F(?:vnd\.apple\.mpegurl|dash\+xml))|\/(?:hls|dash)\/[^?#]*(?:master|manifest|playlist|index))/i;
-  const YOUTUBE_PROGRESSIVE_ITAGS = new Set([17, 18, 22, 36, 43, 44, 45, 46]);
-  const YOUTUBE_AUDIO_ITAGS = new Set([
-    139, 140, 141, 171, 172, 249, 250, 251, 256, 258, 327, 328,
-    571, 599, 600, 774, 775, 776
-  ]);
-  const YOUTUBE_VIDEO_ITAGS = new Set([
-    17, 18, 22, 36, 43, 44, 45, 46,
-    160, 133, 134, 135, 136, 137, 264, 266, 278, 242, 243, 244, 247, 248,
-    271, 272, 298, 299, 302, 303, 308, 313, 315, 330, 331, 332, 333, 334,
-    335, 336, 337, 394, 395, 396, 397, 398, 399, 400, 401
-  ]);
-  const YOUTUBE_HEIGHT_BY_ITAG = new Map(Object.entries({
-    17: 144, 36: 240, 18: 360, 43: 360, 44: 480, 22: 720, 45: 720, 46: 1080,
-    160: 144, 133: 240, 134: 360, 135: 480, 136: 720, 137: 1080, 264: 1440,
-    266: 2160, 278: 144, 242: 240, 243: 360, 244: 480, 247: 720, 248: 1080,
-    271: 1440, 272: 2160, 298: 720, 299: 1080, 302: 720, 303: 1080, 308: 1440,
-    313: 2160, 315: 2160, 330: 144, 331: 240, 332: 360, 333: 480, 334: 720,
-    335: 1080, 336: 1440, 337: 2160, 394: 144, 395: 240, 396: 360, 397: 480,
-    398: 720, 399: 1080, 400: 1440, 401: 2160
-  }).map(([key, value]) => [Number(key), value]));
 
   function connect() {
     if (port) return port;
@@ -108,56 +94,6 @@
     }
   }
 
-  function youtubeStreamInfo(value) {
-    try {
-      const url = new URL(value, location.href);
-      const mediaHost = (url.hostname || '').toLowerCase();
-      if (!(mediaHost === 'googlevideo.com' || mediaHost.endsWith('.googlevideo.com'))) return null;
-      if (!url.pathname.includes('/videoplayback')) return null;
-
-      const queryMime = (url.searchParams.get('mime') || '').toLowerCase();
-      const typeHint = (url.searchParams.get('type') || '').toLowerCase();
-      const codecHint = (url.searchParams.get('codecs') || '').toLowerCase();
-      const itag = Number(url.searchParams.get('itag') || 0);
-      const kind = queryMime.startsWith('video/') ? 'video' :
-        queryMime.startsWith('audio/') ? 'audio' :
-        typeHint.startsWith('video/') ? 'video' :
-        typeHint.startsWith('audio/') ? 'audio' :
-        YOUTUBE_AUDIO_ITAGS.has(itag) ? 'audio' :
-        YOUTUBE_VIDEO_ITAGS.has(itag) ? 'video' :
-        /(?:mp4a|opus|vorbis|ac-3|ec-3)/i.test(codecHint) ? 'audio' :
-        /(?:avc1|av01|vp8|vp9|vp09|hev1|hvc1)/i.test(codecHint) ? 'video' : '';
-      if (!kind) return null;
-
-      ['range', 'rn', 'rbuf'].forEach(name => url.searchParams.delete(name));
-
-      const progressive = kind === 'video' && YOUTUBE_PROGRESSIVE_ITAGS.has(itag);
-      const height = YOUTUBE_HEIGHT_BY_ITAG.get(itag) ||
-        Math.max(0, Number(url.searchParams.get('height') || 0));
-      const width = Math.max(0, Number(url.searchParams.get('width') || 0));
-      const bitrate = Math.max(0, Number(url.searchParams.get('bitrate') || 0));
-      const frameRate = Math.max(0, Number(url.searchParams.get('fps') || 0));
-      const codecMatch = queryMime.match(/codecs?=["']?([^;"']+)/i);
-
-      return {
-        url: url.href,
-        kind,
-        mime: queryMime,
-        source: kind === 'audio'
-          ? 'youtube-adaptive-audio'
-          : (progressive ? 'youtube-progressive' : 'youtube-adaptive-video'),
-        width,
-        height,
-        bitrate,
-        frameRate,
-        codecs: codecMatch ? codecMatch[1].trim() : '',
-        requiresSeparateAudio: kind === 'video' && !progressive
-      };
-    } catch (_) {
-      return null;
-    }
-  }
-
   function classify(url, mime, hint) {
     const path = pathOf(url);
     const lowerUrl = (url || '').toLowerCase();
@@ -221,29 +157,23 @@
   function cleanMediaTitle(value) {
     if (typeof value !== 'string') return '';
     return value
-      .replace(/\s+-\s+YouTube\s*$/i, '')
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 180);
   }
 
   function report(rawUrl, mime, source, width, height, titleOverride) {
-    const youtube = youtubeStreamInfo(rawUrl);
-    const url = normalizedUrl(youtube ? youtube.url : rawUrl);
+    const url = normalizedUrl(rawUrl);
     if (!url) return;
 
-    const effectiveMime = youtube ? youtube.mime : (mime || '');
-    const effectiveSource = youtube ? youtube.source : (source || 'page');
-    const kind = youtube ? youtube.kind : classify(url, effectiveMime, effectiveSource);
+    const effectiveMime = mime || '';
+    const effectiveSource = source || 'page';
+    const kind = classify(url, effectiveMime, effectiveSource);
     if (!kind) return;
 
     const inferred = inferQualityFromUrl(url);
-    const mediaWidth = youtube && youtube.width > 0
-      ? youtube.width
-      : (Number.isFinite(width) && width > 0 ? Math.round(width) : inferred.width);
-    const mediaHeight = youtube && youtube.height > 0
-      ? youtube.height
-      : (Number.isFinite(height) && height > 0 ? Math.round(height) : inferred.height);
+    const mediaWidth = Number.isFinite(width) && width > 0 ? Math.round(width) : inferred.width;
+    const mediaHeight = Number.isFinite(height) && height > 0 ? Math.round(height) : inferred.height;
 
     const key = kind + '|' + url;
     if (!remember(key, effectiveMime, effectiveSource, mediaWidth, mediaHeight)) return;
@@ -257,37 +187,8 @@
       pageUrl: location.href,
       title: cleanMediaTitle(titleOverride) || cleanMediaTitle(document.title),
       width: Math.max(0, mediaWidth),
-      height: Math.max(0, mediaHeight),
-      bitrate: youtube ? youtube.bitrate : 0,
-      frameRate: youtube ? youtube.frameRate : 0,
-      codecs: youtube ? youtube.codecs : '',
-      separateAudio: youtube ? youtube.requiresSeparateAudio === true : false
+      height: Math.max(0, mediaHeight)
     });
-  }
-
-  function connectNetworkPort() {
-    if (networkPort) return;
-    try {
-      const connected = browser.runtime.connect({ name: 'ilyro-media-network' });
-      networkPort = connected;
-      connected.onMessage.addListener(message => {
-        if (!message ||
-            message.type !== 'ilyro-network-media' ||
-            typeof message.url !== 'string') {
-          return;
-        }
-        // The background page sees the actual googlevideo network request even when Gecko does
-        // not expose it through PerformanceObserver.
-        report(message.url, '', 'youtube-webrequest', 0, 0);
-      });
-      connected.onDisconnect.addListener(() => {
-        if (networkPort === connected) networkPort = null;
-        setTimeout(connectNetworkPort, 250);
-      });
-    } catch (_) {
-      networkPort = null;
-      setTimeout(connectNetworkPort, 500);
-    }
   }
 
   function inspectPerformanceEntry(entry) {
@@ -296,14 +197,13 @@
 
     const initiator = (entry?.initiatorType || '').toLowerCase();
     const isMediaInitiator = initiator === 'video' || initiator === 'audio';
-    const youtube = youtubeStreamInfo(name);
 
-    if (!youtube && !isMediaInitiator && !MEDIA_URL_RE.test(name) && !STREAM_HINT_RE.test(name)) return;
+    if (!isMediaInitiator && !MEDIA_URL_RE.test(name) && !STREAM_HINT_RE.test(name)) return;
 
     let hint = 'network';
     if (initiator === 'video') hint = 'resource-video';
     if (initiator === 'audio') hint = 'resource-audio';
-    report(name, youtube ? youtube.mime : '', hint, 0, 0);
+    report(name, '', hint, 0, 0);
   }
 
   function startNetworkWatcher() {
@@ -361,14 +261,6 @@
     document.querySelectorAll('video, audio').forEach(inspectMediaElement);
   }
 
-  function isYouTubePage() {
-    const host = (location.hostname || '').toLowerCase().replace(/\.$/, '');
-    return host === 'youtube.com' ||
-      host.endsWith('.youtube.com') ||
-      host === 'youtu.be';
-  }
-
-  connectNetworkPort();
   startNetworkWatcher();
   scanMediaElements();
 
@@ -385,8 +277,6 @@
   document.addEventListener('playing', mediaEventHandler, true);
   document.addEventListener('durationchange', mediaEventHandler, true);
   document.addEventListener('progress', mediaEventHandler, true);
-  window.addEventListener('yt-navigate-finish', scanMediaElements, true);
-  window.addEventListener('yt-page-data-updated', scanMediaElements, true);
 
   setTimeout(scanMediaElements, 500);
   setTimeout(scanMediaElements, 1500);
@@ -422,14 +312,4 @@
       scanMediaElements();
     }
   }, true);
-
-  // YouTube can replace the MediaSource-backed <video> without emitting a useful src mutation.
-  // Keep a low-cost scan alive on YouTube so a newly selected format is reported after SPA
-  // navigation or a delayed player start.
-  if (isYouTubePage()) {
-    setInterval(() => {
-      startNetworkWatcher();
-      scanMediaElements();
-    }, 2500);
-  }
 })();

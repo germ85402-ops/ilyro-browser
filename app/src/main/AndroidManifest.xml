@@ -25,7 +25,6 @@
         android:label="${appLabel}"
         android:supportsRtl="true"
         android:theme="@style/Theme.ILYRO"
-        android:extractNativeLibs="true"
         android:usesCleartextTraffic="true">
 
 

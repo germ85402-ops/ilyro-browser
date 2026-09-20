@@ -29,19 +29,11 @@ internal data class DetectedMedia(
     val codecs: String? = null,
     val variantLabel: String? = null,
     val hlsHasSeparateAudio: Boolean = false,
-    val requiresSeparateAudio: Boolean = false,
     val firstSeenAt: Long = System.currentTimeMillis(),
     val lastSeenAt: Long = firstSeenAt
 ) {
-    val isYouTubeStream: Boolean
-        get() = source.startsWith("youtube-")
-
-    val isYouTubeExtractor: Boolean
-        get() = source == "youtube-extractor"
-
     val canDownload: Boolean
-        get() = (kind == DetectedMediaKind.VIDEO &&
-            (!requiresSeparateAudio || isYouTubeStream)) ||
+        get() = kind == DetectedMediaKind.VIDEO ||
             kind == DetectedMediaKind.AUDIO ||
             (kind == DetectedMediaKind.HLS && !hlsHasSeparateAudio)
 
@@ -127,66 +119,16 @@ internal object MediaDetectorBridge {
             )
     }
 
-    /**
-     * YouTube changes the visible URL during SPA navigation and can use www, m, youtu.be or an
-     * embed host for the same player. Keep audio pairing attached to the video id instead of the
-     * full, often-changing page URL.
-     */
-    internal fun youtubePageIdentity(rawUrl: String?): String? {
-        if (rawUrl.isNullOrBlank()) return null
-        return runCatching {
-            val uri = Uri.parse(rawUrl)
-            val host = uri.host.orEmpty().lowercase().trimEnd('.')
-            val isYouTubeHost = host == "youtu.be" ||
-                host.endsWith(".youtube.com") ||
-                host == "youtube.com" ||
-                host.endsWith(".youtube-nocookie.com") ||
-                host == "youtube-nocookie.com"
-            if (!isYouTubeHost) return@runCatching null
-
-            val segments = uri.pathSegments
-            val videoId = when {
-                host == "youtu.be" -> segments.firstOrNull()
-                uri.path.equals("/watch", ignoreCase = true) -> uri.getQueryParameter("v")
-                segments.size >= 2 && segments.first().lowercase() in setOf("shorts", "embed", "live") ->
-                    segments[1]
-                else -> null
-            }?.trim()?.takeIf { it.isNotEmpty() }
-
-            videoId?.let { "video:$it" } ?: "page:${host}|${uri.path.orEmpty()}"
-        }.getOrNull()
+    fun isExcludedUrl(url: String): Boolean {
+        val host = runCatching { Uri.parse(url).host.orEmpty().lowercase().trimEnd('.') }
+            .getOrDefault("")
+        return host == "youtube.com" ||
+            host.endsWith(".youtube.com") ||
+            host == "youtube-nocookie.com" ||
+            host.endsWith(".youtube-nocookie.com") ||
+            host == "youtu.be" ||
+            host.endsWith(".youtu.be")
     }
-
-    internal fun sameYoutubePage(firstUrl: String?, secondUrl: String?): Boolean {
-        val first = youtubePageIdentity(firstUrl)
-        val second = youtubePageIdentity(secondUrl)
-        return if (first != null && second != null) first == second else firstUrl == secondUrl
-    }
-
-    /**
-     * A page-level YouTube candidate keeps the media action useful when GeckoView does not expose
-     * the signed googlevideo requests to the bundled detector. The actual stream is resolved by
-     * [YouTubeExtractor] only when the media sheet is opened or the user starts a download.
-     */
-    internal fun youtubePageCandidate(pageUrl: String?, title: String?): DetectedMedia? {
-        val identity = youtubePageIdentity(pageUrl) ?: return null
-        if (!identity.startsWith("video:")) return null
-        val normalizedUrl = pageUrl?.trim()?.takeIf { it.isNotBlank() } ?: return null
-        return DetectedMedia(
-            url = normalizedUrl,
-            kind = DetectedMediaKind.VIDEO,
-            mimeType = "video/mp4",
-            pageUrl = normalizedUrl,
-            title = title?.trim()?.takeIf { it.isNotBlank() },
-            source = "youtube-extractor",
-            width = 0,
-            height = 0,
-            variantLabel = "Best available"
-        )
-    }
-
-    // Media detection is enabled on YouTube too.
-    fun isExcludedUrl(url: String): Boolean = false
 
     private fun install(session: GeckoSession, extension: WebExtension) {
         session.webExtensionController.setMessageDelegate(
@@ -220,7 +162,6 @@ internal object MediaDetectorBridge {
                             val bitrate = json.optLong("bitrate", 0L).coerceAtLeast(0L)
                             val frameRate = json.optDouble("frameRate", 0.0).coerceAtLeast(0.0)
                             val codecs = json.optString("codecs").trim().takeIf { it.isNotEmpty() }
-                            val requiresSeparateAudio = json.optBoolean("separateAudio", false)
                             val now = System.currentTimeMillis()
 
                             val items = mediaBySession.getOrPut(session) { linkedMapOf() }
@@ -239,7 +180,6 @@ internal object MediaDetectorBridge {
                                     bitrate = bitrate,
                                     frameRate = frameRate,
                                     codecs = codecs,
-                                    requiresSeparateAudio = requiresSeparateAudio,
                                     firstSeenAt = now,
                                     lastSeenAt = now
                                 )
@@ -258,8 +198,6 @@ internal object MediaDetectorBridge {
                                     bitrate = maxOf(previous.bitrate, bitrate),
                                     frameRate = maxOf(previous.frameRate, frameRate),
                                     codecs = codecs ?: previous.codecs,
-                                    requiresSeparateAudio =
-                                        previous.requiresSeparateAudio || requiresSeparateAudio,
                                     lastSeenAt = now
                                 )
                             }
@@ -308,7 +246,6 @@ internal object MediaDetectorBridge {
 
     private fun preferSource(old: String, new: String): String {
         fun rank(value: String): Int = when {
-            value.startsWith("youtube-") -> 4
             value.startsWith("resource-") || value == "network" -> 3
             value.startsWith("source-") -> 2
             value == "video" || value == "audio" -> 1
