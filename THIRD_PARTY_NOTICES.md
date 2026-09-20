@@ -6,10 +6,10 @@ ILYRO Browser incorporates or depends on third-party software. Each component re
 
 ## Mozilla GeckoView
 
-ILYRO uses a pinned Mozilla GeckoView Nightly build as its browser engine.
+ILYRO uses a pinned Mozilla GeckoView stable release as its browser engine.
 
 - Project: Mozilla GeckoView / Gecko
-- Pinned artifact: `org.mozilla.geckoview:geckoview-nightly:158.0.20260911092915`
+- Pinned artifact: `org.mozilla.geckoview:geckoview:155.0.20260903215306`
 - License family: Mozilla Public License 2.0 for Mozilla-covered source code
 - License: https://www.mozilla.org/MPL/2.0/
 

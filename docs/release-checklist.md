@@ -2,6 +2,10 @@
 
 Use this checklist before publishing a public release or release candidate.
 
+The automated metadata gate can be run locally with
+`python3 scripts/verify_release_readiness.py`. It also runs in Android CI, the
+release workflow, and the GitHub Pages workflow.
+
 ## Repository
 
 - [ ] Android CI is green for the code revision being released.

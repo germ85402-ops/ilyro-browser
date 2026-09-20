@@ -21,6 +21,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
+      - name: Verify release readiness metadata
+        run: python3 scripts/verify_release_readiness.py
+
       - name: Verify tag matches app version
         id: version
         shell: bash
