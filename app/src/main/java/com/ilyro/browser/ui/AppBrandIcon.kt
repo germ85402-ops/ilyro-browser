@@ -20,7 +20,8 @@ internal fun AppIcon.resource(): Int = when (this) {
 @Composable
 internal fun AppBrandIcon(modifier: Modifier = Modifier, icon: AppIcon = LocalAppIcon.current) {
  val context = LocalContext.current
- val bitmap = remember(icon, context.resources.configuration) {
+ val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+ val bitmap = remember(icon, configuration) {
  ResourcesCompat.getDrawable(context.resources, icon.resource(), context.theme)!!.toBitmap(216,216).asImageBitmap()
  }
  Image(bitmap = bitmap, contentDescription = "ILYRO", modifier = modifier)

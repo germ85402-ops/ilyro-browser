@@ -61,6 +61,7 @@ private fun normalizeLanguageTag(value: String?): String? = value
     ?.lowercase()
     ?.takeIf { it.length in 2..3 }
 
+@org.mozilla.geckoview.ExperimentalGeckoViewApi
 internal fun loadReaderArticle(
     session: GeckoSession,
     url: String,

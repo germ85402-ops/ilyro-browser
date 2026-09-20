@@ -71,7 +71,6 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 private data class HistorySection(
     val date: LocalDate,
@@ -557,11 +556,12 @@ private fun groupHistoryByDay(history: List<HistoryItem>): List<HistorySection> 
 
 @Composable
 private fun historySectionLabel(date: LocalDate): String {
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
     val today = LocalDate.now()
     return when (date) {
         today -> tr("Today", "Сегодня")
         today.minusDays(1) -> tr("Yesterday", "Вчера")
-        else -> date.format(DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.getDefault()))
+        else -> date.format(DateTimeFormatter.ofPattern("d MMMM yyyy", locale))
     }
 }
 

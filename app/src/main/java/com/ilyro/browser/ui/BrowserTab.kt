@@ -29,6 +29,7 @@ private fun browserTabHostLabel(url: String): String {
     return host ?: "New tab"
 }
 
+@org.mozilla.geckoview.ExperimentalGeckoViewApi
 internal class BrowserTab(
     private val runtime: GeckoRuntime,
     private val initialUrl: String,

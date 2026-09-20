@@ -401,9 +401,10 @@ private fun BrowserScreen(
     onSettingsChange: (BrowserSettings) -> Unit
 ) {
     val context = LocalContext.current
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     val focusManager = LocalFocusManager.current
     val browserScope = rememberCoroutineScope()
-    val showTabletTabStrip = context.resources.configuration.smallestScreenWidthDp >= 600
+    val showTabletTabStrip = configuration.smallestScreenWidthDp >= 600
     val runtime = remember { BrowserEngine.getRuntime(context, settings.theme, settings.preferredSiteLanguages) }
     SideEffect {
         BrowserEngine.applyPreferredColorScheme(settings.theme)

@@ -52,6 +52,7 @@
                   ) : PendingSitePermission
               }
 
+              @org.mozilla.geckoview.ExperimentalGeckoViewApi
               internal object SitePermissionCoordinator {
                   private data class AndroidPermissionRequest(
                       val permissions: Array<String>,
