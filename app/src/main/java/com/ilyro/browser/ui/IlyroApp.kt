@@ -2064,7 +2064,8 @@ private fun BrowserScreen(
                                 .asSequence()
                                 .filter {
                                     it.kind == DetectedMediaKind.AUDIO &&
-                                        it.isYouTubeStream
+                                        it.isYouTubeStream &&
+                                        (item.pageUrl == null || it.pageUrl == item.pageUrl)
                                 }
                                 .sortedWith(
                                     compareByDescending<DetectedMedia> {
