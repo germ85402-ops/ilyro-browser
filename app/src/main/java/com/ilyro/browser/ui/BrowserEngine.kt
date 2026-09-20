@@ -109,8 +109,10 @@ internal object BrowserEngine {
                     { extension ->
                         if (extension != null) {
                             adBlockExtension = extension
-                            ProtectionBridge.attach(created, extension)
                             controller.setAllowedInPrivateBrowsing(extension, true)
+                            // Attach the native bridge only after uBO has reached the requested
+                            // enabled state. Attaching before controller.enable()/disable() can
+                            // leave the already-connected native port orphaned until app restart.
                             applyAdBlockState(controller, extension, adBlockingEnabled)
                         }
                     },
@@ -243,6 +245,21 @@ internal object BrowserEngine {
         extension: WebExtension,
         enabled: Boolean
     ) {
+        fun attachStableExtension(stableExtension: WebExtension) {
+            adBlockExtension = stableExtension
+            runtime?.let { currentRuntime ->
+                ProtectionBridge.attach(currentRuntime, stableExtension)
+            }
+        }
+
+        // Do not reload an already-correct uBO instance. Reloading it after the bridge has
+        // connected can replace the WebExtension object while the native port still belongs to
+        // the previous instance, leaving ILYRO Shield stuck on "Starting…" until app restart.
+        if (extension.metaData.enabled == enabled) {
+            attachStableExtension(extension)
+            return
+        }
+
         val result = if (enabled) {
             controller.enable(extension, WebExtensionController.EnableSource.USER)
         } else {
@@ -250,12 +267,7 @@ internal object BrowserEngine {
         }
         result.accept(
             { updated ->
-                if (updated != null) {
-                    adBlockExtension = updated
-                    runtime?.let { currentRuntime ->
-                        ProtectionBridge.attach(currentRuntime, updated)
-                    }
-                }
+                attachStableExtension(updated ?: extension)
             },
             { error ->
                 Log.e(ENGINE_LOG_TAG, "Failed to change bundled ad blocker state", error)
