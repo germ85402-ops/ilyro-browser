@@ -39,6 +39,12 @@ android {
     packaging { jniLibs { useLegacyPackaging = true }; resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" } }
 }
 
+kotlin {
+    compilerOptions {
+        optIn.add("org.mozilla.geckoview.ExperimentalGeckoViewApi")
+    }
+}
+
 // Kotlin/Compose browser source is canonical in git. preBuild validates the
 // Gecko/Compose overlay contract but never rewrites application source.
 val prepareBundledAdBlock by tasks.registering(Exec::class) {
