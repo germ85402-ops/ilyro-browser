@@ -863,8 +863,15 @@ private fun BrowserScreen(
         MediaDetectorBridge.itemsFor(activeTab.session)
     }
     val mediaEnabledForPage = !isHome && !MediaDetectorBridge.isExcludedUrl(activeTab.url)
-    val detectedVideoCount = if (mediaEnabledForPage) {
-        detectedMedia.count { it.kind != DetectedMediaKind.AUDIO }
+    val latestDetectedMedia = remember(detectedMedia) {
+        MediaDetectorBridge.selectPrimaryCandidate(detectedMedia)
+    }
+    val detectedVideoCount = if (
+        mediaEnabledForPage &&
+        latestDetectedMedia != null &&
+        latestDetectedMedia.kind != DetectedMediaKind.AUDIO
+    ) {
+        1
     } else {
         0
     }
@@ -875,22 +882,27 @@ private fun BrowserScreen(
         !isHome && activeHost.isNotBlank() &&
         ProtectionBridge.siteEnabled("https://$activeHost/")
 
-    LaunchedEffect(showMedia, activeTab.id) {
+    LaunchedEffect(showMedia, activeTab.id, mediaRevision) {
         if (!showMedia || !mediaEnabledForPage) {
             resolvingMediaQualities = false
             return@LaunchedEffect
         }
+        val candidate = MediaDetectorBridge.selectPrimaryCandidate(detectedMedia)
         val requestId = mediaResolveRequest + 1
         mediaResolveRequest = requestId
         val tabId = activeTab.id
-        resolvedMedia = detectedMedia
-        resolvingMediaQualities = detectedMedia.any { it.kind == DetectedMediaKind.HLS }
+        resolvedMedia = listOfNotNull(candidate)
+        resolvingMediaQualities = candidate?.kind == DetectedMediaKind.HLS
+        if (candidate == null) return@LaunchedEffect
+
         downloadController.resolveMediaQualities(
-            media = detectedMedia,
+            media = listOf(candidate),
             isPrivate = activeTab.isPrivate
         ) { resolved ->
             if (mediaResolveRequest == requestId && activeTabId == tabId && showMedia) {
-                resolvedMedia = resolved
+                resolvedMedia = listOfNotNull(
+                    MediaDetectorBridge.selectPrimaryCandidate(resolved)
+                )
                 resolvingMediaQualities = false
             }
         }
@@ -2021,7 +2033,11 @@ private fun BrowserScreen(
         val mediaOpenLabel = tr("View download", "Показать загрузку")
         val mediaDownloadFailedMessage = tr("Couldn't start media download", "Не удалось начать загрузку медиа")
         MediaSheet(
-            media = if (resolvedMedia.isNotEmpty() || detectedMedia.isEmpty()) resolvedMedia else detectedMedia,
+            media = if (resolvedMedia.isNotEmpty() || detectedMedia.isEmpty()) {
+                resolvedMedia
+            } else {
+                listOfNotNull(latestDetectedMedia)
+            },
             resolvingQualities = resolvingMediaQualities,
             onDismiss = { showMedia = false },
             onDownload = { item ->
@@ -2038,7 +2054,52 @@ private fun BrowserScreen(
                             Toast.makeText(context, message, Toast.LENGTH_LONG).show()
                         }
                     )
-                    DetectedMediaKind.VIDEO, DetectedMediaKind.AUDIO ->
+                    DetectedMediaKind.VIDEO -> {
+                        if (item.isYouTubeStream && item.requiresSeparateAudio) {
+                            val videoContainer = item.mimeType
+                                ?.substringBefore(';')
+                                ?.substringAfter('/')
+                                ?.lowercase()
+                            val audio = detectedMedia
+                                .asSequence()
+                                .filter {
+                                    it.kind == DetectedMediaKind.AUDIO &&
+                                        it.isYouTubeStream
+                                }
+                                .sortedWith(
+                                    compareByDescending<DetectedMedia> {
+                                        val audioContainer = it.mimeType
+                                            ?.substringBefore(';')
+                                            ?.substringAfter('/')
+                                            ?.lowercase()
+                                        audioContainer == videoContainer
+                                    }.thenByDescending { it.lastSeenAt }
+                                )
+                                .firstOrNull()
+                            downloadController.enqueueYouTubeDownload(
+                                video = item,
+                                audio = audio,
+                                suggestedTitle = activeTab.title.takeIf { it.isNotBlank() } ?: item.title,
+                                referrer = item.pageUrl ?: activeTab.url,
+                                isPrivate = activeTab.isPrivate,
+                                onRecordsChanged = refreshDownloads,
+                                onError = { message ->
+                                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                                }
+                            )
+                        } else {
+                            downloadController.enqueueNavigationWithSession(
+                                url = item.url,
+                                sourceSettings = activeTab.session.settings,
+                                suggestedName = activeTab.title.takeIf { it.isNotBlank() } ?: item.title,
+                                allowMetered = currentSettings.downloadsOverMetered,
+                                referrer = item.pageUrl ?: activeTab.url,
+                                isPrivate = activeTab.isPrivate,
+                                onRecordsChanged = refreshDownloads
+                            )
+                        }
+                    }
+                    DetectedMediaKind.AUDIO ->
                         downloadController.enqueueNavigationWithSession(
                             url = item.url,
                             sourceSettings = activeTab.session.settings,
@@ -2596,8 +2657,8 @@ private fun BrowserScreen(
                                             tr("Media", "Медиа")
                                         } else {
                                             tr(
-                                                "Media · ${detectedMedia.size}",
-                                                "Медиа · ${detectedMedia.size}"
+                                                "Media · 1",
+                                                "Медиа · 1"
                                             )
                                         }
                                         MenuAction(Icons.Rounded.VideoLibrary, mediaLabel) {
