@@ -62,7 +62,7 @@ jobs:
 
       - name: Upload debug APK
         if: github.event_name != 'pull_request'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ILYRO-debug-${{ github.sha }}
           path: app/build/outputs/apk/debug/app-debug.apk
