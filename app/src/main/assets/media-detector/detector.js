@@ -10,6 +10,7 @@
   const seen = new Map();
   const MAX_SEEN = 256;
   const MEDIA_URL_RE = /\.(m3u8|mpd|mp4|webm|m4v|mov|ogv|mp3|m4a|aac|flac|wav|oga|opus)(?:$|[?#])/i;
+  const STREAM_HINT_RE = /(?:[?&](?:format|type|mime)=(?:m3u8|application%2F(?:vnd\.apple\.mpegurl|dash\+xml))|\/(?:hls|dash)\/[^?#]*(?:master|manifest|playlist|index))/i;
 
   function connect() {
     if (port) return port;
@@ -45,11 +46,22 @@
 
   function classify(url, mime, hint) {
     const path = pathOf(url);
+    const lowerUrl = (url || '').toLowerCase();
     const type = (mime || '').toLowerCase();
     const source = (hint || '').toLowerCase();
 
-    if (type.includes('mpegurl') || path.endsWith('.m3u8')) return 'hls';
-    if (type.includes('dash+xml') || path.endsWith('.mpd')) return 'dash';
+    if (
+      type.includes('mpegurl') ||
+      path.endsWith('.m3u8') ||
+      /[?&](?:format|type)=m3u8(?:&|$)/i.test(lowerUrl) ||
+      (/\/hls\//i.test(lowerUrl) && /(?:master|playlist|index)/i.test(lowerUrl))
+    ) return 'hls';
+    if (
+      type.includes('dash+xml') ||
+      path.endsWith('.mpd') ||
+      /[?&](?:format|type)=mpd(?:&|$)/i.test(lowerUrl) ||
+      (/\/dash\//i.test(lowerUrl) && /(?:manifest|index)/i.test(lowerUrl))
+    ) return 'dash';
 
     if (
       type.startsWith('video/') ||
@@ -76,14 +88,39 @@
     return true;
   }
 
-  function report(rawUrl, mime, source, width, height) {
+  function inferQualityFromUrl(url) {
+    const decoded = (() => {
+      try { return decodeURIComponent(url); } catch (_) { return url; }
+    })();
+    const dimensions = decoded.match(/(?:^|[^0-9])(\d{3,4})[x×](\d{3,4})(?:[^0-9]|$)/i);
+    if (dimensions) {
+      return {
+        width: Math.max(0, Number(dimensions[1]) || 0),
+        height: Math.max(0, Number(dimensions[2]) || 0)
+      };
+    }
+    const quality = decoded.match(/(?:^|[/_.-])(4320|2160|1440|1080|900|720|576|540|480|360|240|144)p(?:[/_.?#&-]|$)/i) ||
+      decoded.match(/(?:^|[/_.-])(4320|2160|1440|1080|900|720|576|540|480|360|240|144)(?:[/_.-]|$)/i);
+    return { width: 0, height: quality ? Math.max(0, Number(quality[1]) || 0) : 0 };
+  }
+
+  function cleanMediaTitle(value) {
+    if (typeof value !== 'string') return '';
+    return value.replace(/\s+/g, ' ').trim().slice(0, 180);
+  }
+
+  function report(rawUrl, mime, source, width, height, titleOverride) {
     const url = normalizedUrl(rawUrl);
     if (!url) return;
     const kind = classify(url, mime, source);
     if (!kind) return;
 
+    const inferred = inferQualityFromUrl(url);
+    const mediaWidth = Number.isFinite(width) && width > 0 ? Math.round(width) : inferred.width;
+    const mediaHeight = Number.isFinite(height) && height > 0 ? Math.round(height) : inferred.height;
+
     const key = `${kind}|${url}`;
-    if (!remember(key, mime, source, width, height)) return;
+    if (!remember(key, mime, source, mediaWidth, mediaHeight)) return;
 
     const targetPort = connect();
     if (!targetPort) return;
@@ -96,9 +133,9 @@
         mime: typeof mime === 'string' ? mime : '',
         source: source || 'page',
         pageUrl: location.href,
-        title: document.title || '',
-        width: Number.isFinite(width) ? Math.max(0, Math.round(width)) : 0,
-        height: Number.isFinite(height) ? Math.max(0, Math.round(height)) : 0
+        title: cleanMediaTitle(titleOverride) || cleanMediaTitle(document.title),
+        width: Math.max(0, mediaWidth),
+        height: Math.max(0, mediaHeight)
       });
     } catch (_) {
       port = null;
@@ -112,7 +149,7 @@
     const initiator = (entry?.initiatorType || '').toLowerCase();
     const isMediaInitiator = initiator === 'video' || initiator === 'audio';
 
-    if (!isMediaInitiator && !MEDIA_URL_RE.test(name)) return;
+    if (!isMediaInitiator && !MEDIA_URL_RE.test(name) && !STREAM_HINT_RE.test(name)) return;
 
     let hint = 'network';
     if (initiator === 'video') hint = 'resource-video';
@@ -146,12 +183,20 @@
 
     startNetworkWatcher();
 
-    const width = isVideo ? (element.videoWidth || element.clientWidth || 0) : 0;
-    const height = isVideo ? (element.videoHeight || element.clientHeight || 0) : 0;
+    // Only intrinsic media dimensions describe stream quality. CSS/client dimensions describe
+    // the player box and previously produced fake qualities such as 538p or 150p.
+    const width = isVideo ? (element.videoWidth || 0) : 0;
+    const height = isVideo ? (element.videoHeight || 0) : 0;
     const hint = isVideo ? 'video' : 'audio';
+    const mediaTitle =
+      element.getAttribute('aria-label') ||
+      element.getAttribute('title') ||
+      element.getAttribute('data-title') ||
+      element.closest?.('[data-title]')?.getAttribute?.('data-title') ||
+      '';
 
-    report(element.currentSrc, element.getAttribute('type') || '', hint, width, height);
-    report(element.src, element.getAttribute('type') || '', hint, width, height);
+    report(element.currentSrc, element.getAttribute('type') || '', hint, width, height, mediaTitle);
+    report(element.src, element.getAttribute('type') || '', hint, width, height, mediaTitle);
 
     element.querySelectorAll('source[src]').forEach(source => {
       report(
@@ -159,7 +204,8 @@
         source.type || '',
         isVideo ? 'source-video' : 'source-audio',
         width,
-        height
+        height,
+        mediaTitle
       );
     });
   }
@@ -187,6 +233,30 @@
   setTimeout(scanMediaElements, 1500);
   setTimeout(scanMediaElements, 4000);
   setTimeout(scanMediaElements, 12000);
+
+  // Players are often inserted or swapped after user interaction. Observe the document instead
+  // of relying only on fixed timers, while batching scans to keep the page cheap.
+  let mutationScanTimer = null;
+  try {
+    const observer = new MutationObserver(mutations => {
+      if (!mutations.some(mutation =>
+        mutation.type === 'childList' ||
+        (mutation.type === 'attributes' && ['src', 'type'].includes(mutation.attributeName))
+      )) return;
+      if (mutationScanTimer !== null) return;
+      mutationScanTimer = setTimeout(() => {
+        mutationScanTimer = null;
+        scanMediaElements();
+      }, 120);
+    });
+    observer.observe(document.documentElement || document, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ['src', 'type']
+    });
+  } catch (_) {
+  }
 
   window.addEventListener('pageshow', scanMediaElements, true);
   document.addEventListener('visibilitychange', () => {

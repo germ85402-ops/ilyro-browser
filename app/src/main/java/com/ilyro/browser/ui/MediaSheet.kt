@@ -55,10 +55,17 @@ internal fun MediaSheet(
             .distinct()
             .sortedWith(compareByDescending<String>(::qualitySortValue).thenBy { it })
     }
+    val bestHeight = remember(media) { media.maxOfOrNull { it.height } ?: 0 }
+    val bestBitrate = remember(media) { media.maxOfOrNull { it.bitrate } ?: 0L }
     var selectedQuality by remember(qualityKeys) { mutableStateOf("all") }
     val visibleMedia = remember(media, selectedQuality) {
         if (selectedQuality == "all") media
         else media.filter { mediaQualityBucket(it) == selectedQuality }
+    }
+    val bestLabel = when {
+        bestHeight > 0 -> qualityDisplayName("${bestHeight}p")
+        bestBitrate > 0L -> formatBitrate(bestBitrate)
+        else -> null
     }
 
     ModalBottomSheet(
@@ -97,10 +104,20 @@ internal fun MediaSheet(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = tr(
-                            "${media.size} source${if (media.size == 1) "" else "s"} on this page",
-                            "Источников на странице: ${media.size}"
-                        ),
+                        text = when {
+                            resolvingQualities -> tr(
+                                "${media.size} sources · checking stream qualities",
+                                "Источников: ${media.size} · определяю качество потоков"
+                            )
+                            bestLabel != null -> tr(
+                                "${media.size} sources · up to $bestLabel",
+                                "Источников: ${media.size} · до $bestLabel"
+                            )
+                            else -> tr(
+                                "${media.size} source${if (media.size == 1) "" else "s"} on this page",
+                                "Источников на странице: ${media.size}"
+                            )
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -114,8 +131,8 @@ internal fun MediaSheet(
                     )
                     Text(
                         text = tr(
-                            "Checking available qualities…",
-                            "Определяю доступные качества…"
+                            "Reading HLS manifests and available variants…",
+                            "Читаю HLS-потоки и доступные варианты качества…"
                         ),
                         modifier = Modifier.padding(top = 6.dp),
                         style = MaterialTheme.typography.bodySmall,
@@ -181,8 +198,8 @@ internal fun MediaSheet(
                             )
                             Text(
                                 text = tr(
-                                    "Start playback on the page. When ILYRO sees a stream, the media shortcut appears automatically in the address bar.",
-                                    "Запустите видео на странице. Когда ILYRO увидит поток, быстрый значок медиа автоматически появится в адресной строке."
+                                    "Start playback on the page. ILYRO also watches dynamically created players and stream manifests.",
+                                    "Запустите видео на странице. ILYRO также отслеживает динамические плееры и потоковые манифесты."
                                 ),
                                 modifier = Modifier.padding(top = 4.dp),
                                 style = MaterialTheme.typography.bodyMedium,
@@ -205,6 +222,7 @@ internal fun MediaSheet(
                                 item = item,
                                 compact = dense || metrics.isCompact,
                                 narrow = metrics.isNarrowPhone,
+                                isBestQuality = item.height > 0 && item.height == bestHeight,
                                 onDownload = { onDownload(item) },
                                 onOpenExternal = {
                                     onDismiss()
@@ -218,8 +236,8 @@ internal fun MediaSheet(
                 if (media.any { it.kind == DetectedMediaKind.DASH || it.hlsHasSeparateAudio }) {
                     Text(
                         text = tr(
-                            "Some adaptive streams keep video and audio separately. They can be opened in an external player; ILYRO only enables Download when it can create a valid local file.",
-                            "Некоторые адаптивные потоки хранят видео и звук отдельно. Их можно открыть во внешнем плеере; кнопка «Скачать» доступна только когда ILYRO может создать корректный локальный файл."
+                            "Some adaptive streams keep video and audio separately. ILYRO shows them, but only enables Download when it can create a valid local file.",
+                            "Некоторые адаптивные потоки хранят видео и звук отдельно. ILYRO показывает их, но включает «Скачать» только когда может создать корректный локальный файл."
                         ),
                         modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
                         style = MaterialTheme.typography.bodySmall,
@@ -258,7 +276,10 @@ private fun QualityTab(
     ) {
         Text(
             text = label,
-            modifier = Modifier.padding(horizontal = if (LocalIlyroUiDensity.current == UiDensity.COMPACT) 10.dp else 14.dp, vertical = if (LocalIlyroUiDensity.current == UiDensity.COMPACT) 6.dp else 9.dp),
+            modifier = Modifier.padding(
+                horizontal = if (LocalIlyroUiDensity.current == UiDensity.COMPACT) 10.dp else 14.dp,
+                vertical = if (LocalIlyroUiDensity.current == UiDensity.COMPACT) 6.dp else 9.dp
+            ),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
             color = if (selected) {
@@ -275,24 +296,37 @@ private fun MediaCard(
     item: DetectedMedia,
     compact: Boolean,
     narrow: Boolean,
+    isBestQuality: Boolean,
     onDownload: () -> Unit,
     onOpenExternal: () -> Unit
 ) {
     val uri = runCatching { Uri.parse(item.url) }.getOrNull()
-    val host = uri?.host.orEmpty()
-    val pathName = uri?.lastPathSegment.orEmpty()
-        .substringBefore('?')
-        .takeIf { it.isNotBlank() }
+    val host = uri?.host.orEmpty().removePrefix("www.")
     val dimensions = if (item.width > 0 && item.height > 0) {
         "${item.width}×${item.height}"
     } else null
     val bitrate = item.bitrate.takeIf { it > 0L }?.let(::formatBitrate)
-    val details = listOfNotNull(
+    val frameRate = item.frameRate.takeIf { it >= 1.0 }?.let {
+        val rounded = kotlin.math.round(it).toInt()
+        "${rounded} fps"
+    }
+    val codec = compactCodecName(item.codecs)
+    val tier = qualityTierLabel(item.height)
+    val title = item.title
+        ?.replace(Regex("\\s+"), " ")
+        ?.trim()
+        ?.take(140)
+        ?.takeIf { it.isNotBlank() && !it.equals("undefined", true) }
+        ?: tr("Video stream", "Видеопоток")
+
+    val technical = listOfNotNull(
         mediaKindLabel(item.kind),
+        tier,
         dimensions,
         bitrate,
-        host.takeIf { it.isNotBlank() }
-    ).joinToString(" · ")
+        frameRate,
+        codec
+    ).distinct().joinToString(" · ")
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -302,7 +336,11 @@ private fun MediaCard(
         ),
         border = BorderStroke(
             1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = IlyroVisualTokens.SubtleBorderAlpha)
+            if (isBestQuality) {
+                MaterialTheme.colorScheme.primary.copy(alpha = 0.26f)
+            } else {
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = IlyroVisualTokens.SubtleBorderAlpha)
+            }
         ),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp
@@ -310,11 +348,15 @@ private fun MediaCard(
         Column(modifier = Modifier.padding(if (compact) 10.dp else 14.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
                 Surface(
                     shape = RoundedCornerShape(IlyroVisualTokens.SmallRadius),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f),
+                    color = if (isBestQuality) {
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f)
+                    },
                     tonalElevation = 0.dp,
                     shadowElevation = 0.dp
                 ) {
@@ -325,29 +367,58 @@ private fun MediaCard(
                             vertical = if (compact) 5.dp else 7.dp
                         ),
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = if (isBestQuality) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
                     )
                 }
+
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .padding(start = if (compact) 8.dp else 10.dp)
                 ) {
                     Text(
-                        text = details,
+                        text = title,
+                        maxLines = if (narrow) 1 else 2,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = technical,
+                        modifier = Modifier.padding(top = 2.dp),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    if (!narrow && !pathName.isNullOrBlank()) {
+                    if (host.isNotBlank()) {
                         Text(
-                            text = pathName,
+                            text = tr("Source: $host", "Источник: $host"),
                             modifier = Modifier.padding(top = 2.dp),
-                            style = MaterialTheme.typography.bodySmall,
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                if (isBestQuality && !narrow) {
+                    Surface(
+                        shape = RoundedCornerShape(IlyroVisualTokens.PillRadius),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    ) {
+                        Text(
+                            text = tr("Best", "Лучшее"),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
@@ -356,7 +427,7 @@ private fun MediaCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = if (compact) 7.dp else 11.dp),
+                    .padding(top = if (compact) 8.dp else 11.dp),
                 horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp)
             ) {
                 if (item.canDownload) {
@@ -373,15 +444,25 @@ private fun MediaCard(
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(IlyroVisualTokens.ControlRadius)
                 ) {
-                    Text(tr("Player", "В плеер"))
+                    Text(tr("Open in player", "В плеер"))
                 }
             }
 
             if (item.hlsHasSeparateAudio) {
                 Text(
                     text = tr(
-                        "This quality uses a separate audio track",
-                        "У этого качества звук идёт отдельной дорожкой"
+                        "Audio is stored separately for this quality",
+                        "Для этого качества звук хранится отдельной дорожкой"
+                    ),
+                    modifier = Modifier.padding(top = 7.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else if (item.height <= 0 && item.kind == DetectedMediaKind.HLS) {
+                Text(
+                    text = tr(
+                        "The server does not advertise a fixed resolution; the player chooses it automatically.",
+                        "Сервер не сообщает фиксированное разрешение — плеер выбирает качество автоматически."
                     ),
                     modifier = Modifier.padding(top = 7.dp),
                     style = MaterialTheme.typography.bodySmall,
@@ -414,6 +495,33 @@ private fun qualityDisplayName(key: String): String = when (key) {
     "video" -> tr("Video", "Видео")
     "audio" -> tr("Audio", "Аудио")
     else -> key
+}
+
+@Composable
+private fun qualityTierLabel(height: Int): String? = when {
+    height >= 4320 -> "8K UHD"
+    height >= 2160 -> "4K UHD"
+    height >= 1440 -> "QHD"
+    height >= 1080 -> "Full HD"
+    height >= 720 -> "HD"
+    height > 0 -> "SD"
+    else -> null
+}
+
+private fun compactCodecName(codecs: String?): String? {
+    val clean = codecs?.trim()?.takeIf { it.isNotBlank() } ?: return null
+    val videoCodec = clean.split(',').firstNotNullOfOrNull { token ->
+        val value = token.trim().lowercase()
+        when {
+            value.startsWith("avc1") || value.startsWith("avc3") -> "H.264"
+            value.startsWith("hvc1") || value.startsWith("hev1") -> "HEVC"
+            value.startsWith("av01") -> "AV1"
+            value.startsWith("vp09") || value.startsWith("vp9") -> "VP9"
+            value.startsWith("vp08") || value.startsWith("vp8") -> "VP8"
+            else -> null
+        }
+    }
+    return videoCodec ?: clean.take(28)
 }
 
 private fun formatBitrate(bitsPerSecond: Long): String {

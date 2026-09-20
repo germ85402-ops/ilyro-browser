@@ -25,7 +25,11 @@ internal data class HlsMasterVariant(
     val bandwidth: Long,
     val width: Int,
     val height: Int,
-    val hasSeparateAudio: Boolean
+    val hasSeparateAudio: Boolean,
+    val name: String? = null,
+    val frameRate: Double = 0.0,
+    val codecs: String? = null,
+    val videoRange: String? = null
 ) {
     val pixelCount: Long
         get() = width.toLong() * height.toLong()
@@ -49,14 +53,23 @@ internal fun parseHlsMasterVariants(text: String, baseUrl: String): List<HlsMast
             ?.split('x')
             ?.takeIf { it.size == 2 }
         val width = dimensions?.getOrNull(0)?.toIntOrNull()?.coerceAtLeast(0) ?: 0
-        val height = dimensions?.getOrNull(1)?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+        val explicitHeight = dimensions?.getOrNull(1)?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+        val name = attributes["NAME"]?.trim()?.takeIf { it.isNotBlank() }
+        val height = explicitHeight.takeIf { it > 0 }
+            ?: inferHlsQualityHeight(name)
+            ?: inferHlsQualityHeight(uriLine)
+            ?: 0
 
         variants += HlsMasterVariant(
             url = resolved,
             bandwidth = bandwidth,
             width = width,
             height = height,
-            hasSeparateAudio = !attributes["AUDIO"].isNullOrBlank()
+            hasSeparateAudio = !attributes["AUDIO"].isNullOrBlank(),
+            name = name,
+            frameRate = attributes["FRAME-RATE"]?.toDoubleOrNull()?.coerceAtLeast(0.0) ?: 0.0,
+            codecs = attributes["CODECS"]?.trim()?.takeIf { it.isNotBlank() },
+            videoRange = attributes["VIDEO-RANGE"]?.trim()?.takeIf { it.isNotBlank() }
         )
     }
 
@@ -64,12 +77,26 @@ internal fun parseHlsMasterVariants(text: String, baseUrl: String): List<HlsMast
         .distinctBy { Triple(it.url, it.width, it.height) }
         .sortedWith(
             compareByDescending<HlsMasterVariant> { it.pixelCount }
+                .thenByDescending { it.height }
                 .thenByDescending { it.bandwidth }
         )
 }
 
 internal fun selectBestHlsVariant(text: String, baseUrl: String): HlsMasterVariant? {
     return parseHlsMasterVariants(text, baseUrl).firstOrNull()
+}
+
+private fun inferHlsQualityHeight(value: String?): Int? {
+    val clean = value?.trim().orEmpty()
+    if (clean.isBlank()) return null
+    val explicit = Regex(
+        "(?i)(?:^|[^0-9])(4320|2160|1440|1080|900|720|576|540|480|360|240|144)p(?:[^0-9]|$)"
+    ).find(clean)?.groupValues?.getOrNull(1)?.toIntOrNull()
+    if (explicit != null) return explicit
+
+    return Regex(
+        "(?i)(?:^|[/_.-])(4320|2160|1440|1080|900|720|576|540|480|360|240|144)(?:[/_.-]|$)"
+    ).find(clean)?.groupValues?.getOrNull(1)?.toIntOrNull()
 }
 
 internal fun parseHlsMediaPlaylist(text: String, baseUrl: String): HlsMediaPlaylist {

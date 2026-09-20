@@ -25,6 +25,9 @@ internal data class DetectedMedia(
     val width: Int,
     val height: Int,
     val bitrate: Long = 0L,
+    val frameRate: Double = 0.0,
+    val codecs: String? = null,
+    val variantLabel: String? = null,
     val hlsHasSeparateAudio: Boolean = false,
     val firstSeenAt: Long = System.currentTimeMillis()
 ) {
@@ -36,6 +39,7 @@ internal data class DetectedMedia(
     val qualityLabel: String
         get() = when {
             height > 0 -> "${height}p"
+            !variantLabel.isNullOrBlank() -> variantLabel
             kind == DetectedMediaKind.AUDIO -> "Audio"
             kind == DetectedMediaKind.HLS || kind == DetectedMediaKind.DASH -> "Auto"
             else -> "Video"
@@ -54,7 +58,8 @@ internal object MediaDetectorBridge {
     private val EPHEMERAL_QUERY_KEYS = setOf(
         "token", "sig", "signature", "expires", "expire", "exp", "policy",
         "key-pair-id", "hdnts", "hdntl", "auth", "authorization",
-        "timestamp", "ts", "cache", "cachebust", "cb", "_"
+        "timestamp", "ts", "t", "st", "e", "ttl", "session", "session_id", "sid",
+        "nonce", "rnd", "random", "cache", "cachebust", "cb", "_"
     )
 
     private var extension: WebExtension? = null
@@ -185,7 +190,10 @@ internal object MediaDetectorBridge {
             val authority = if (port >= 0) "$host:$port" else host
             val path = uri.encodedPath.orEmpty().ifBlank { "/" }
             val queryParts = uri.queryParameterNames
-                .filterNot { it.lowercase() in EPHEMERAL_QUERY_KEYS }
+                .filterNot { name ->
+                    val normalized = name.lowercase()
+                    normalized in EPHEMERAL_QUERY_KEYS || normalized.startsWith("x-amz-")
+                }
                 .sortedBy { it.lowercase() }
                 .flatMap { name ->
                     val values = uri.getQueryParameters(name)

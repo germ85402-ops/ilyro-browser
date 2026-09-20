@@ -712,7 +712,12 @@ internal class DownloadController(
         onResolved: (List<DetectedMedia>) -> Unit
     ) {
         if (media.none { it.kind == DetectedMediaKind.HLS }) {
-            mainHandler.post { onResolved(media) }
+            mainHandler.post {
+                onResolved(
+                    media.map(::enrichMediaQualityFromUrl)
+                        .distinctBy(::mediaQualityIdentity)
+                )
+            }
             return
         }
 
@@ -720,31 +725,73 @@ internal class DownloadController(
             val expanded = mutableListOf<DetectedMedia>()
             media.forEach { item ->
                 if (item.kind != DetectedMediaKind.HLS) {
-                    expanded += item
+                    expanded += enrichMediaQualityFromUrl(item)
                     return@forEach
                 }
 
-                val variants = runCatching {
+                val root = runCatching {
                     val fetched = fetchHlsText(
                         url = item.url,
                         referrer = item.pageUrl,
                         isPrivate = isPrivate
                     )
-                    parseHlsMasterVariants(fetched.second, fetched.first)
-                }.getOrDefault(emptyList())
+                    fetched.first to parseHlsMasterVariants(fetched.second, fetched.first)
+                }.getOrNull()
 
+                val variants = root?.second.orEmpty()
                 if (variants.isEmpty()) {
-                    expanded += item
-                } else {
-                    variants.take(MAX_HLS_QUALITY_VARIANTS).forEach { variant ->
-                        expanded += item.copy(
-                            url = variant.url,
-                            width = variant.width.takeIf { it > 0 } ?: item.width,
-                            height = variant.height.takeIf { it > 0 } ?: item.height,
-                            bitrate = variant.bandwidth,
-                            hlsHasSeparateAudio = variant.hasSeparateAudio,
-                            source = "hls-variant"
-                        )
+                    expanded += enrichMediaQualityFromUrl(item)
+                    return@forEach
+                }
+
+                variants.take(MAX_HLS_QUALITY_VARIANTS).forEach { variant ->
+                    var candidate = item.copy(
+                        url = variant.url,
+                        width = variant.width.takeIf { it > 0 } ?: item.width,
+                        height = variant.height.takeIf { it > 0 } ?: item.height,
+                        bitrate = variant.bandwidth.takeIf { it > 0L } ?: item.bitrate,
+                        frameRate = variant.frameRate.takeIf { it > 0.0 } ?: item.frameRate,
+                        codecs = variant.codecs ?: item.codecs,
+                        variantLabel = variant.name ?: item.variantLabel,
+                        hlsHasSeparateAudio = variant.hasSeparateAudio,
+                        source = "hls-variant"
+                    )
+                    candidate = enrichMediaQualityFromUrl(candidate)
+
+                    // Some providers use a hierarchy of master playlists and only advertise the
+                    // actual resolution one level deeper. Inspect unresolved children so the UI
+                    // can show real 1080p/720p/etc. instead of a wall of "Auto" entries.
+                    if (candidate.height <= 0) {
+                        val nested = runCatching {
+                            val fetched = fetchHlsText(
+                                url = variant.url,
+                                referrer = item.pageUrl,
+                                isPrivate = isPrivate
+                            )
+                            parseHlsMasterVariants(fetched.second, fetched.first)
+                        }.getOrDefault(emptyList())
+
+                        if (nested.isNotEmpty()) {
+                            nested.take(MAX_HLS_QUALITY_VARIANTS).forEach { child ->
+                                expanded += enrichMediaQualityFromUrl(
+                                    candidate.copy(
+                                        url = child.url,
+                                        width = child.width.takeIf { it > 0 } ?: candidate.width,
+                                        height = child.height.takeIf { it > 0 } ?: candidate.height,
+                                        bitrate = child.bandwidth.takeIf { it > 0L } ?: candidate.bitrate,
+                                        frameRate = child.frameRate.takeIf { it > 0.0 } ?: candidate.frameRate,
+                                        codecs = child.codecs ?: candidate.codecs,
+                                        variantLabel = child.name ?: candidate.variantLabel,
+                                        hlsHasSeparateAudio =
+                                            candidate.hlsHasSeparateAudio || child.hasSeparateAudio
+                                    )
+                                )
+                            }
+                        } else {
+                            expanded += candidate
+                        }
+                    } else {
+                        expanded += candidate
                     }
                 }
             }
@@ -768,6 +815,31 @@ internal class DownloadController(
         DetectedMediaKind.HLS -> 1
         DetectedMediaKind.DASH -> 2
         DetectedMediaKind.AUDIO -> 3
+    }
+
+    private fun enrichMediaQualityFromUrl(item: DetectedMedia): DetectedMedia {
+        if (item.height > 0 && item.width > 0) return item
+        val decoded = runCatching { Uri.decode(item.url) }.getOrDefault(item.url)
+        val dimensions = Regex(
+            "(?i)(?:^|[^0-9])(\\d{3,4})[x×](\\d{3,4})(?:[^0-9]|$)"
+        ).find(decoded)
+        val inferredWidth = dimensions?.groupValues?.getOrNull(1)?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+        val inferredHeightFromDimensions =
+            dimensions?.groupValues?.getOrNull(2)?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+        val inferredHeight = inferredHeightFromDimensions.takeIf { it > 0 }
+            ?: Regex(
+                "(?i)(?:^|[/_.-])(4320|2160|1440|1080|900|720|576|540|480|360|240|144)p(?:[/_.?#&-]|$)"
+            ).find(decoded)?.groupValues?.getOrNull(1)?.toIntOrNull()
+            ?: Regex(
+                "(?i)(?:^|[/_.-])(4320|2160|1440|1080|900|720|576|540|480|360|240|144)(?:[/_.-]|$)"
+            ).find(decoded)?.groupValues?.getOrNull(1)?.toIntOrNull()
+            ?: 0
+
+        if (inferredHeight <= 0 && inferredWidth <= 0) return item
+        return item.copy(
+            width = item.width.takeIf { it > 0 } ?: inferredWidth,
+            height = item.height.takeIf { it > 0 } ?: inferredHeight
+        )
     }
 
     private fun mediaQualityIdentity(item: DetectedMedia): String {

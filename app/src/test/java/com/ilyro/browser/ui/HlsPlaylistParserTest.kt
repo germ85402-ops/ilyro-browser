@@ -38,6 +38,26 @@ class HlsPlaylistParserTest {
     }
 
     @Test
+    fun masterPlaylist_readsNamedQualityFrameRateAndCodecs() {
+        val playlist = """
+            #EXTM3U
+            #EXT-X-STREAM-INF:BANDWIDTH=5400000,NAME="1080p",FRAME-RATE=59.94,CODECS="avc1.640028,mp4a.40.2"
+            stream/1080/index.m3u8
+        """.trimIndent()
+
+        val variant = selectBestHlsVariant(
+            playlist,
+            "https://media.example.com/master.m3u8"
+        )
+
+        assertNotNull(variant)
+        assertEquals(1080, variant!!.height)
+        assertEquals("1080p", variant.name)
+        assertEquals(59.94, variant.frameRate, 0.01)
+        assertEquals("avc1.640028,mp4a.40.2", variant.codecs)
+    }
+
+    @Test
     fun masterPlaylist_marksSeparateAudioVariants() {
         val playlist = """
             #EXTM3U
