@@ -433,7 +433,9 @@ internal fun ProtectionSheet(
                                 )
                             }
                             Switch(
-                                checked = ready && siteEnabled,
+                                // While uBO is warming up, keep the requested site state visible
+                                // instead of flashing the switch off until the native bridge connects.
+                                checked = globalEnabled && siteEnabled,
                                 enabled = ready,
                                 onCheckedChange = { enabled ->
                                     if (ProtectionBridge.setSiteEnabled(siteUrl, enabled)) {
