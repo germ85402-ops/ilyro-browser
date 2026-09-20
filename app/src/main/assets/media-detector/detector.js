@@ -12,7 +12,8 @@
   const STREAM_HINT_RE = /(?:[?&](?:format|type|mime)=(?:m3u8|application%2F(?:vnd\.apple\.mpegurl|dash\+xml))|\/(?:hls|dash)\/[^?#]*(?:master|manifest|playlist|index))/i;
   const YOUTUBE_PROGRESSIVE_ITAGS = new Set([17, 18, 22, 36, 43, 44, 45, 46]);
   const YOUTUBE_AUDIO_ITAGS = new Set([
-    139, 140, 141, 171, 172, 249, 250, 251, 599, 600
+    139, 140, 141, 171, 172, 249, 250, 251, 256, 258, 327, 328,
+    571, 599, 600, 774, 775, 776
   ]);
   const YOUTUBE_VIDEO_ITAGS = new Set([
     17, 18, 22, 36, 43, 44, 45, 46,
@@ -115,11 +116,17 @@
       if (!url.pathname.includes('/videoplayback')) return null;
 
       const queryMime = (url.searchParams.get('mime') || '').toLowerCase();
+      const typeHint = (url.searchParams.get('type') || '').toLowerCase();
+      const codecHint = (url.searchParams.get('codecs') || '').toLowerCase();
       const itag = Number(url.searchParams.get('itag') || 0);
       const kind = queryMime.startsWith('video/') ? 'video' :
         queryMime.startsWith('audio/') ? 'audio' :
+        typeHint.startsWith('video/') ? 'video' :
+        typeHint.startsWith('audio/') ? 'audio' :
         YOUTUBE_AUDIO_ITAGS.has(itag) ? 'audio' :
-        YOUTUBE_VIDEO_ITAGS.has(itag) ? 'video' : '';
+        YOUTUBE_VIDEO_ITAGS.has(itag) ? 'video' :
+        /(?:mp4a|opus|vorbis|ac-3|ec-3)/i.test(codecHint) ? 'audio' :
+        /(?:avc1|av01|vp8|vp9|vp09|hev1|hvc1)/i.test(codecHint) ? 'video' : '';
       if (!kind) return null;
 
       ['range', 'rn', 'rbuf'].forEach(name => url.searchParams.delete(name));
@@ -354,6 +361,13 @@
     document.querySelectorAll('video, audio').forEach(inspectMediaElement);
   }
 
+  function isYouTubePage() {
+    const host = (location.hostname || '').toLowerCase().replace(/\.$/, '');
+    return host === 'youtube.com' ||
+      host.endsWith('.youtube.com') ||
+      host === 'youtu.be';
+  }
+
   connectNetworkPort();
   startNetworkWatcher();
   scanMediaElements();
@@ -369,6 +383,10 @@
   document.addEventListener('canplay', mediaEventHandler, true);
   document.addEventListener('play', mediaEventHandler, true);
   document.addEventListener('playing', mediaEventHandler, true);
+  document.addEventListener('durationchange', mediaEventHandler, true);
+  document.addEventListener('progress', mediaEventHandler, true);
+  window.addEventListener('yt-navigate-finish', scanMediaElements, true);
+  window.addEventListener('yt-page-data-updated', scanMediaElements, true);
 
   setTimeout(scanMediaElements, 500);
   setTimeout(scanMediaElements, 1500);
@@ -404,4 +422,14 @@
       scanMediaElements();
     }
   }, true);
+
+  // YouTube can replace the MediaSource-backed <video> without emitting a useful src mutation.
+  // Keep a low-cost scan alive on YouTube so a newly selected format is reported after SPA
+  // navigation or a delayed player start.
+  if (isYouTubePage()) {
+    setInterval(() => {
+      startNetworkWatcher();
+      scanMediaElements();
+    }, 2500);
+  }
 })();
