@@ -14,7 +14,7 @@ class IlyroStringsTest {
         assertEquals("Bahasa Indonesia", appLanguageLabel(AppLanguage.INDONESIAN))
         assertEquals("es", appLanguageLocale(AppLanguage.SPANISH).language)
         assertEquals("zh", appLanguageLocale(AppLanguage.CHINESE).language)
-        assertEquals(14, AppLanguage.entries.size)
+        assertEquals(15, AppLanguage.entries.size)
     }
 
     @Test
