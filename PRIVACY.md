@@ -1,6 +1,6 @@
 # ILYRO Browser Privacy Policy
 
-_Last updated: September 15, 2026_
+_Last updated: September 20, 2026_
 
 This document describes the privacy behavior of the current ILYRO Browser beta/RC codebase. It should be reviewed again before public store distribution, especially if analytics, advertising, cloud services, account features, or other data flows are added later.
 
@@ -24,6 +24,16 @@ ILYRO stores browser data locally where required for browser functionality, incl
 - downloads and download state.
 
 Private tabs use a private Gecko session context. Private-page navigation is not added to ILYRO's normal browsing history, and private tabs are intentionally excluded from normal tab-session restoration and ILYRO Drive backup data.
+
+## Saved passwords and data transfer
+
+Saved passwords are stored in an application-private vault encrypted with AES-GCM. The encryption key is generated and kept in Android Keystore and is not stored in ILYRO settings or uploaded to ILYRO-operated servers.
+
+ILYRO does not include saved passwords in Google Drive sync. The app disables Android backup and also declares explicit Android 12+ data-extraction rules that exclude application data from cloud backup and device-to-device transfer.
+
+Revealing or editing a saved password requires Android device authentication when a device screen lock is configured. A revealed password is hidden again automatically after a short period.
+
+Password CSV import is processed in memory. ILYRO does not keep a plaintext app copy of an imported CSV. Password CSV export is an explicit user action, requires device authentication, and writes plaintext credentials only to the document location selected by the user. Exported CSV files are not encrypted by ILYRO, so users should store and share them carefully.
 
 ## Search and address suggestions
 
@@ -58,6 +68,8 @@ Google's own terms and privacy practices apply to Google authentication and Goog
 ILYRO may request Android permissions when a website or browser feature needs them, including camera, microphone, location, notifications, and file/camera access. Site permission prompts are shown by ILYRO/GeckoView before supported website permissions are granted.
 
 Permission choices can also be controlled through Android system settings and ILYRO's site controls where available.
+
+When the user explicitly chooses to open a downloaded APK, ILYRO can ask Android to allow package installation from ILYRO. Package installation is initiated and confirmed by the user; ILYRO does not silently install APK files.
 
 ## Downloads
 

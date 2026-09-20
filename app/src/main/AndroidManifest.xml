@@ -18,6 +18,7 @@
     <application
         android:name=".IlyroApplication"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@mipmap/ic_launcher_deer"
         android:roundIcon="@mipmap/ic_launcher_deer"
         android:label="${appLabel}"
