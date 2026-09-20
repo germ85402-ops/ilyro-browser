@@ -29,10 +29,16 @@ internal data class DetectedMedia(
     val codecs: String? = null,
     val variantLabel: String? = null,
     val hlsHasSeparateAudio: Boolean = false,
-    val firstSeenAt: Long = System.currentTimeMillis()
+    val requiresSeparateAudio: Boolean = false,
+    val firstSeenAt: Long = System.currentTimeMillis(),
+    val lastSeenAt: Long = firstSeenAt
 ) {
+    val isYouTubeStream: Boolean
+        get() = source.startsWith("youtube-")
+
     val canDownload: Boolean
-        get() = kind == DetectedMediaKind.VIDEO ||
+        get() = (kind == DetectedMediaKind.VIDEO &&
+            (!requiresSeparateAudio || isYouTubeStream)) ||
             kind == DetectedMediaKind.AUDIO ||
             (kind == DetectedMediaKind.HLS && !hlsHasSeparateAudio)
 
@@ -59,7 +65,8 @@ internal object MediaDetectorBridge {
         "token", "sig", "signature", "expires", "expire", "exp", "policy",
         "key-pair-id", "hdnts", "hdntl", "auth", "authorization",
         "timestamp", "ts", "t", "st", "e", "ttl", "session", "session_id", "sid",
-        "nonce", "rnd", "random", "cache", "cachebust", "cb", "_"
+        "nonce", "rnd", "random", "cache", "cachebust", "cb", "_",
+        "range", "rn", "rbuf"
     )
 
     private var extension: WebExtension? = null
@@ -92,21 +99,33 @@ internal object MediaDetectorBridge {
         return mediaBySession[session]
             ?.values
             ?.sortedWith(
-                compareBy<DetectedMedia> { mediaPriority(it.kind) }
+                compareByDescending<DetectedMedia> { it.lastSeenAt }
+                    .thenBy { mediaPriority(it.kind) }
                     .thenByDescending { it.width * it.height }
-                    .thenBy { it.firstSeenAt }
             )
             .orEmpty()
     }
 
-    fun isExcludedUrl(url: String): Boolean {
-        val host = runCatching { Uri.parse(url).host.orEmpty().lowercase().trimEnd('.') }
-            .getOrDefault("")
-        return host == "youtube.com" ||
-            host.endsWith(".youtube.com") ||
-            host == "youtu.be" ||
-            host.endsWith(".youtu.be")
+    internal fun selectPrimaryCandidate(media: List<DetectedMedia>): DetectedMedia? {
+        val visual = media.filter { it.kind != DetectedMediaKind.AUDIO }
+        val candidates = if (visual.isNotEmpty()) visual else media
+        if (candidates.isEmpty()) return null
+
+        val newestSeenAt = candidates.maxOf { it.lastSeenAt }
+        return candidates
+            .asSequence()
+            .filter { it.lastSeenAt == newestSeenAt }
+            .maxWithOrNull(
+                compareBy<DetectedMedia> { if (it.canDownload) 1 else 0 }
+                    .thenBy { if (it.height > 0) 1 else 0 }
+                    .thenBy { it.height }
+                    .thenBy { it.width }
+                    .thenBy { it.bitrate }
+            )
     }
+
+    // Media detection is enabled on YouTube too.
+    fun isExcludedUrl(url: String): Boolean = false
 
     private fun install(session: GeckoSession, extension: WebExtension) {
         session.webExtensionController.setMessageDelegate(
@@ -137,6 +156,11 @@ internal object MediaDetectorBridge {
                             val source = json.optString("source").trim().takeIf { it.isNotEmpty() } ?: "page"
                             val width = json.optInt("width", 0).coerceAtLeast(0)
                             val height = json.optInt("height", 0).coerceAtLeast(0)
+                            val bitrate = json.optLong("bitrate", 0L).coerceAtLeast(0L)
+                            val frameRate = json.optDouble("frameRate", 0.0).coerceAtLeast(0.0)
+                            val codecs = json.optString("codecs").trim().takeIf { it.isNotEmpty() }
+                            val requiresSeparateAudio = json.optBoolean("separateAudio", false)
+                            val now = System.currentTimeMillis()
 
                             val items = mediaBySession.getOrPut(session) { linkedMapOf() }
                             val key = canonicalMediaIdentity(mediaUrl)
@@ -150,7 +174,13 @@ internal object MediaDetectorBridge {
                                     title = title,
                                     source = source,
                                     width = width,
-                                    height = height
+                                    height = height,
+                                    bitrate = bitrate,
+                                    frameRate = frameRate,
+                                    codecs = codecs,
+                                    requiresSeparateAudio = requiresSeparateAudio,
+                                    firstSeenAt = now,
+                                    lastSeenAt = now
                                 )
                             } else {
                                 previous.copy(
@@ -163,12 +193,20 @@ internal object MediaDetectorBridge {
                                     title = title ?: previous.title,
                                     source = preferSource(previous.source, source),
                                     width = maxOf(previous.width, width),
-                                    height = maxOf(previous.height, height)
+                                    height = maxOf(previous.height, height),
+                                    bitrate = maxOf(previous.bitrate, bitrate),
+                                    frameRate = maxOf(previous.frameRate, frameRate),
+                                    codecs = codecs ?: previous.codecs,
+                                    requiresSeparateAudio =
+                                        previous.requiresSeparateAudio || requiresSeparateAudio,
+                                    lastSeenAt = now
                                 )
                             }
 
-                            if (previous == next) return
+                            val meaningfulChange = previous == null ||
+                                previous.copy(lastSeenAt = next.lastSeenAt) != next
                             items[key] = next
+                            if (!meaningfulChange) return
                             while (items.size > MAX_MEDIA_PER_SESSION) {
                                 items.remove(items.keys.first())
                             }
@@ -209,6 +247,7 @@ internal object MediaDetectorBridge {
 
     private fun preferSource(old: String, new: String): String {
         fun rank(value: String): Int = when {
+            value.startsWith("youtube-") -> 4
             value.startsWith("resource-") || value == "network" -> 3
             value.startsWith("source-") -> 2
             value == "video" || value == "audio" -> 1
