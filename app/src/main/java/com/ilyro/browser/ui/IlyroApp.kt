@@ -418,10 +418,9 @@ private fun BrowserScreen(
     // moment before the saved "off" setting is applied, and guarantees the media detector is
     // attached to the final WebExtension instance before YouTube starts loading.
     if (!BrowserEngine.startupExtensionsReady) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-        ) {}
+        // Keep this placeholder transparent: GeckoView is Activity-owned and the project
+        // contract forbids an opaque BrowserScreen root from covering it.
+        Box(modifier = Modifier.fillMaxSize())
         return
     }
     val prefs = remember { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
