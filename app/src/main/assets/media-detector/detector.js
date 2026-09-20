@@ -7,6 +7,15 @@
   const MEDIA_URL_RE = /\.(m3u8|mpd|mp4|webm|m4v|mov|ogv|mp3|m4a|aac|flac|wav|oga|opus)(?:$|[?#])/i;
   const STREAM_HINT_RE = /(?:[?&](?:format|type|mime)=(?:m3u8|application%2F(?:vnd\.apple\.mpegurl|dash\+xml))|\/(?:hls|dash)\/[^?#]*(?:master|manifest|playlist|index))/i;
   const YOUTUBE_PROGRESSIVE_ITAGS = new Set([17, 18, 22, 36, 43, 44, 45, 46]);
+  const YOUTUBE_AUDIO_ITAGS = new Set([
+    139, 140, 141, 171, 172, 249, 250, 251, 599, 600
+  ]);
+  const YOUTUBE_VIDEO_ITAGS = new Set([
+    17, 18, 22, 36, 43, 44, 45, 46,
+    160, 133, 134, 135, 136, 137, 264, 266, 278, 242, 243, 244, 247, 248,
+    271, 272, 298, 299, 302, 303, 308, 313, 315, 330, 331, 332, 333, 334,
+    335, 336, 337, 394, 395, 396, 397, 398, 399, 400, 401
+  ]);
   const YOUTUBE_HEIGHT_BY_ITAG = new Map(Object.entries({
     17: 144, 36: 240, 18: 360, 43: 360, 44: 480, 22: 720, 45: 720, 46: 1080,
     160: 144, 133: 240, 134: 360, 135: 480, 136: 720, 137: 1080, 264: 1440,
@@ -59,7 +68,9 @@
       const queryMime = (url.searchParams.get('mime') || '').toLowerCase();
       const itag = Number(url.searchParams.get('itag') || 0);
       const kind = queryMime.startsWith('video/') ? 'video' :
-        queryMime.startsWith('audio/') ? 'audio' : '';
+        queryMime.startsWith('audio/') ? 'audio' :
+        YOUTUBE_AUDIO_ITAGS.has(itag) ? 'audio' :
+        YOUTUBE_VIDEO_ITAGS.has(itag) ? 'video' : '';
       if (!kind) return null;
 
       ['range', 'rn', 'rbuf'].forEach(name => url.searchParams.delete(name));
@@ -204,6 +215,15 @@
       port = null;
     }
   }
+
+  browser.runtime.onMessage.addListener(message => {
+    if (!message || message.type !== 'ilyro-network-media' || typeof message.url !== 'string') {
+      return;
+    }
+    // PerformanceObserver does not reliably expose media subrequests on every Gecko/YouTube
+    // combination. The background webRequest observer forwards the actual googlevideo request.
+    report(message.url, '', 'youtube-webrequest', 0, 0);
+  });
 
   function inspectPerformanceEntry(entry) {
     const name = typeof entry?.name === 'string' ? entry.name : '';
