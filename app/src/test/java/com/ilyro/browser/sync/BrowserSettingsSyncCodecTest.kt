@@ -40,6 +40,21 @@ class BrowserSettingsSyncCodecTest {
     }
 
     @Test
+    fun roundTrip_preservesExpandedBrowserLanguage() {
+        val source = BrowserSettings(
+            language = AppLanguage.CHINESE,
+            preferredSiteLanguages = listOf("zh", "en")
+        )
+
+        val restored = BrowserSettingsSyncCodec.decode(
+            BrowserSettingsSyncCodec.encode(source)
+        )
+
+        assertEquals(AppLanguage.CHINESE, restored.language)
+        assertEquals(listOf("zh", "en"), restored.preferredSiteLanguages)
+    }
+
+    @Test
     fun decode_unknownEnumAndMissingFields_fallsBackSafely() {
         val restored = BrowserSettingsSyncCodec.decode(
             """{

@@ -110,6 +110,22 @@ class BrowserSettingsStoreTest {
         assertTrue(restored.toolbarActions.isNotEmpty())
         assertFalse(ToolbarAction.SHIELD in restored.toolbarActions)
     }
+
+    @Test
+    fun expandedBrowserLanguageRoundTripsWithoutChangingSiteLanguages() {
+        val prefs = MemorySharedPreferences()
+        val expected = BrowserSettings(
+            language = AppLanguage.SPANISH,
+            preferredSiteLanguages = listOf("es", "en", "hy")
+        )
+
+        BrowserSettingsStore.save(prefs, expected)
+
+        val restored = BrowserSettingsStore.restore(prefs)
+
+        assertEquals(AppLanguage.SPANISH, restored.language)
+        assertEquals(listOf("es", "en", "hy"), restored.preferredSiteLanguages)
+    }
 }
 
 private class MemorySharedPreferences(

@@ -100,6 +100,23 @@ def main() -> int:
     require("BUY_ME_A_COFFEE_URL" in settings, "support URL placeholder is missing")
     require("privacy.html" in settings and "terms.html" in settings, "About screen is missing public legal links")
 
+    language_store = read("app/src/main/java/com/ilyro/browser/ui/BrowserSettingsStore.kt")
+    for language in (
+        "SPANISH",
+        "CHINESE",
+        "HINDI",
+        "PORTUGUESE",
+        "ARABIC",
+        "FRENCH",
+        "GERMAN",
+        "JAPANESE",
+        "KOREAN",
+        "TURKISH",
+        "ITALIAN",
+        "INDONESIAN",
+    ):
+        require(f"{language}(" in language_store, f"expanded app language is missing: {language}")
+
     release_workflow = read(".github/workflows/release.yml")
     for secret in (
         "ILYRO_RELEASE_KEYSTORE_BASE64",

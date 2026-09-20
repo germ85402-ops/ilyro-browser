@@ -7,6 +7,8 @@
 - Move the browser engine from GeckoView Nightly to Mozilla's stable GeckoView 155 release.
 - Refresh the public third-party notice so it matches the stable GeckoView dependency used by the app.
 - Add direct Privacy Policy and Terms of Service links to the About screen.
+- Add global browser-interface language choices with Android System detection and a compact picker.
+- Keep website-language preferences independent from the app interface language and preserve them in sync.
 
 ## 0.26.0-rc1 — release candidate
 

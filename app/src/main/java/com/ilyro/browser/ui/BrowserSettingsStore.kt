@@ -6,7 +6,19 @@ import java.util.Locale
 internal enum class AppLanguage(val displayName: String) {
     SYSTEM("System"),
     ENGLISH("English"),
-    RUSSIAN("Русский")
+    RUSSIAN("Русский"),
+    SPANISH("Español"),
+    CHINESE("中文"),
+    HINDI("हिन्दी"),
+    PORTUGUESE("Português"),
+    ARABIC("العربية"),
+    FRENCH("Français"),
+    GERMAN("Deutsch"),
+    JAPANESE("日本語"),
+    KOREAN("한국어"),
+    TURKISH("Türkçe"),
+    ITALIAN("Italiano"),
+    INDONESIAN("Bahasa Indonesia")
 }
 
 internal enum class SearchEngine(val displayName: String, val queryUrl: String) {

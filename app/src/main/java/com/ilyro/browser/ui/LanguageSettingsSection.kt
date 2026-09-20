@@ -55,10 +55,9 @@ internal fun LanguageSettingsSection(
     onSettingsChange: (BrowserSettings) -> Unit
 ) {
     var showPicker by remember { mutableStateOf(false) }
+    var showBrowserLanguagePicker by remember { mutableStateOf(false) }
     val resolvedUiLanguage = resolveAppLanguage(settings.language)
-    val displayLocale = remember(resolvedUiLanguage) {
-        if (resolvedUiLanguage == AppLanguage.RUSSIAN) Locale.forLanguageTag("ru") else Locale.ENGLISH
-    }
+    val displayLocale = remember(resolvedUiLanguage) { appLanguageLocale(settings.language) }
     val availableLanguages = remember(displayLocale) { buildSiteLanguageOptions(displayLocale) }
     val preferredLanguages = settings.preferredSiteLanguages.ifEmpty { defaultPreferredSiteLanguages() }
 
@@ -83,32 +82,10 @@ internal fun LanguageSettingsSection(
                 fontWeight = FontWeight.SemiBold
             )
 
-            Text(
-                tr("Browser language", "Язык браузера"),
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+            LanguageSummaryRow(
+                selectedLanguage = settings.language,
+                onClick = { showBrowserLanguagePicker = true }
             )
-
-            AppLanguage.entries.forEachIndexed { index, language ->
-                LanguageChoiceRow(
-                    title = appLanguageLabel(language),
-                    subtitle = if (language == AppLanguage.SYSTEM) {
-                        tr(
-                            "Uses the supported language from Android; falls back to English.",
-                            "Использует поддерживаемый язык Android; если перевода нет — English."
-                        )
-                    } else null,
-                    selected = settings.language == language,
-                    onClick = { onSettingsChange(settings.copy(language = language)) }
-                )
-                if (index != AppLanguage.entries.lastIndex) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(start = 54.dp),
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
-                    )
-                }
-            }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
@@ -181,6 +158,50 @@ internal fun LanguageSettingsSection(
             onDismiss = { showPicker = false }
         )
     }
+
+    if (showBrowserLanguagePicker) {
+        BrowserLanguagePickerDialog(
+            selectedLanguage = settings.language,
+            onSelectedLanguage = { language ->
+                onSettingsChange(settings.copy(language = language))
+                showBrowserLanguagePicker = false
+            },
+            onDismiss = { showBrowserLanguagePicker = false }
+        )
+    }
+}
+
+@Composable
+private fun LanguageSummaryRow(
+    selectedLanguage: AppLanguage,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                tr("Browser language", "Язык браузера"),
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium
+            )
+            Text(
+                appLanguageLabel(selectedLanguage),
+                modifier = Modifier.padding(top = 3.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Icon(
+            Icons.Rounded.KeyboardArrowDown,
+            contentDescription = tr("Choose language", "Выбрать язык"),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
 }
 
 @Composable
@@ -209,6 +230,44 @@ private fun LanguageChoiceRow(
             }
         }
     }
+}
+
+@Composable
+private fun BrowserLanguagePickerDialog(
+    selectedLanguage: AppLanguage,
+    onSelectedLanguage: (AppLanguage) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(tr("Browser language", "Язык браузера")) },
+        text = {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 430.dp)
+            ) {
+                items(AppLanguage.entries, key = { it.name }) { language ->
+                    LanguageChoiceRow(
+                        title = appLanguageLabel(language),
+                        subtitle = if (language == AppLanguage.SYSTEM) {
+                            tr(
+                                "Uses the supported language from Android; falls back to English.",
+                                "Использует поддерживаемый язык Android; если перевода нет — English."
+                            )
+                        } else null,
+                        selected = selectedLanguage == language,
+                        onClick = { onSelectedLanguage(language) }
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(tr("Done", "Готово"))
+            }
+        }
+    )
 }
 
 @Composable
