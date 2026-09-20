@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#080a0f" />
+    <meta name="description" content="ILYRO Browser Privacy Policy: how the Android browser handles local data, Google sign-in, Google Drive sync, permissions, and downloads." />
+    <title>ILYRO — Privacy Policy</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css" />
+    <script>document.documentElement.classList.add('js');</script>
+  </head>
+  <body>
+    <div class="site-noise" aria-hidden="true"></div>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
+    
+<header class="site-header" id="top">
+  <div class="header-inner">
+    <a class="brand" href="index.html#top" aria-label="ILYRO, на главную"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 38.9c-4.4-1.4-7.5-5.2-7.5-10.1 0-3.6 1.4-6.6 4-8.9-2.7-3.4-3.4-7-1.8-10.7 2.1 1.2 3.9 2.8 5.3 4.9 1.4-2.1 3.2-3.7 5.3-4.9 1.6 3.7.9 7.3-1.8 10.7 2.6 2.3 4 5.3 4 8.9 0 4.9-3.1 8.7-7.5 10.1Z" /><path class="mark-line" d="M20.7 12.7 16 8.4l-3.2-4.2M27.3 12.7 32 8.4l3.2-4.2M16 8.4l.2-4.8M32 8.4l-.2-4.8" /><path class="mark-cut" d="M20.5 25.2c1.1 1.2 2.3 1.8 3.5-1.8" /></svg></span><span class="brand-name">ILYRO</span></a>
+    <nav class="main-nav" id="main-nav" aria-label="Основная навигация">
+      <a href="index.html#features">Возможности</a>
+      <a href="index.html#experience">Интерфейс</a>
+      <a href="index.html#privacy">Приватность</a>
+      <a href="index.html#download">Проект</a>
+    </nav>
+    <div class="header-actions">
+      <button class="icon-button theme-toggle" id="theme-toggle" type="button" aria-label="Включить светлую тему">
+        <svg class="icon icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.6"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path></svg>
+        <svg class="icon icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.3 15.1A8.6 8.6 0 0 1 8.9 3.7 8.6 8.6 0 1 0 20.3 15.1Z"></path></svg>
+      </button>
+      <a class="header-cta" href="index.html#download">Открыть проект <span aria-hidden="true">↗</span></a>
+      <button class="icon-button menu-toggle" id="menu-toggle" type="button" aria-label="Открыть меню" aria-expanded="false" aria-controls="main-nav"><span></span><span></span></button>
+    </div>
+  </div>
+</header>
+    <main class="legal-main">
+      <section class="legal-page section-shell reveal is-visible" aria-labelledby="legal-title">
+        <div class="eyebrow"><span class="eyebrow-dot"></span> ILYRO / LEGAL</div>
+        <h1 id="legal-title">Privacy<br /><span>Policy.</span></h1>
+        <p class="legal-lead">A clear description of what ILYRO stores locally, what can leave the device, and how optional Google account features work.</p>
+        <div class="legal-switch" aria-label="Legal pages">
+          <a class="is-active" href="privacy.html">Privacy Policy</a>
+          <a class="" href="terms.html">Terms of Service</a>
+        </div>
+        <article class="legal-card"><p><em>Last updated: September 20, 2026</em></p>
+<p>This document describes the privacy behavior of the current ILYRO Browser beta/RC codebase. It should be reviewed again before public store distribution, especially if analytics, advertising, cloud services, account features, or other data flows are added later.</p>
+<h2>Summary</h2>
+<p>ILYRO is designed so ordinary browsing data stays on the user's device unless the user explicitly uses a feature that needs a network service, such as visiting a website, using a search engine, signing in with Google, or backing up browser data to Google Drive.</p>
+<p>The current ILYRO codebase does not include ILYRO-operated analytics, advertising SDKs, Crashlytics, Sentry, or an ILYRO telemetry backend.</p>
+<h2>Browsing and website data</h2>
+<p>Web pages are loaded through Mozilla GeckoView. Websites and services the user visits can receive normal web-request information such as the requested URL, IP address, cookies, headers, browser capabilities, and data the user submits to those sites.</p>
+<p>ILYRO stores browser data locally where required for browser functionality, including items such as:</p>
+<ul><li>browsing history, when history is enabled;</li><li>bookmarks and quick links;</li><li>normal-tab session restoration data;</li><li>browser settings and personalization choices;</li><li>site permissions and site-specific browser settings;</li><li>downloads and download state.</li></ul>
+<p>Private tabs use a private Gecko session context. Private-page navigation is not added to ILYRO's normal browsing history, and private tabs are intentionally excluded from normal tab-session restoration and ILYRO Drive backup data.</p>
+<h2>Saved passwords and data transfer</h2>
+<p>Saved passwords are stored in an application-private vault encrypted with AES-GCM. The encryption key is generated and kept in Android Keystore and is not stored in ILYRO settings or uploaded to ILYRO-operated servers.</p>
+<p>ILYRO does not include saved passwords in Google Drive sync. The app disables Android backup and also declares explicit Android 12+ data-extraction rules that exclude application data from cloud backup and device-to-device transfer.</p>
+<p>Revealing or editing a saved password requires Android device authentication when a device screen lock is configured. A revealed password is hidden again automatically after a short period.</p>
+<p>Password CSV import is processed in memory. ILYRO does not keep a plaintext app copy of an imported CSV. Password CSV export is an explicit user action, requires device authentication, and writes plaintext credentials only to the document location selected by the user. Exported CSV files are not encrypted by ILYRO, so users should store and share them carefully.</p>
+<h2>Search and address suggestions</h2>
+<p>When the user performs a search, the query is sent to the search provider selected in ILYRO. If remote search suggestions are enabled/used by the selected provider, suggestion text may be sent to that provider as part of the feature.</p>
+<p>Private tabs are designed not to expose local browsing-history suggestions or send remote suggestion queries through ILYRO's omnibox suggestion feature.</p>
+<h2>Google account and Google Drive sync</h2>
+<p>Google account features are optional. When the user chooses to sign in and authorize sync, ILYRO can use Google authentication and the Google Drive <code>appDataFolder</code> area to upload and restore an ILYRO browser snapshot.</p>
+<p>The current sync snapshot can include:</p>
+<ul><li>browser settings;</li><li>browsing history;</li><li>bookmarks;</li><li>quick links;</li><li>normal tab URLs, pin state, group names, and active-tab index.</li></ul>
+<p>The current sync format intentionally excludes:</p>
+<ul><li>passwords;</li><li>website cookies and authenticated website sessions;</li><li>private tabs;</li><li>downloads and downloaded files;</li><li>Gecko serialized page/session state.</li></ul>
+<p>Google's own terms and privacy practices apply to Google authentication and Google Drive services.</p>
+<h2>Permissions</h2>
+<p>ILYRO may request Android permissions when a website or browser feature needs them, including camera, microphone, location, notifications, and file/camera access. Site permission prompts are shown by ILYRO/GeckoView before supported website permissions are granted.</p>
+<p>Permission choices can also be controlled through Android system settings and ILYRO's site controls where available.</p>
+<p>When the user explicitly chooses to open a downloaded APK, ILYRO can ask Android to allow package installation from ILYRO. Package installation is initiated and confirmed by the user; ILYRO does not silently install APK files.</p>
+<h2>Downloads</h2>
+<p>Files downloaded through ILYRO are stored on the user's device. Direct and media/HLS downloads can use Android foreground-service notifications so transfer progress remains visible while a download is active.</p>
+<p>ILYRO does not upload downloaded files to an ILYRO server.</p>
+<h2>Content blocking</h2>
+<p>ILYRO bundles uBlock Origin integration for content blocking. uBlock Origin is a third-party open-source project. Its filter lists and related assets can involve network requests according to uBlock Origin's own behavior and configuration.</p>
+<h2>Data sharing by ILYRO</h2>
+<p>The current codebase does not contain an ILYRO-operated advertising network, analytics collector, or telemetry server to which ordinary browsing history is intentionally uploaded.</p>
+<p>Network data can still be sent to third parties when the user uses their services, including websites, selected search engines, Google account/Drive services, extension/filter-list infrastructure, and other destinations requested by the user.</p>
+<h2>Data deletion</h2>
+<p>Users can clear supported local browser data from ILYRO settings. Android application-data controls can also remove the app's local data. Google Drive sync data can be removed through the account/sync controls when that action is available and authorized.</p>
+<h2>Changes to this policy</h2>
+<p>This policy must be updated when ILYRO adds or materially changes data collection, synchronization, analytics, advertising, account, or cloud functionality.</p>
+<h2>Contact</h2>
+<p>For privacy questions or support requests, open an issue at <a href="https://github.com/germ85402-ops/ilyro-browser/issues" target="_blank" rel="noreferrer">GitHub Issues</a>. Do not include passwords, authentication codes, browsing history, or other sensitive personal data in a public issue.</p></article>
+      </section>
+    </main>
+    
+<footer class="site-footer section-shell">
+  <a class="brand footer-brand" href="index.html#top" aria-label="ILYRO, наверх"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 38.9c-4.4-1.4-7.5-5.2-7.5-10.1 0-3.6 1.4-6.6 4-8.9-2.7-3.4-3.4-7-1.8-10.7 2.1 1.2 3.9 2.8 5.3 4.9 1.4-2.1 3.2-3.7 5.3-4.9 1.6 3.7.9 7.3-1.8 10.7 2.6 2.3 4 5.3 4 8.9 0 4.9-3.1 8.7-7.5 10.1Z" /><path class="mark-line" d="M20.7 12.7 16 8.4l-3.2-4.2M27.3 12.7 32 8.4l3.2-4.2M16 8.4l.2-4.8M32 8.4l-.2-4.8" /><path class="mark-cut" d="M20.5 25.2c1.1 1.2 2.3 1.8 3.5-1.8" /></svg></span><span class="brand-name">ILYRO</span></a>
+  <div class="footer-links"><a href="https://github.com/germ85402-ops/ilyro-browser" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/germ85402-ops/ilyro-browser/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Changelog</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a></div>
+  <div class="footer-copy">© <span id="year"></span> ILYRO. Built for Android.</div>
+</footer>
+    <script src="script.js"></script>
+  </body>
+</html>
