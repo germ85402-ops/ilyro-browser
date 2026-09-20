@@ -110,14 +110,21 @@ button {
 
 .ambient-one {
   top: 21rem;
-  left: -19rem;
+  left: 0;
   background: #536dff;
 }
 
 .ambient-two {
   top: 112rem;
-  right: -19rem;
+  right: 0;
   background: #b15fff;
+}
+
+@media (max-width: 620px) {
+  .ambient {
+    width: min(30rem, 100vw);
+    height: min(30rem, 100vw);
+  }
 }
 
 .section-shell {
