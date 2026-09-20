@@ -2507,3 +2507,43 @@ button {
     font-size: 0.93rem;
   }
 }
+
+
+/* Compact desktop/tablet hero */
+@media (max-width: 1400px) and (min-width: 1081px) {
+  .header-inner {
+    gap: 16px;
+  }
+
+  .main-nav {
+    gap: 22px;
+    margin-right: 14px;
+    font-size: 13px;
+  }
+
+  .hero {
+    min-height: 660px;
+    grid-template-columns: minmax(0, 0.9fr) minmax(520px, 1.1fr);
+    gap: 18px;
+    padding-top: 56px;
+    padding-bottom: 56px;
+  }
+
+  .hero h1 {
+    max-width: 540px;
+    font-size: clamp(3.7rem, 6.1vw, 5.9rem);
+  }
+
+  .hero-lead {
+    max-width: 470px;
+    font-size: 16px;
+  }
+
+  .hero-visual {
+    min-height: 520px;
+  }
+
+  .browser-device {
+    width: min(100%, 590px);
+  }
+}
