@@ -74,7 +74,7 @@ dependencies {
     implementation("androidx.credentials:credentials:1.6.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.6.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.2.0")
-    implementation("com.google.android.gms:play-services-auth:21.5.0")
+    implementation("com.google.android.gms:play-services-auth:22.0.0")
     implementation("androidx.work:work-runtime-ktx:2.11.2")
     implementation("org.mozilla.geckoview:geckoview-nightly:158.0.20260911092915")
     testImplementation("junit:junit:4.13.2")
