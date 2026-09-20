@@ -1,9 +1,4 @@
 (() => {
-  const host = (location.hostname || '').toLowerCase();
-  if (host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'youtu.be' || host.endsWith('.youtu.be')) {
-    return;
-  }
-
   let port = null;
   let networkWatcherStarted = false;
   let performanceObserver = null;
@@ -11,6 +6,16 @@
   const MAX_SEEN = 256;
   const MEDIA_URL_RE = /\.(m3u8|mpd|mp4|webm|m4v|mov|ogv|mp3|m4a|aac|flac|wav|oga|opus)(?:$|[?#])/i;
   const STREAM_HINT_RE = /(?:[?&](?:format|type|mime)=(?:m3u8|application%2F(?:vnd\.apple\.mpegurl|dash\+xml))|\/(?:hls|dash)\/[^?#]*(?:master|manifest|playlist|index))/i;
+  const YOUTUBE_PROGRESSIVE_ITAGS = new Set([17, 18, 22, 36, 43, 44, 45, 46]);
+  const YOUTUBE_HEIGHT_BY_ITAG = new Map(Object.entries({
+    17: 144, 36: 240, 18: 360, 43: 360, 44: 480, 22: 720, 45: 720, 46: 1080,
+    160: 144, 133: 240, 134: 360, 135: 480, 136: 720, 137: 1080, 264: 1440,
+    266: 2160, 278: 144, 242: 240, 243: 360, 244: 480, 247: 720, 248: 1080,
+    271: 1440, 272: 2160, 298: 720, 299: 1080, 302: 720, 303: 1080, 308: 1440,
+    313: 2160, 315: 2160, 330: 144, 331: 240, 332: 360, 333: 480, 334: 720,
+    335: 1080, 336: 1440, 337: 2160, 394: 144, 395: 240, 396: 360, 397: 480,
+    398: 720, 399: 1080, 400: 1440, 401: 2160
+  }).map(([key, value]) => [Number(key), value]));
 
   function connect() {
     if (port) return port;
@@ -41,6 +46,48 @@
       return new URL(url).pathname.toLowerCase();
     } catch (_) {
       return '';
+    }
+  }
+
+  function youtubeStreamInfo(value) {
+    try {
+      const url = new URL(value, location.href);
+      const mediaHost = (url.hostname || '').toLowerCase();
+      if (!(mediaHost === 'googlevideo.com' || mediaHost.endsWith('.googlevideo.com'))) return null;
+      if (!url.pathname.includes('/videoplayback')) return null;
+
+      const queryMime = (url.searchParams.get('mime') || '').toLowerCase();
+      const itag = Number(url.searchParams.get('itag') || 0);
+      const kind = queryMime.startsWith('video/') ? 'video' :
+        queryMime.startsWith('audio/') ? 'audio' : '';
+      if (!kind) return null;
+
+      ['range', 'rn', 'rbuf'].forEach(name => url.searchParams.delete(name));
+
+      const progressive = kind === 'video' && YOUTUBE_PROGRESSIVE_ITAGS.has(itag);
+      const height = YOUTUBE_HEIGHT_BY_ITAG.get(itag) ||
+        Math.max(0, Number(url.searchParams.get('height') || 0));
+      const width = Math.max(0, Number(url.searchParams.get('width') || 0));
+      const bitrate = Math.max(0, Number(url.searchParams.get('bitrate') || 0));
+      const frameRate = Math.max(0, Number(url.searchParams.get('fps') || 0));
+      const codecMatch = queryMime.match(/codecs?=["']?([^;"']+)/i);
+
+      return {
+        url: url.href,
+        kind,
+        mime: queryMime,
+        source: kind === 'audio'
+          ? 'youtube-adaptive-audio'
+          : (progressive ? 'youtube-progressive' : 'youtube-adaptive-video'),
+        width,
+        height,
+        bitrate,
+        frameRate,
+        codecs: codecMatch ? codecMatch[1].trim() : '',
+        requiresSeparateAudio: kind === 'video' && !progressive
+      };
+    } catch (_) {
+      return null;
     }
   }
 
@@ -79,7 +126,7 @@
   }
 
   function remember(key, mime, source, width, height) {
-    const signature = `${mime || ''}|${source || ''}|${width || 0}|${height || 0}`;
+    const signature = (mime || '') + '|' + (source || '') + '|' + (width || 0) + '|' + (height || 0);
     if (seen.get(key) === signature) return false;
     seen.set(key, signature);
     if (seen.size > MAX_SEEN) {
@@ -106,21 +153,33 @@
 
   function cleanMediaTitle(value) {
     if (typeof value !== 'string') return '';
-    return value.replace(/\s+/g, ' ').trim().slice(0, 180);
+    return value
+      .replace(/\s+-\s+YouTube\s*$/i, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 180);
   }
 
   function report(rawUrl, mime, source, width, height, titleOverride) {
-    const url = normalizedUrl(rawUrl);
+    const youtube = youtubeStreamInfo(rawUrl);
+    const url = normalizedUrl(youtube ? youtube.url : rawUrl);
     if (!url) return;
-    const kind = classify(url, mime, source);
+
+    const effectiveMime = youtube ? youtube.mime : (mime || '');
+    const effectiveSource = youtube ? youtube.source : (source || 'page');
+    const kind = youtube ? youtube.kind : classify(url, effectiveMime, effectiveSource);
     if (!kind) return;
 
     const inferred = inferQualityFromUrl(url);
-    const mediaWidth = Number.isFinite(width) && width > 0 ? Math.round(width) : inferred.width;
-    const mediaHeight = Number.isFinite(height) && height > 0 ? Math.round(height) : inferred.height;
+    const mediaWidth = youtube && youtube.width > 0
+      ? youtube.width
+      : (Number.isFinite(width) && width > 0 ? Math.round(width) : inferred.width);
+    const mediaHeight = youtube && youtube.height > 0
+      ? youtube.height
+      : (Number.isFinite(height) && height > 0 ? Math.round(height) : inferred.height);
 
-    const key = `${kind}|${url}`;
-    if (!remember(key, mime, source, mediaWidth, mediaHeight)) return;
+    const key = kind + '|' + url;
+    if (!remember(key, effectiveMime, effectiveSource, mediaWidth, mediaHeight)) return;
 
     const targetPort = connect();
     if (!targetPort) return;
@@ -130,12 +189,16 @@
         type: 'media',
         url,
         kind,
-        mime: typeof mime === 'string' ? mime : '',
-        source: source || 'page',
+        mime: effectiveMime,
+        source: effectiveSource,
         pageUrl: location.href,
         title: cleanMediaTitle(titleOverride) || cleanMediaTitle(document.title),
         width: Math.max(0, mediaWidth),
-        height: Math.max(0, mediaHeight)
+        height: Math.max(0, mediaHeight),
+        bitrate: youtube ? youtube.bitrate : 0,
+        frameRate: youtube ? youtube.frameRate : 0,
+        codecs: youtube ? youtube.codecs : '',
+        separateAudio: youtube ? youtube.requiresSeparateAudio === true : false
       });
     } catch (_) {
       port = null;
@@ -148,13 +211,14 @@
 
     const initiator = (entry?.initiatorType || '').toLowerCase();
     const isMediaInitiator = initiator === 'video' || initiator === 'audio';
+    const youtube = youtubeStreamInfo(name);
 
-    if (!isMediaInitiator && !MEDIA_URL_RE.test(name) && !STREAM_HINT_RE.test(name)) return;
+    if (!youtube && !isMediaInitiator && !MEDIA_URL_RE.test(name) && !STREAM_HINT_RE.test(name)) return;
 
     let hint = 'network';
     if (initiator === 'video') hint = 'resource-video';
     if (initiator === 'audio') hint = 'resource-audio';
-    report(name, '', hint, 0, 0);
+    report(name, youtube ? youtube.mime : '', hint, 0, 0);
   }
 
   function startNetworkWatcher() {
@@ -163,7 +227,7 @@
 
     try {
       const existing = performance.getEntriesByType('resource');
-      existing.slice(Math.max(0, existing.length - 250)).forEach(inspectPerformanceEntry);
+      existing.slice(Math.max(0, existing.length - 300)).forEach(inspectPerformanceEntry);
 
       performanceObserver = new PerformanceObserver(list => {
         list.getEntries().forEach(inspectPerformanceEntry);
@@ -183,8 +247,6 @@
 
     startNetworkWatcher();
 
-    // Only intrinsic media dimensions describe stream quality. CSS/client dimensions describe
-    // the player box and previously produced fake qualities such as 538p or 150p.
     const width = isVideo ? (element.videoWidth || 0) : 0;
     const height = isVideo ? (element.videoHeight || 0) : 0;
     const hint = isVideo ? 'video' : 'audio';
@@ -198,10 +260,10 @@
     report(element.currentSrc, element.getAttribute('type') || '', hint, width, height, mediaTitle);
     report(element.src, element.getAttribute('type') || '', hint, width, height, mediaTitle);
 
-    element.querySelectorAll('source[src]').forEach(source => {
+    element.querySelectorAll('source[src]').forEach(sourceElement => {
       report(
-        source.src,
-        source.type || '',
+        sourceElement.src,
+        sourceElement.type || '',
         isVideo ? 'source-video' : 'source-audio',
         width,
         height,
@@ -234,8 +296,6 @@
   setTimeout(scanMediaElements, 4000);
   setTimeout(scanMediaElements, 12000);
 
-  // Players are often inserted or swapped after user interaction. Observe the document instead
-  // of relying only on fixed timers, while batching scans to keep the page cheap.
   let mutationScanTimer = null;
   try {
     const observer = new MutationObserver(mutations => {
@@ -260,6 +320,9 @@
 
   window.addEventListener('pageshow', scanMediaElements, true);
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) scanMediaElements();
+    if (!document.hidden) {
+      startNetworkWatcher();
+      scanMediaElements();
+    }
   }, true);
 })();
