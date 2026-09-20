@@ -50,22 +50,8 @@ internal fun MediaSheet(
 ) {
     val metrics = rememberIlyroLayoutMetrics()
     val dense = LocalIlyroUiDensity.current == UiDensity.COMPACT
-    val qualityKeys = remember(media) {
-        media.map(::mediaQualityBucket)
-            .distinct()
-            .sortedWith(compareByDescending<String>(::qualitySortValue).thenBy { it })
-    }
-    val bestHeight = remember(media) { media.maxOfOrNull { it.height } ?: 0 }
-    val bestBitrate = remember(media) { media.maxOfOrNull { it.bitrate } ?: 0L }
-    var selectedQuality by remember(qualityKeys) { mutableStateOf("all") }
-    val visibleMedia = remember(media, selectedQuality) {
-        if (selectedQuality == "all") media
-        else media.filter { mediaQualityBucket(it) == selectedQuality }
-    }
-    val bestLabel = when {
-        bestHeight > 0 -> qualityDisplayName("${bestHeight}p")
-        bestBitrate > 0L -> formatBitrate(bestBitrate)
-        else -> null
+    val latestMedia = remember(media) {
+        MediaDetectorBridge.selectPrimaryCandidate(media)
     }
 
     ModalBottomSheet(
@@ -99,23 +85,27 @@ internal fun MediaSheet(
                         .padding(top = if (dense) 8.dp else if (metrics.isCompact) 12.dp else 18.dp)
                 ) {
                     Text(
-                        text = tr("Media found", "Найденные видео"),
+                        text = tr("Video found", "Найдено видео"),
                         style = if (dense) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = when {
                             resolvingQualities -> tr(
-                                "${media.size} sources · checking stream qualities",
-                                "Источников: ${media.size} · определяю качество потоков"
+                                "Latest stream · checking quality",
+                                "Последний поток · определяю качество"
                             )
-                            bestLabel != null -> tr(
-                                "${media.size} sources · up to $bestLabel",
-                                "Источников: ${media.size} · до $bestLabel"
+                            latestMedia?.height ?: 0 > 0 -> tr(
+                                "Latest detected stream · ${latestMedia?.qualityLabel.orEmpty()}",
+                                "Последний обнаруженный поток · ${latestMedia?.qualityLabel.orEmpty()}"
+                            )
+                            latestMedia != null -> tr(
+                                "Latest detected stream",
+                                "Последний обнаруженный поток"
                             )
                             else -> tr(
-                                "${media.size} source${if (media.size == 1) "" else "s"} on this page",
-                                "Источников на странице: ${media.size}"
+                                "Start playback to detect the active video",
+                                "Запустите воспроизведение, чтобы определить активное видео"
                             )
                         },
                         style = MaterialTheme.typography.bodyMedium,
@@ -142,33 +132,7 @@ internal fun MediaSheet(
 
                 Spacer(modifier = Modifier.height(metrics.sectionGap))
 
-                if (
-                    qualityKeys.size > 1 ||
-                    qualityKeys.firstOrNull()?.let { it != "video" && it != "auto" } == true
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(metrics.itemGap)
-                    ) {
-                        QualityTab(
-                            label = tr("All", "Все"),
-                            selected = selectedQuality == "all",
-                            onClick = { selectedQuality = "all" }
-                        )
-                        qualityKeys.forEach { key ->
-                            QualityTab(
-                                label = qualityDisplayName(key),
-                                selected = selectedQuality == key,
-                                onClick = { selectedQuality = key }
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(metrics.sectionGap))
-                }
-
-                if (media.isEmpty() && !resolvingQualities) {
+                if (latestMedia == null && !resolvingQualities) {
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -191,15 +155,15 @@ internal fun MediaSheet(
                         ) {
                             Text(
                                 text = tr(
-                                    "No media detected yet",
-                                    "Видео пока не найдено"
+                                    "No active video yet",
+                                    "Активное видео пока не найдено"
                                 ),
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
                                 text = tr(
-                                    "Start playback on the page. ILYRO also watches dynamically created players and stream manifests.",
-                                    "Запустите видео на странице. ILYRO также отслеживает динамические плееры и потоковые манифесты."
+                                    "Start playback on the page. ILYRO will show only the latest active stream here.",
+                                    "Запустите видео на странице. Здесь ILYRO будет показывать только последний активный поток."
                                 ),
                                 modifier = Modifier.padding(top = 4.dp),
                                 style = MaterialTheme.typography.bodyMedium,
@@ -207,37 +171,35 @@ internal fun MediaSheet(
                             )
                         }
                     }
-                } else if (visibleMedia.isNotEmpty()) {
-                    LazyColumn(
-                        modifier = Modifier.heightIn(
-                            max = if (metrics.isCompact) 520.dp else 590.dp
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(metrics.itemGap)
-                    ) {
-                        items(
-                            visibleMedia,
-                            key = { "${it.kind}:${it.qualityLabel}:${it.url}" }
-                        ) { item ->
-                            MediaCard(
-                                item = item,
-                                compact = dense || metrics.isCompact,
-                                narrow = metrics.isNarrowPhone,
-                                isBestQuality = item.height > 0 && item.height == bestHeight,
-                                onDownload = { onDownload(item) },
-                                onOpenExternal = {
-                                    onDismiss()
-                                    onOpenExternal(item)
-                                }
-                            )
+                } else if (latestMedia != null) {
+                    MediaCard(
+                        item = latestMedia,
+                        compact = dense || metrics.isCompact,
+                        narrow = metrics.isNarrowPhone,
+                        isBestQuality = false,
+                        onDownload = { onDownload(latestMedia) },
+                        onOpenExternal = {
+                            onDismiss()
+                            onOpenExternal(latestMedia)
                         }
-                    }
+                    )
                 }
 
-                if (media.any { it.kind == DetectedMediaKind.DASH || it.hlsHasSeparateAudio }) {
+                if (latestMedia?.requiresSeparateAudio == true && latestMedia.isYouTubeStream) {
                     Text(
                         text = tr(
-                            "Some adaptive streams keep video and audio separately. ILYRO shows them, but only enables Download when it can create a valid local file.",
-                            "Некоторые адаптивные потоки хранят видео и звук отдельно. ILYRO показывает их, но включает «Скачать» только когда может создать корректный локальный файл."
+                            "YouTube provides this quality as separate video and audio. ILYRO will combine the detected tracks while downloading.",
+                            "YouTube отдаёт это качество отдельными видео- и аудиодорожками. При скачивании ILYRO объединит найденные дорожки."
+                        ),
+                        modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else if (latestMedia?.kind == DetectedMediaKind.DASH || latestMedia?.hlsHasSeparateAudio == true) {
+                    Text(
+                        text = tr(
+                            "This adaptive stream keeps video and audio separately and cannot be saved as one file yet.",
+                            "Этот адаптивный поток хранит видео и звук отдельно и пока не может быть сохранён одним файлом."
                         ),
                         modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
                         style = MaterialTheme.typography.bodySmall,
@@ -301,7 +263,11 @@ private fun MediaCard(
     onOpenExternal: () -> Unit
 ) {
     val uri = runCatching { Uri.parse(item.url) }.getOrNull()
-    val host = uri?.host.orEmpty().removePrefix("www.")
+    val host = if (item.isYouTubeStream) {
+        "YouTube"
+    } else {
+        uri?.host.orEmpty().removePrefix("www.")
+    }
     val dimensions = if (item.width > 0 && item.height > 0) {
         "${item.width}×${item.height}"
     } else null
