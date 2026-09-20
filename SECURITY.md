@@ -6,7 +6,7 @@ Security fixes are applied to the current development branch and the newest publ
 
 ## Reporting a vulnerability
 
-Use GitHub's private vulnerability reporting or open a private security advisory from the repository Security tab. Do not publish credentials, browsing data, exploit details, or other sensitive information in a public issue.
+Use GitHub's private vulnerability reporting when it is available for this repository. If the private reporting option is not visible, do not publish credentials, browsing data, exploit details, or other sensitive information in a public issue; open a minimal non-sensitive issue asking the maintainer for a private reporting channel.
 
 For ordinary bugs that do not expose user data or weaken security, use GitHub Issues.
 
