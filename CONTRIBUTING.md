@@ -12,12 +12,12 @@ Thank you for helping improve ILYRO Browser.
 
 ## Local checks
 
-The project currently uses Gradle 9.6:
+The repository includes the verified Gradle 9.6.0 Wrapper:
 
 ```bash
 python3 scripts/prepare_ublock.py
 python3 scripts/prepare_darkreader.py
-gradle :app:lintDebug :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
+./gradlew :app:lintDebug :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest
 node app/src/test/js/gesture-policy.test.js
 ```
 
