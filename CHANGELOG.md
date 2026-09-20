@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+## 0.26.0-rc2 — release candidate
+
+- Complete the production-readiness pass for Google account synchronization without changing the existing OAuth client, package identity, signing identity, or Drive app-data scope.
 - Protect local settings and open tabs from being silently overwritten when another device changes them at the same time.
 - Show background sync failures, retry recoverable errors with exponential backoff, and add a confirmed action to delete the Google Drive backup.
 - Move the browser engine from GeckoView Nightly to Mozilla's stable GeckoView 155 release.
