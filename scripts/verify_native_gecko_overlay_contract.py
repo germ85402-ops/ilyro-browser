@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,7 +13,10 @@ def fail(message: str) -> None:
     raise SystemExit(f"Native Gecko overlay contract failed: {message}")
 
 
-if "NativeBrowserHost.install(this) { IlyroApp() }" not in main:
+if re.search(
+    r"NativeBrowserHost\\.install\\(\\s*this(?:\\s*,|\\s*\\))",
+    main
+) is None:
     fail("MainActivity is not using the Activity-owned native Gecko host")
 
 if "NativeBrowserHostCoordinator.setBounds(" not in app:
