@@ -10,6 +10,8 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image as ComposeImage
@@ -104,6 +106,7 @@ internal fun TabOverviewSheet(
     onSelect: (String) -> Unit,
     onClose: (String) -> Unit,
     onCloseAll: () -> Unit,
+    onDismissNotice: () -> Unit = {},
     onTogglePinned: (String) -> Unit,
     onUpdateGroup: (String, String?) -> Unit,
     tabCloseNotice: BrowserTopNotice? = null,
@@ -120,6 +123,28 @@ internal fun TabOverviewSheet(
     var actionTabId by remember { mutableStateOf<String?>(null) }
     var openingTabId by remember { mutableStateOf<String?>(null) }
     var showCloseAllDialog by remember { mutableStateOf(false) }
+    var sheetVisible by remember { mutableStateOf(false) }
+    var pendingExitAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+
+    fun requestSheetDismiss(after: () -> Unit = onDismiss) {
+        if (!sheetVisible || pendingExitAction != null) return
+        pendingExitAction = after
+        sheetVisible = false
+    }
+
+    LaunchedEffect(Unit) {
+        sheetVisible = true
+    }
+
+    LaunchedEffect(sheetVisible, pendingExitAction) {
+        if (!sheetVisible) {
+            val action = pendingExitAction ?: return@LaunchedEffect
+            delay(260L)
+            if (!sheetVisible && pendingExitAction != null) {
+                action()
+            }
+        }
+    }
 
     val groups = tabs
         .mapNotNull { it.groupName?.trim()?.takeIf(String::isNotBlank) }
@@ -183,12 +208,12 @@ internal fun TabOverviewSheet(
     LaunchedEffect(openingTabId) {
         val id = openingTabId ?: return@LaunchedEffect
         delay(IlyroVisualTokens.MotionFastMs.toLong())
-        onSelect(id)
         openingTabId = null
+        requestSheetDismiss { onSelect(id) }
     }
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { requestSheetDismiss() },
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
             decorFitsSystemWindows = false,
@@ -197,10 +222,23 @@ internal fun TabOverviewSheet(
         )
     ) {
         IlyroSystemBarAppearance()
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            AnimatedVisibility(
+                visible = sheetVisible,
+                enter = slideInVertically(
+                    initialOffsetY = { it },
+                    animationSpec = tween(IlyroVisualTokens.MotionStandardMs)
+                ) + fadeIn(tween(130)),
+                exit = slideOutVertically(
+                    targetOffsetY = { it },
+                    animationSpec = tween(IlyroVisualTokens.MotionStandardMs)
+                ) + fadeOut(tween(170)),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -217,7 +255,7 @@ internal fun TabOverviewSheet(
                         IlyroScreenHeader(
                             title = tr("Tabs", "Вкладки"),
                             subtitle = tr("${tabs.size} open", "Открыто: ${tabs.size}"),
-                            onBack = onDismiss,
+                            onBack = { requestSheetDismiss() },
                             actions = {
                                 if (tabs.isNotEmpty()) {
                                     TextButton(onClick = { showCloseAllDialog = true }) {
@@ -350,7 +388,10 @@ internal fun TabOverviewSheet(
                         BrowserTopNoticeCard(
                             notice = notice,
                             onClick = {},
-                            onActionClick = onUndoClose
+                            onActionClick = onUndoClose,
+                            onDismiss = onDismissNotice,
+                            allowSwipeUp = true,
+                            allowSwipeDown = true
                         )
                     }
                 }
@@ -368,9 +409,19 @@ internal fun TabOverviewSheet(
                         selectedGroup = null
                         actionTabId = null
                     },
-                    onNewTab = if (section == TabOverviewSection.PRIVATE) onNewPrivateTab else onNewTab,
+                    onNewTab = {
+                        requestSheetDismiss {
+                            if (section == TabOverviewSection.PRIVATE) {
+                                onNewPrivateTab()
+                            } else {
+                                onNewTab()
+                            }
+                        }
+                    },
                     modifier = Modifier.align(Alignment.BottomCenter)
                 )
+            }
+        }
             }
         }
     }
