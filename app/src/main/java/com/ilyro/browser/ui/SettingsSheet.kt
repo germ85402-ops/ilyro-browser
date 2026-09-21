@@ -894,7 +894,11 @@ private fun SupportAction(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, bottom = if (dense) 10.dp else 12.dp),
+            .padding(
+                start = 12.dp,
+                end = 12.dp,
+                bottom = if (dense) 10.dp else 12.dp
+            ),
         shape = RoundedCornerShape(if (dense) 16.dp else 18.dp),
         color = MaterialTheme.colorScheme.primaryContainer,
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
