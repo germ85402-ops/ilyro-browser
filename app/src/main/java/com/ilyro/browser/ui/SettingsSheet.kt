@@ -5,6 +5,7 @@ import android.net.Uri
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -60,6 +61,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -145,7 +149,6 @@ internal fun SettingsSheet(
                             SettingsSidebar(
                                 current = category,
                                 wide = wide,
-                                versionName = versionName,
                                 onSelect = { selectedName = it.name },
                                 modifier = if (wide) {
                                     Modifier.width(224.dp).fillMaxHeight()
@@ -313,11 +316,11 @@ private fun ModernSettingsHeader(
 private fun SettingsSidebar(
     current: SettingsCategory,
     wide: Boolean,
-    versionName: String,
     onSelect: (SettingsCategory) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val dense = LocalIlyroUiDensity.current == UiDensity.COMPACT
+    val context = LocalContext.current
     val categories = listOf(
         SettingsCategory.GENERAL,
         SettingsCategory.APPEARANCE,
@@ -406,11 +409,15 @@ private fun SettingsSidebar(
             }
         }
 
-        Text(
-            "ILYRO $versionName",
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 16.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.68f)
+        SidebarSupportCard(
+            onClick = {
+                context.startActivity(
+                    Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse(BUY_ME_A_COFFEE_URL)
+                    )
+                )
+            }
         )
     }
 }
@@ -649,25 +656,6 @@ private fun SettingsCategoryContent(
                 )
             }
 
-            SettingsCard(title = tr("Support ILYRO", "Поддержать ILYRO")) {
-                SupportAction(
-                    title = tr("Buy Me a Coffee", "Buy Me a Coffee"),
-                    subtitle = tr(
-                        "Support the browser and its future updates.",
-                        "Поддержать развитие браузера и будущие обновления."
-                    ),
-                    actionLabel = tr("Open", "Открыть"),
-                    onClick = {
-                        context.startActivity(
-                            Intent(
-                                Intent.ACTION_VIEW,
-                                Uri.parse(BUY_ME_A_COFFEE_URL)
-                            )
-                        )
-                    }
-                )
-            }
-
             SettingsCard(title = tr("Legal", "Юридическая информация")) {
                 ActionRow(
                     tr("Privacy Policy", "Политика конфиденциальности"),
@@ -883,10 +871,7 @@ private fun ToggleRow(
 }
 
 @Composable
-private fun SupportAction(
-    title: String,
-    subtitle: String,
-    actionLabel: String,
+private fun SidebarSupportCard(
     onClick: () -> Unit
 ) {
     val dense = LocalIlyroUiDensity.current == UiDensity.COMPACT
@@ -894,69 +879,137 @@ private fun SupportAction(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(
-                start = 12.dp,
-                end = 12.dp,
-                bottom = if (dense) 10.dp else 12.dp
-            ),
-        shape = RoundedCornerShape(if (dense) 16.dp else 18.dp),
-        color = MaterialTheme.colorScheme.primaryContainer,
+            .padding(top = if (dense) 8.dp else 12.dp),
+        shape = RoundedCornerShape(if (dense) 18.dp else 20.dp),
+        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.90f),
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+        ),
         tonalElevation = 0.dp
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(
-                    horizontal = if (dense) 12.dp else 14.dp,
-                    vertical = if (dense) 10.dp else 12.dp
-                ),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(if (dense) 10.dp else 12.dp),
+            verticalArrangement = Arrangement.spacedBy(if (dense) 8.dp else 10.dp)
         ) {
-            Surface(
-                modifier = Modifier.size(if (dense) 36.dp else 42.dp),
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                contentColor = MaterialTheme.colorScheme.primary,
-                tonalElevation = 0.dp
+            Row(
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.LocalCafe, contentDescription = null)
+                SteamingCoffeeIcon(compact = dense)
+                Spacer(modifier = Modifier.width(if (dense) 8.dp else 10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        tr("Support ILYRO", "Поддержать ILYRO"),
+                        style = if (dense) {
+                            MaterialTheme.typography.labelLarge
+                        } else {
+                            MaterialTheme.typography.titleSmall
+                        },
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        tr("Help keep the browser growing.", "Помочь развивать браузер."),
+                        modifier = Modifier.padding(top = 2.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
             }
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = if (dense) 10.dp else 12.dp)
-            ) {
-                Text(
-                    title,
-                    style = if (dense) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Text(
-                    subtitle,
-                    modifier = Modifier.padding(top = 2.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f)
-                )
-            }
+
             Surface(
+                modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.primary,
                 contentColor = MaterialTheme.colorScheme.onPrimary,
                 tonalElevation = 0.dp
             ) {
-                Text(
-                    actionLabel,
-                    modifier = Modifier.padding(
-                        horizontal = if (dense) 10.dp else 12.dp,
-                        vertical = 7.dp
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Medium
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        tr("Buy me a coffee", "Угостить кофе"),
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Icon(
+                        Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun SteamingCoffeeIcon(compact: Boolean) {
+    val primary = MaterialTheme.colorScheme.primary
+    val iconSize = if (compact) 38.dp else 44.dp
+    Surface(
+        modifier = Modifier.size(iconSize),
+        shape = RoundedCornerShape(if (compact) 13.dp else 15.dp),
+        color = primary.copy(alpha = 0.14f),
+        contentColor = primary,
+        tonalElevation = 0.dp
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(if (compact) 4.dp else 5.dp)
+            ) {
+                val steamStroke = Stroke(
+                    width = 1.5.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+                val leftSteam = Path().apply {
+                    moveTo(size.width * 0.36f, size.height * 0.34f)
+                    cubicTo(
+                        size.width * 0.22f,
+                        size.height * 0.25f,
+                        size.width * 0.54f,
+                        size.height * 0.18f,
+                        size.width * 0.42f,
+                        size.height * 0.08f
+                    )
+                }
+                val rightSteam = Path().apply {
+                    moveTo(size.width * 0.62f, size.height * 0.32f)
+                    cubicTo(
+                        size.width * 0.49f,
+                        size.height * 0.22f,
+                        size.width * 0.77f,
+                        size.height * 0.16f,
+                        size.width * 0.65f,
+                        size.height * 0.06f
+                    )
+                }
+                drawPath(leftSteam, primary.copy(alpha = 0.62f), style = steamStroke)
+                drawPath(rightSteam, primary.copy(alpha = 0.38f), style = steamStroke)
+            }
+            Icon(
+                Icons.Rounded.LocalCafe,
+                contentDescription = null,
+                modifier = Modifier.size(if (compact) 20.dp else 23.dp)
+            )
         }
     }
 }
