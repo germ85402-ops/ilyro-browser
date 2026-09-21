@@ -167,7 +167,7 @@ internal object BrowserSettingsSyncCodec {
                         queryUrlTemplate = item.optString("url")
                     )
                 ) ?: continue
-                if (none { it.id == engine.id }) add(engine)
+                if (none { existing: CustomSearchEngine -> existing.id == engine.id }) add(engine)
                 if (size >= MAX_CUSTOM_SEARCH_ENGINES) break
             }
         }

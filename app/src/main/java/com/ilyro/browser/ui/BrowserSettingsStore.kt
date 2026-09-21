@@ -196,7 +196,7 @@ internal object BrowserSettingsStore {
                             queryUrlTemplate = item.optString("url")
                         )
                     ) ?: continue
-                    if (none { it.id == candidate.id }) add(candidate)
+                    if (none { existing: CustomSearchEngine -> existing.id == candidate.id }) add(candidate)
                     if (size >= MAX_CUSTOM_SEARCH_ENGINES) break
                 }
             }

@@ -245,7 +245,7 @@ internal fun IlyroHomeOmnibox(
                     Text(
                         tr(
                             "Search with ${customSearchEngine?.displayName ?: searchEngine.displayName} or enter address",
-                            "Поиск через ${customSearchEngine?.displayName ?: searchEngine.displayName} или адрес
+                            "Поиск через ${customSearchEngine?.displayName ?: searchEngine.displayName} или адрес"
                         )
                     )
                 },
