@@ -3901,3 +3901,279 @@ button {
     color: #164a4b;
   }
 }
+
+
+/* ILYRO icon system and visual polish */
+.icon-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.ui-icon {
+  display: block;
+  width: 1.05em;
+  height: 1.05em;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.ui-icon-inline {
+  width: 15px;
+  height: 15px;
+}
+
+.ui-icon-github {
+  fill: currentColor;
+  stroke: none;
+}
+
+.header-cta .ui-icon,
+.button .ui-icon {
+  transform: translateY(-0.5px);
+}
+
+.home-page .header-cta {
+  border-radius: 999px;
+  padding-right: 15px;
+  padding-left: 15px;
+}
+
+.home-page .button {
+  min-height: 44px;
+  border-radius: 12px;
+  gap: 9px;
+}
+
+.home-page .button-primary {
+  box-shadow: 0 12px 26px rgba(67, 205, 162, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.home-page .button-outline {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.github-mark {
+  width: 17px;
+  height: 17px;
+  border: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+.hero-tags {
+  gap: 8px;
+}
+
+.hero-tags span {
+  min-height: 30px;
+  border-radius: 999px;
+  padding-right: 10px;
+  padding-left: 10px;
+}
+
+.tag-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.tag-icon .ui-icon {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.7;
+}
+
+.benefit-strip {
+  gap: 14px;
+}
+
+.benefit-card {
+  min-height: 84px;
+  gap: 14px;
+  border-radius: 14px;
+  padding: 14px 16px;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.benefit-card:hover {
+  border-color: var(--home-line-strong);
+  box-shadow: 0 14px 30px rgba(4, 25, 36, 0.14);
+  transform: translateY(-2px);
+}
+
+.benefit-icon {
+  width: 44px;
+  height: 44px;
+  flex-basis: 44px;
+  border-radius: 13px;
+  background: linear-gradient(145deg, rgba(92, 224, 184, 0.18), rgba(92, 224, 184, 0.06));
+}
+
+.benefit-icon .ui-icon {
+  width: 21px;
+  height: 21px;
+  stroke-width: 1.75;
+}
+
+.benefit-icon-bolt {
+  color: #8bdcff;
+}
+
+.benefit-icon-palette {
+  color: #d2b8ff;
+}
+
+.benefit-icon-sync {
+  color: #a7d5ff;
+}
+
+.section-link {
+  gap: 8px;
+}
+
+.section-link > span:first-child {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.section-link .section-arrow {
+  width: 16px;
+  height: 16px;
+  transition: transform 180ms ease;
+}
+
+.section-link:hover .section-arrow,
+.section-link:focus-visible .section-arrow {
+  transform: translateX(4px);
+}
+
+.why-grid {
+  gap: 14px;
+}
+
+.why-card {
+  border-radius: 14px;
+}
+
+.why-card img {
+  height: 164px;
+}
+
+.reference-shot-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px 14px;
+}
+
+.reference-shot img {
+  aspect-ratio: 1.6 / 1;
+  border-radius: 12px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.18);
+}
+
+.reference-shot figcaption {
+  padding: 10px 2px 0;
+}
+
+.footer-social {
+  gap: 9px;
+}
+
+.footer-social a {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid rgba(118, 173, 198, 0.24);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.035);
+  color: inherit;
+  transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+}
+
+.footer-social a:hover,
+.footer-social a:focus-visible {
+  border-color: var(--home-green);
+  background: rgba(99, 226, 181, 0.12);
+  transform: translateY(-2px);
+}
+
+.footer-social .ui-icon {
+  width: 15px;
+  height: 15px;
+}
+
+:root:not([data-theme]) .home-page .benefit-icon {
+  border-color: rgba(13, 159, 120, 0.2);
+  background: linear-gradient(145deg, rgba(82, 214, 177, 0.18), rgba(82, 214, 177, 0.06));
+}
+
+:root:not([data-theme]) .home-page .benefit-icon-bolt {
+  color: #1587a0;
+}
+
+:root:not([data-theme]) .home-page .benefit-icon-palette {
+  color: #7a58c2;
+}
+
+:root:not([data-theme]) .home-page .benefit-icon-sync {
+  color: #2c76b8;
+}
+
+@media (max-width: 860px) {
+  .reference-shot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .home-page .button {
+    min-height: 46px;
+  }
+
+  .hero-tags span {
+    min-height: 29px;
+  }
+
+  .benefit-card {
+    min-height: 76px;
+  }
+
+  .reference-shot-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .why-card img {
+    height: 190px;
+  }
+
+  .footer-social a {
+    width: 34px;
+    height: 34px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media (max-width: 620px) {
+  .ui-icon-inline {
+    width: 16px;
+    height: 16px;
+  }
+}
