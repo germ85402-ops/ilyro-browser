@@ -265,6 +265,7 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        BrowserEngine.updateSystemDarkTheme(newConfig)
         if (::browserPrefs.isInitialized) {
             applySystemChrome()
             window.decorView.post { applySystemChrome() }

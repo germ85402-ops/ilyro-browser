@@ -254,7 +254,7 @@ fun IlyroApp() {
     var onboardingComplete by remember {
         mutableStateOf(prefs.getBoolean(PREF_ONBOARDING_COMPLETE, existingInstall))
     }
-    val systemDarkTheme = androidx.compose.foundation.isSystemInDarkTheme()
+    val systemDarkTheme = BrowserEngine.systemDarkTheme
     val darkTheme = when (settings.theme) {
         BrowserTheme.SYSTEM -> systemDarkTheme
         BrowserTheme.LIGHT -> false
@@ -791,6 +791,7 @@ private fun BrowserScreen(
 
     var darkWebsitesReloadRevision by remember { mutableIntStateOf(0) }
     var darkWebsitesSettingInitialized by remember { mutableStateOf(false) }
+    var lastAppliedBrowserTheme by remember { mutableStateOf(settings.theme) }
     var lastAppliedDarkTheme by remember { mutableStateOf(darkTheme) }
 
     fun reloadActivePageForAppearance() {
@@ -823,8 +824,11 @@ private fun BrowserScreen(
     // Many sites only evaluate prefers-color-scheme while creating the document. Update Gecko
     // first, then reload each already-open web session exactly once. There is no arbitrary delay:
     // the runtime preference has already been set by updateSettings for manual theme changes.
-    LaunchedEffect(darkTheme) {
-        if (lastAppliedDarkTheme == darkTheme) return@LaunchedEffect
+    LaunchedEffect(settings.theme, darkTheme) {
+        val browserThemeChanged = lastAppliedBrowserTheme != settings.theme
+        val resolvedAppearanceChanged = lastAppliedDarkTheme != darkTheme
+        if (!browserThemeChanged && !resolvedAppearanceChanged) return@LaunchedEffect
+        lastAppliedBrowserTheme = settings.theme
         lastAppliedDarkTheme = darkTheme
         BrowserEngine.applyPreferredColorScheme(settings.theme)
 

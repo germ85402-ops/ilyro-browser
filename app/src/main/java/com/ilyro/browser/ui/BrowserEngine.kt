@@ -3,6 +3,7 @@
 package com.ilyro.browser.ui
 
 import android.content.Context
+import android.content.res.Configuration
 import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -34,6 +35,21 @@ internal object BrowserEngine {
 
     @Volatile
     private var runtime: GeckoRuntime? = null
+
+    // MainActivity owns uiMode changes because it intentionally handles them without recreating
+    // the Gecko host. Expose the current system appearance as Compose state so the browser UI,
+    // Gecko runtime and already-open pages observe the same change immediately.
+    var systemDarkTheme by mutableStateOf(false)
+        private set
+
+    fun updateSystemDarkTheme(configuration: Configuration) {
+        val isDark = configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
+            Configuration.UI_MODE_NIGHT_YES
+        if (systemDarkTheme != isDark) {
+            systemDarkTheme = isDark
+        }
+    }
+
     @Volatile
     private var adBlockingEnabled = true
     private var darkWebsitesEnabled = false
@@ -56,6 +72,7 @@ internal object BrowserEngine {
     }
 
     fun getRuntime(context: Context, theme: BrowserTheme, requestedLocales: List<String>): GeckoRuntime {
+        updateSystemDarkTheme(context.resources.configuration)
         runtime?.let { existing ->
             // A process-wide runtime can outlive a theme change. Refresh the values before any
             // caller gets the runtime so restored/new tabs never start with the previous scheme.
