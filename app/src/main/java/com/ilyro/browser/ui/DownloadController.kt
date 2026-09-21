@@ -1818,8 +1818,8 @@ internal class DownloadController(
         if (!networkAllowed(record.allowMetered)) return false
 
         if (record.isHls &&
-            record.id !in activeHlsPools &&
-            record.id !in activeHlsBodies
+            !activeHlsPools.containsKey(record.id) &&
+            !activeHlsBodies.containsKey(record.id)
         ) {
             val pausedItem = DownloadUiItem(
                 record = record,

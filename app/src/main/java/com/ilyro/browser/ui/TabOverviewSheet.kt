@@ -811,6 +811,12 @@ private fun ModernTabCard(
         label = "tab-open-alpha"
     )
 
+    val privateTabDescription = tr("Private tab", "Приватная вкладка")
+    val pinnedDescription = tr("Pinned", "Закреплена")
+    val groupDescription = tr("Group", "Группа")
+    val selectedDescription = tr("Selected", "Выбрана")
+    val notSelectedDescription = tr("Not selected", "Не выбрана")
+
     LaunchedEffect(removing) {
         if (removing) {
             delay(210)
@@ -851,16 +857,16 @@ private fun ModernTabCard(
                         contentDescription = buildString {
                             append(tab.title)
                             if (tab.host.isNotBlank()) append(". ${tab.host}")
-                            if (tab.isPrivate) append(". ${tr("Private tab", "Приватная вкладка")}")
-                            if (tab.isPinned) append(". ${tr("Pinned", "Закреплена")}")
+                            if (tab.isPrivate) append(". $privateTabDescription")
+                            if (tab.isPinned) append(". $pinnedDescription")
                             tab.groupName?.takeIf { it.isNotBlank() }?.let {
-                                append(". ${tr("Group", "Группа")}: $it")
+                                append(". $groupDescription: $it")
                             }
                         }
                         stateDescription = if (tab.selected) {
-                            tr("Selected", "Выбрана")
+                            selectedDescription
                         } else {
-                            tr("Not selected", "Не выбрана")
+                            notSelectedDescription
                         }
                     }
                     .combinedClickable(
