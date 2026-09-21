@@ -21,7 +21,9 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import com.ilyro.browser.passwords.PasswordManagerService
 import com.ilyro.browser.ui.BookmarkStore
+import com.ilyro.browser.ui.BrowserEngine
 import com.ilyro.browser.ui.BrowserIconCache
+import com.ilyro.browser.ui.BrowserSettingsStore
 import com.ilyro.browser.ui.DownloadStateRecovery
 import com.ilyro.browser.ui.HomeOmniboxTouchCoordinator
 import com.ilyro.browser.ui.AddressOmniboxTouchCoordinator
@@ -150,6 +152,15 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
 
 
         browserPrefs = getSharedPreferences("ilyro_browser", MODE_PRIVATE)
+
+        // Warm GeckoView and bundled extensions before Compose restores the first tab.
+        // The call is idempotent; onboarding will apply any newly selected settings later.
+        runCatching {
+            BrowserEngine.prewarm(
+                applicationContext,
+                BrowserSettingsStore.restore(browserPrefs)
+            )
+        }
         DownloadStateRecovery.recoverInterruptedDirectDownloadsOnce(applicationContext, browserPrefs)
         PasswordManagerService.prepare(applicationContext)
         BrowserIconCache.initialize(

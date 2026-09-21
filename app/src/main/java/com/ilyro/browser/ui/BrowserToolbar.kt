@@ -8,7 +8,6 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,7 +24,9 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -234,15 +235,16 @@ internal fun TabletTabStrip(
 ) {
     val metrics = rememberIlyroLayoutMetrics()
     val dense = LocalIlyroUiDensity.current == UiDensity.COMPACT
-    val scrollState = rememberScrollState()
+    val listState = rememberLazyListState()
     val stripHeight = if (dense) { if (metrics.isMedium) 46.dp else 48.dp } else { if (metrics.isMedium) 50.dp else 52.dp }
     val tabMinWidth = if (dense) { if (metrics.isMedium) 126.dp else 138.dp } else { if (metrics.isMedium) 138.dp else 150.dp }
     val tabMaxWidth = if (dense) { if (metrics.isMedium) 188.dp else 204.dp } else { if (metrics.isMedium) 205.dp else 225.dp }
 
     LaunchedEffect(activeTabId, tabs.size) {
-        if (tabs.lastOrNull()?.id == activeTabId) {
+        val activeIndex = tabs.indexOfFirst { it.id == activeTabId }
+        if (activeIndex >= 0) {
             delay(48L)
-            scrollState.animateScrollTo(scrollState.maxValue)
+            listState.animateScrollToItem(activeIndex)
         }
     }
 
@@ -266,15 +268,18 @@ internal fun TabletTabStrip(
                 .padding(horizontal = if (dense) 7.dp else 9.dp, vertical = if (dense) 4.dp else 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
+            LazyRow(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxHeight()
-                    .horizontalScroll(scrollState),
+                    .fillMaxHeight(),
+                state = listState,
                 horizontalArrangement = Arrangement.spacedBy(if (dense) 4.dp else 6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                tabs.forEach { tab ->
+                items(
+                    items = tabs,
+                    key = { it.id }
+                ) { tab ->
                     val selected = tab.id == activeTabId
                     val accent = if (tab.isPrivate) {
                         Color(0xFF8B5CF6)

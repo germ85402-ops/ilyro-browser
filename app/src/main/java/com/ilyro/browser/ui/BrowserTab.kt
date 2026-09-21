@@ -74,7 +74,6 @@ internal class BrowserTab(
     var isLoading by mutableStateOf(false)
     var loadProgress by mutableIntStateOf(0)
     var isPullRefreshing by mutableStateOf(false)
-    var scrollY by mutableIntStateOf(0)
     var pullDistance by mutableStateOf(0f)
     var lastSuccessfulPageUrl by mutableStateOf<String?>(null)
     private var urlBeforeCurrentLoad: String? = null
@@ -257,12 +256,6 @@ internal class BrowserTab(
             }
         })
 
-        session.setScrollDelegate(object : GeckoSession.ScrollDelegate {
-            override fun onScrollChanged(session: GeckoSession, scrollX: Int, scrollY: Int) {
-                this@BrowserTab.scrollY = scrollY.coerceAtLeast(0)
-            }
-        })
-
         session.setProgressDelegate(object : GeckoSession.ProgressDelegate {
             override fun onPageStart(session: GeckoSession, url: String) {
                 NativeBrowserHostCoordinator.coverUntilFirstPaint(session)
@@ -279,7 +272,6 @@ internal class BrowserTab(
                 } else {
                     pageStartSequence += 1
                 }
-                scrollY = 0
                 pullDistance = 0f
                 loadProgress = if (url == HOME_URL) 100 else 0
                 isLoading = url != HOME_URL

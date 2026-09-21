@@ -49,12 +49,13 @@ internal fun HomeWallpaper(settings: BrowserSettings) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
         return
     }
-    val blurRadius = settings.wallpaperBlur.radiusDp.dp
+    // Full-screen blur is GPU-heavy; cap the strongest preset while keeping its visual character.
+    val blurRadius = settings.wallpaperBlur.radiusDp.coerceAtMost(10).dp
     val blurred = settings.wallpaperBlur != WallpaperBlur.OFF
     val effectScale = when (settings.wallpaperBlur) {
         WallpaperBlur.OFF -> 1f
-        WallpaperBlur.SOFT -> 1.025f
-        WallpaperBlur.MEDIUM -> 1.055f
+        WallpaperBlur.SOFT -> 1.015f
+        WallpaperBlur.MEDIUM -> 1.03f
     }
 
     Box(

@@ -943,7 +943,7 @@ private fun ModernTabCard(
                                         contentDescription = null,
                                         modifier = Modifier.fillMaxSize(),
                                         contentScale = ContentScale.Crop,
-                                        filterQuality = FilterQuality.High
+                                        filterQuality = FilterQuality.Medium
                                     )
 
                                     tab.isHome -> Column(

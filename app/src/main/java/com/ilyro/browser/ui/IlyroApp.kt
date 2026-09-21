@@ -102,6 +102,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -203,6 +204,13 @@ private data class LinkContextMenuRequest(
     val sourceTabId: String,
     val url: String,
     val title: String?
+)
+
+private data class RestorableTabSnapshot(
+    val ids: List<String>,
+    val urls: List<String>,
+    val states: List<String?>,
+    val metadata: List<TabSessionMetadata>
 )
 
 private fun ensureDownloadNotificationPermission(context: Context) {
@@ -864,10 +872,21 @@ private fun BrowserScreen(
         SiteDesktopModeStore.effective(prefs, effectivePageUrl, settings.desktopMode)
     }
     val isBookmarked = !isHome && bookmarks.any { it.url == effectivePageUrl }
-    val restorableTabs = tabs.filterNot { it.isPrivate }
-    val restorableTabUrls = restorableTabs.map { it.url }
-    val restorableTabStates = restorableTabs.map { it.serializedSessionState }
-    val restorableTabMetadata = restorableTabs.map { TabSessionMetadata(it.isPinned, it.groupName) }
+    val restorableSnapshot by remember {
+        derivedStateOf {
+            val restorableTabs = tabs.filterNot { it.isPrivate }
+            RestorableTabSnapshot(
+                ids = restorableTabs.map { it.id },
+                urls = restorableTabs.map { it.url },
+                states = restorableTabs.map { it.serializedSessionState },
+                metadata = restorableTabs.map { TabSessionMetadata(it.isPinned, it.groupName) }
+            )
+        }
+    }
+    val restorableTabIds = restorableSnapshot.ids
+    val restorableTabUrls = restorableSnapshot.urls
+    val restorableTabStates = restorableSnapshot.states
+    val restorableTabMetadata = restorableSnapshot.metadata
     val blockedBadge = ProtectionBridge.blockedBadge(activeTab.session)
     val extensionReady = ProtectionBridge.extensionReady
     val extensionPopupSession = ExtensionHostBridge.popupSession
@@ -1115,16 +1134,8 @@ private fun BrowserScreen(
         )
     }
 
-    // Keep a current thumbnail while the page surface is still visible. Capturing only when the
-    // tabs dialog opens can race SurfaceView composition (especially after switching to the light
-    // color scheme) and return an empty frame. A post-load/theme capture gives the overview a
-    // stable bitmap before any overlay is shown.
-    LaunchedEffect(activeTab.id, activeTab.loadSequence, darkTheme, currentGeckoView) {
-        if (activeTab.url != HOME_URL && !activeTab.isLoading && currentGeckoView != null) {
-            delay(180L)
-            captureActivePreview()
-        }
-    }
+    // Capture only when the user is about to need a preview (opening the tab overview or
+    // switching away). This avoids a full GPU readback after every page load.
 
     fun selectTab(tab: BrowserTab) {
         if (tab.id != activeTabId) captureActivePreview()
@@ -1553,7 +1564,7 @@ private fun BrowserScreen(
     LaunchedEffect(restorableTabUrls, restorableTabStates, restorableTabMetadata, activeTabId) {
         delay(250L)
         val activeIndex = restorableTabs
-            .indexOfFirst { it.id == activeTabId }
+            .indexOf(activeTabId)
             .coerceAtLeast(0)
         TabSessionStore.save(
             prefs = prefs,
