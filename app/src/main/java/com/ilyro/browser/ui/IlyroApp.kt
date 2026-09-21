@@ -1416,6 +1416,7 @@ private fun BrowserScreen(
         addressText = if (target == HOME_URL) "" else target
         BrowserEngine.applyPreferredColorScheme(settings.theme)
         runCatching { activeTab.session.compositorController.setClearColor(pageTransitionColor) }
+        NativeBrowserHostCoordinator.coverUntilFirstPaint(activeTab.session)
         activeTab.session.loadUri(target)
         focusManager.clearFocus()
         showFindInPage = false
@@ -1477,6 +1478,7 @@ private fun BrowserScreen(
         addressText = bookmark.url
         BrowserEngine.applyPreferredColorScheme(settings.theme)
         runCatching { activeTab.session.compositorController.setClearColor(pageTransitionColor) }
+        NativeBrowserHostCoordinator.coverUntilFirstPaint(activeTab.session)
         activeTab.session.loadUri(bookmark.url)
         focusManager.clearFocus()
     }
@@ -1501,6 +1503,7 @@ private fun BrowserScreen(
         addressText = entry.url
         BrowserEngine.applyPreferredColorScheme(settings.theme)
         runCatching { activeTab.session.compositorController.setClearColor(pageTransitionColor) }
+        NativeBrowserHostCoordinator.coverUntilFirstPaint(activeTab.session)
         activeTab.session.loadUri(entry.url)
         focusManager.clearFocus()
     }
@@ -1819,14 +1822,29 @@ private fun BrowserScreen(
                         }
                     }
 
+                    val displayedNotice = renderedTopNotice ?: topNotice
+                    val noticeAtBottom = displayedNotice?.kind == BrowserTopNoticeKind.TAB_CLOSED
                     androidx.compose.animation.AnimatedVisibility(
                         visible = topNotice != null,
-                        enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
-                        exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut(),
+                        enter = if (noticeAtBottom) {
+                            slideInVertically(initialOffsetY = { it }) + fadeIn()
+                        } else {
+                            slideInVertically(initialOffsetY = { -it }) + fadeIn()
+                        },
+                        exit = if (noticeAtBottom) {
+                            slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                        } else {
+                            slideOutVertically(targetOffsetY = { -it }) + fadeOut()
+                        },
                         modifier = Modifier
-                            .align(Alignment.TopCenter)
+                            .align(
+                                if (noticeAtBottom) Alignment.BottomCenter else Alignment.TopCenter
+                            )
                             .padding(horizontal = 12.dp)
-                            .padding(top = 10.dp)
+                            .padding(
+                                top = if (noticeAtBottom) 0.dp else 10.dp,
+                                bottom = if (noticeAtBottom) 12.dp else 0.dp
+                            )
                             .onGloballyPositioned { coordinates ->
                                 val bounds = coordinates.boundsInWindow()
                                 NativeBrowserHostCoordinator.setInputExclusion(
@@ -1837,7 +1855,7 @@ private fun BrowserScreen(
                                 )
                             }
                     ) {
-                        val notice = renderedTopNotice ?: topNotice
+                        val notice = displayedNotice
                         if (notice != null) {
                             val runNoticeAction: () -> Unit = {
                                 when (notice.kind) {

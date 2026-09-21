@@ -181,7 +181,10 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
         PasswordPromptCoordinator.bind(this)
         applySystemChrome()
 
-        NativeBrowserHost.install(this) { IlyroApp() }
+        NativeBrowserHost.install(
+            this,
+            initialTransitionColor = initialBrowserTransitionColor()
+        ) { IlyroApp() }
         handleBrowserUiIntent(intent)
 
         val relaunchedFromHistory =
@@ -393,5 +396,12 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
             else -> systemDark
         }
     }
+
+    private fun initialBrowserTransitionColor(): Int =
+        if (resolvedDarkTheme()) {
+            Color.rgb(0x07, 0x12, 0x25)
+        } else {
+            Color.rgb(0xF7, 0xF8, 0xFA)
+        }
 
 }

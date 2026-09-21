@@ -23,9 +23,14 @@ import org.mozilla.geckoview.GeckoView
  * content rectangle reported by Compose.
  */
 internal object NativeBrowserHost {
-    fun install(activity: ComponentActivity, content: @Composable () -> Unit) {
-        val root = BrowserRootLayout(activity)
+    fun install(
+        activity: ComponentActivity,
+        initialTransitionColor: Int = android.graphics.Color.BLACK,
+        content: @Composable () -> Unit
+    ) {
+        val root = BrowserRootLayout(activity, initialTransitionColor)
         val engineHost = IlyroEngineView(activity).apply {
+            setTransitionColor(initialTransitionColor)
             visibility = View.INVISIBLE
         }
         val composeView = ComposeView(activity).apply {
@@ -119,6 +124,7 @@ internal object NativeBrowserHostCoordinator {
 
     fun setTransitionColor(color: Int) {
         hostRef.get()?.setTransitionColor(color)
+        rootRef.get()?.setTransitionColor(color)
     }
 
     fun coverUntilFirstPaint(session: GeckoSession? = null) {
@@ -142,7 +148,11 @@ internal object NativeBrowserHostCoordinator {
     }
 }
 
-internal class BrowserRootLayout(context: Context) : FrameLayout(context) {
+internal class BrowserRootLayout(
+    context: Context,
+    initialTransitionColor: Int
+) : FrameLayout(context) {
+    private var transitionColor = initialTransitionColor
     private var engineHost: IlyroEngineView? = null
     private val engineBounds = Rect()
     private val engineInputExclusionBounds = Rect()
@@ -150,6 +160,16 @@ internal class BrowserRootLayout(context: Context) : FrameLayout(context) {
     private var engineInputEnabled = false
     private var engineGestureActive = false
     private var engineGestureDownTime = 0L
+
+    init {
+        setBackgroundColor(transitionColor)
+    }
+
+    fun setTransitionColor(color: Int) {
+        transitionColor = color
+        setBackgroundColor(color)
+        invalidate()
+    }
 
     fun attachEngineHost(host: IlyroEngineView) {
         engineHost = host

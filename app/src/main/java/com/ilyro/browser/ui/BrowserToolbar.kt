@@ -44,7 +44,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -59,6 +58,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -617,9 +617,9 @@ internal fun BrowserTopNoticeCard(
     Surface(
         onClick = onClick,
         modifier = Modifier
-            .fillMaxWidth(if (metrics.isNarrowPhone) 0.90f else 0.72f)
-            .widthIn(max = 330.dp),
-        shape = RoundedCornerShape(IlyroVisualTokens.CardRadius),
+            .fillMaxWidth(if (metrics.isNarrowPhone) 0.88f else 0.62f)
+            .widthIn(max = 300.dp),
+        shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(
             1.dp,
@@ -628,18 +628,18 @@ internal fun BrowserTopNoticeCard(
             )
         ),
         tonalElevation = 0.dp,
-        shadowElevation = 3.dp
+        shadowElevation = 2.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .padding(horizontal = 8.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Surface(
-                modifier = Modifier.size(30.dp),
-                shape = RoundedCornerShape(IlyroVisualTokens.SmallRadius),
+                modifier = Modifier.size(28.dp),
+                shape = RoundedCornerShape(9.dp),
                 color = MaterialTheme.colorScheme.primaryContainer,
                 tonalElevation = 0.dp,
                 shadowElevation = 0.dp
@@ -652,60 +652,47 @@ internal fun BrowserTopNoticeCard(
                             else -> Icons.Rounded.Fullscreen
                         },
                         contentDescription = null,
-                        modifier = Modifier.size(IlyroVisualTokens.SmallIconSize),
+                        modifier = Modifier.size(17.dp),
                         tint = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
             }
+
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = notice.title,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = notice.message,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
+
             notice.actionLabel?.let { label ->
                 if (!metrics.isNarrowPhone || notice.kind == BrowserTopNoticeKind.TAB_CLOSED) {
-                    if (notice.kind == BrowserTopNoticeKind.TAB_CLOSED) {
-                        Surface(
-                            onClick = onActionClick,
-                            shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-                            border = BorderStroke(
-                                1.dp,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.58f)
-                            ),
-                            tonalElevation = 0.dp,
-                            shadowElevation = 0.dp
-                        ) {
-                            Text(
-                                text = label,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    } else {
-                        TextButton(
-                            onClick = onActionClick,
-                            shape = RoundedCornerShape(IlyroVisualTokens.PillRadius)
-                        ) {
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
+                    Surface(
+                        onClick = onActionClick,
+                        shape = RoundedCornerShape(9.dp),
+                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
+                        contentColor = MaterialTheme.colorScheme.primary,
+                        tonalElevation = 0.dp,
+                        shadowElevation = 0.dp
+                    ) {
+                        Text(
+                            text = label,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
+                        )
                     }
                 }
             }
