@@ -2,9 +2,8 @@
   const host = location.hostname.toLowerCase();
   const isYouTube = host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'youtu.be';
 
-  // Keep fullscreen videos inside a black viewport without changing their aspect ratio.
-  // YouTube's player owns the controls and chooses the media dimensions; ILYRO only
-  // centers the existing video box when the YouTube player enters fullscreen.
+  // Keep YouTube's fullscreen media box large enough to use the available surface.
+  // object-fit: contain preserves the original aspect ratio without cropping or stretching.
   const style = document.createElement('style');
   style.textContent = `
     :fullscreen {
@@ -48,8 +47,8 @@
       right: auto !important;
       bottom: auto !important;
       display: block !important;
-      width: auto !important;
-      height: auto !important;
+      width: 100% !important;
+      height: 100% !important;
       min-width: 0 !important;
       min-height: 0 !important;
       max-width: 100% !important;
@@ -59,7 +58,7 @@
       transform: none !important;
       object-fit: contain !important;
       object-position: center center !important;
-      background: #000 !important;
+      background: transparent !important;
     }
   `;
 

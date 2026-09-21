@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.26.0-rc6 — release candidate
+
+- Fix YouTube fullscreen sizing so the video uses the available surface while staying centered, uncropped, and aspect-preserving.
+- Keep YouTube Ambient Mode visible around videos with different aspect ratios.
+
+
 ## 0.26.0-rc5 — release candidate
 
 - Center fullscreen videos without stretching them and preserve the ambient background glow.
