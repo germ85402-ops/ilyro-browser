@@ -127,6 +127,29 @@ class HlsPlaylistParserTest {
         assertFalse(parsed.prefersMp4Container)
     }
 
+    @Test
+    fun mediaPlaylist_keepsEncryptionFlagForEarlierSegmentsAfterKeyReset() {
+        val playlist = """
+            #EXTM3U
+            #EXT-X-KEY:METHOD=AES-128,URI="key.bin"
+            #EXTINF:4,
+            encrypted.ts
+            #EXT-X-KEY:METHOD=NONE
+            #EXTINF:4,
+            clear.ts
+            #EXT-X-ENDLIST
+        """.trimIndent()
+
+        val parsed = parseHlsMediaPlaylist(
+            playlist,
+            "https://video.example.org/index.m3u8"
+        )
+
+        assertTrue(parsed.segments[0].encrypted)
+        assertFalse(parsed.segments[1].encrypted)
+        assertTrue(parsed.hasUnsupportedEncryption)
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun mediaPlaylist_rejectsPlaylistWithoutSegments() {
         parseHlsMediaPlaylist(

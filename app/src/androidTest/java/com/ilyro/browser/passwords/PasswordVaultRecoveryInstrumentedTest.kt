@@ -6,7 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import java.io.File
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -32,7 +32,7 @@ class PasswordVaultRecoveryInstrumentedTest {
     }
 
     @Test
-    fun corruptedVaultIsQuarantinedAndFutureSaveRecovers() {
+    fun corruptedVaultIsPreservedUntilUserChoosesReset() {
         val vault = PasswordVault(context)
         vault.upsert(
             PasswordCredential(
@@ -49,14 +49,15 @@ class PasswordVaultRecoveryInstrumentedTest {
 
         vaultFile.writeBytes("not-an-ilyro-vault".toByteArray())
 
-        assertTrue(vault.snapshot().isEmpty())
-        assertFalse(vaultFile.exists())
+        assertThrows(PasswordVaultReadException::class.java) { vault.snapshot() }
+        assertTrue(vaultFile.exists())
         assertTrue(
             vaultDirectory.listFiles().orEmpty().any { file ->
                 file.name.startsWith("ilyro-passwords.v1.corrupt-")
             }
         )
 
+        vault.clear()
         vault.upsert(
             PasswordCredential(
                 guid = "second",

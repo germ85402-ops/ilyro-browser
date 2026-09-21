@@ -1,180 +1,4 @@
-package com.ilyro.browser.ui
-
-import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-
-@OptIn(ExperimentalAnimationApi::class)
-@Composable
-internal fun OnboardingScreen(
-    settings: BrowserSettings,
-    onSettingsChange: (BrowserSettings) -> Unit,
-    onFinish: (Set<String>) -> Unit,
-    onSkip: () -> Unit = { onFinish(emptySet()) }
-) {
-    val metrics = rememberIlyroLayoutMetrics()
-    var step by remember { mutableIntStateOf(0) }
-    val totalSteps = 4
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.07f),
-                        MaterialTheme.colorScheme.background,
-                        MaterialTheme.colorScheme.background
-                    )
-                )
-            )
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            OnboardingTopBar(step = step, totalSteps = totalSteps)
-
-            AnimatedContent(
-                targetState = step,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                transitionSpec = {
-                    val forward = targetState > initialState
-                    (slideInHorizontally(
-                        animationSpec = tween(IlyroVisualTokens.MotionStandardMs),
-                        initialOffsetX = { width -> if (forward) width / 6 else -width / 6 }
-                    ) + fadeIn(tween(IlyroVisualTokens.MotionFastMs))) togetherWith
-                        (slideOutHorizontally(
-                            animationSpec = tween(IlyroVisualTokens.MotionFastMs),
-                            targetOffsetX = { width -> if (forward) -width / 7 else width / 7 }
-                        ) + fadeOut(tween(130)))
-                },
-                label = "ilyro-onboarding-step"
-            ) { currentStep ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(
-                            horizontal = metrics.horizontalPadding,
-                            vertical = if (metrics.isNarrowPhone) 10.dp else 16.dp
-                        ),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .widthIn(max = 760.dp)
-                            .fillMaxWidth()
-                    ) {
-                        when (currentStep) {
-                            0 -> AppearanceSetupStep(settings, onSettingsChange)
-                            1 -> BrowserSetupStep(settings, onSettingsChange)
-                            2 -> ExtensionsStep(
-                                settings = settings,
-                                onSettingsChange = onSettingsChange
-                            )
-                            else -> FinishStep(settings)
-                        }
-                        Spacer(modifier = Modifier.height(24.dp))
-                    }
-                }
-            }
-
-            OnboardingBottomBar(
-                step = step,
-                totalSteps = totalSteps,
-                onBack = { if (step > 0) step-- },
-                onContinue = {
-                    if (step < totalSteps - 1) step++
-                    else onFinish(emptySet())
-                },
-                onSkip = onSkip
-            )
-        }
-    }
-}
-
-@Composable
-private fun OnboardingTopBar(step: Int, totalSteps: Int) {
-    val metrics = rememberIlyroLayoutMetrics()
-    val dense = LocalIlyroUiDensity.current == UiDensity.COMPACT
-    Column(
-        modifier = Modifier
-            .statusBarsPadding()
-            .fillMaxWidth()
-            .padding(
-                horizontal = metrics.horizontalPadding,
-                vertical = if (dense) 6.dp else if (metrics.isNarrowPhone) 8.dp else 12.dp
-            ),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Row(
-            modifier = Modifier
-                .widthIn(max = 760.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Surface(
-                modifier = Modifier.size(if (dense) 38.dp else if (metrics.isNarrowPhone) 42.dp else 48.dp),
-                shape = RoundedCornerShape(IlyroVisualTokens.SmallRadius),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.84f),
-                border = BorderStroke(
-                    1.dp,
-                    MaterialTheme.colorScheme.outlineVariant.copy(
-                        alpha = IlyroVisualTokens.SubtleBorderAlpha
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬ÕÁ…­…”½´¹¥±åÉ¼¹‰É½İÍ•È¹Õ¤()¥µÁ½ÉĞ…¹‘É½¥¹½¹Ñ•¹Ğ¹%¹Ñ•¹Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹…Ñ¥Ù¥Ñä¹½µÁ½Í”¹É•µ•µ‰•É1…Õ¹¡•É½ÉÑ¥Ù¥ÑåI•ÍÕ±Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹…Ñ¥Ù¥Ñä¹É•ÍÕ±Ğ¹½¹ÑÉ…Ğ¹Ñ¥Ù¥ÑåI•ÍÕ±Ñ½¹ÑÉ…ÑÌ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹¹¥µ…Ñ•‘½¹Ñ•¹Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹áÁ•É¥µ•¹Ñ…±¹¥µ…Ñ¥½¹Á¤)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹™…‘•%¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹™…‘•=ÕĞ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹Í±¥‘•%¹!½É¥é½¹Ñ…±±ä)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹Í±¥‘•=ÕÑ!½É¥é½¹Ñ…±±ä)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹Ñ½•Ñ¡•É]¥Ñ )¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹½É”¹Ñİ••¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹	½É‘•ÉMÑÉ½­”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹‰…­É½Õ¹)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹¡½É¥é½¹Ñ…±MÉ½±°)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹¥ÍMåÍÑ•µ%¹…É­Q¡•µ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹ÉÉ…¹•µ•¹Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹	½à)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹½±Õµ¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹I½Ü)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹MÁ…•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹™¥±±5…áM¥é”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹™¥±±5…á]¥‘Ñ )¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹¡•¥¡Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹¹…Ù¥…Ñ¥½¹	…ÉÍA…‘‘¥¹œ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹Á…‘‘¥¹œ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹Í¥é”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹ÍÑ…ÑÕÍ	…ÉÍA…‘‘¥¹œ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹İ¥‘Ñ )¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹İ¥‘Ñ¡%¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹É•µ•µ‰•ÉMÉ½±±MÑ…Ñ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹Í¡…Á”¹¥É±•M¡…Á”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹Í¡…Á”¹I½Õ¹‘•‘½É¹•ÉM¡…Á”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹Ù•ÉÑ¥…±MÉ½±°)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹	ÕÑÑ½¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹1¥¹•…ÉAÉ½É•ÍÍ%¹‘¥…Ñ½È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹5…Ñ•É¥…±Q¡•µ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹MÕÉ™…”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹Mİ¥Ñ )¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹Q•áĞ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹Q•áÑ	ÕÑÑ½¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹½µÁ½Í…‰±”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹•ÑY…±Õ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹µÕÑ…‰±•%¹ÑMÑ…Ñ•=˜)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹µÕÑ…‰±•MÑ…Ñ•=˜)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹É•µ•µ‰•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹Í…Ù•…‰±”¹É•µ•µ‰•ÉM…Ù•…‰±”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹Í•ÑY…±Õ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹±¥¹µ•¹Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹5½‘¥™¥•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹‘É…Ü¹±¥À)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹É…Á¡¥Ì¹	ÉÕÍ )¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹É…Á¡¥Ì¹½±½È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Á±…Ñ™½É´¹1½…±½¹Ñ•áĞ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Ñ•áĞ¹™½¹Ğ¹½¹Ñ]•¥¡Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Ñ•áĞ¹ÍÑå±”¹Q•áÑ±¥¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Ñ•áĞ¹ÍÑå±”¹Q•áÑ=Ù•É™±½Ü)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Õ¹¥Ğ¹‘À)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Õ¹¥Ğ¹ÍÀ()=ÁÑ%¸¡áÁ•É¥µ•¹Ñ…±¹¥µ…Ñ¥½¹Á¤èé±…ÍÌ¤)½µÁ½Í…‰±”)¥¹Ñ•É¹…°™Õ¸=¹‰½…É‘¥¹MÉ••¸ (€€€Í•ÑÑ¥¹Ìè	É½İÍ•ÉM•ÑÑ¥¹Ì°(€€€½¹M•ÑÑ¥¹Í¡…¹”è€¡	É½İÍ•ÉM•ÑÑ¥¹Ì¤€´øU¹¥Ğ°(€€€½¹¥¹¥Í è€¡M•ĞñMÑÉ¥¹œø¤€´øU¹¥Ğ°(€€€½¹M­¥Àè€ ¤€´øU¹¥Ğ€ôì½¹¥¹¥Í ¡•µÁÑåM•Ğ ¤¤ô(¤ì(€€€Ù…°µ•ÑÉ¥Ì€ôÉ•µ•µ‰•É%±åÉ½1…å½ÕÑ5•ÑÉ¥Ì ¤(€€€Ù…ÈÍÑ•À‰äÉ•µ•µ‰•ÉM…Ù•…‰±”ìµÕÑ…‰±•%¹ÑMÑ…Ñ•=˜ À¤ô(€€€Ù…°Ñ½Ñ…±MÑ•ÁÌ€ô€Ğ((€€€	½à (€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€¹™¥±±5…áM¥é” ¤(€€€€€€€€€€€€¹‰…­É½Õ¹ (€€€€€€€€€€€€€€€	ÉÕÍ ¹Ù•ÉÑ¥…±É…‘¥•¹Ğ (€€€€€€€€€€€€€€€€€€€±¥ÍÑ=˜ (€€€€€€€€€€€€€€€€€€€€€€€5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÁÉ¥µ…Éä¹½Áä¡…±Á¡„€ô€À¸Àİ˜¤°(€€€€€€€€€€€€€€€€€€€€€€€5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹‰…­É½Õ¹°(€€€€€€€€€€€€€€€€€€€€€€€5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹‰…­É½Õ¹(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€¤(€€€€¤ì(€€€€€€€½±Õµ¸¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹™¥±±5…áM¥é” ¤¤ì(€€€€€€€€€€€=¹‰½…É‘¥¹Q½Á	…È¡ÍÑ•À€ôÍÑ•À°Ñ½Ñ…±MÑ•ÁÌ€ôÑ½Ñ…±MÑ•ÁÌ¤((€€€€€€€€€€€¹¥µ…Ñ•‘½¹Ñ•¹Ğ (€€€€€€€€€€€€€€€Ñ…É•ÑMÑ…Ñ”€ôÍÑ•À°(€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€¹İ•¥¡Ğ Å˜¤(€€€€€€€€€€€€€€€€€€€€¹™¥±±5…á]¥‘Ñ  ¤°(€€€€€€€€€€€€€€€ÑÉ…¹Í¥Ñ¥½¹MÁ•Œ€ôì(€€€€€€€€€€€€€€€€€€€Ù…°™½Éİ…É€ôÑ…É•ÑMÑ…Ñ”€ø¥¹¥Ñ¥…±MÑ…Ñ”(€€€€€€€€€€€€€€€€€€€€¡Í±¥‘•%¹!½É¥é½¹Ñ…±±ä (€€€€€€€€€€€€€€€€€€€€€€€…¹¥µ…Ñ¥½¹MÁ•Œ€ôÑİ••¸¡%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹5½Ñ¥½¹MÑ…¹‘…É‘5Ì¤°(€€€€€€€€€€€€€€€€€€€€€€€¥¹¥Ñ¥…±=™™Í•Ñ`€ôìİ¥‘Ñ €´ø¥˜€¡™½Éİ…É¤İ¥‘Ñ €¼€Ø•±Í”€µİ¥‘Ñ €¼€Øô(€€€€€€€€€€€€€€€€€€€€¤€¬™…‘•%¸¡Ñİ••¸¡%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹5½Ñ¥½¹…ÍÑ5Ì¤¤¤Ñ½•Ñ¡•É]¥Ñ (€€€€€€€€€€€€€€€€€€€€€€€€¡Í±¥‘•=ÕÑ!½É¥é½¹Ñ…±±ä (€€€€€€€€€€€€€€€€€€€€€€€€€€€…¹¥µ…Ñ¥½¹MÁ•Œ€ôÑİ••¸¡%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹5½Ñ¥½¹…ÍÑ5Ì¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ…É•Ñ=™™Í•Ñ`€ôìİ¥‘Ñ €´ø¥›]4ÒÚ$z{-®éÜj×isualTokens.SubtleBorderAlpha
                     )
                 ),
                 tonalElevation = 0.dp,
@@ -293,212 +117,7 @@ private fun OnboardingBottomBar(
                             .height(if (dense) 46.dp else 50.dp),
                         onClick = onBack
                     ) {
-                        Text(tr("Back", "ĞĞ°Ğ·Ğ°Ğ´"))
-                    }
-                }
-
-                Button(
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(if (dense) 46.dp else 50.dp),
-                    shape = RoundedCornerShape(IlyroVisualTokens.ControlRadius),
-                    onClick = onContinue
-                ) {
-                    Text(
-                        if (step == totalSteps - 1) {
-                            tr("Start ILYRO", "ĞĞ°Ñ‡Ğ°Ñ‚ÑŒ Ñ€Ğ°Ğ±Ğ¾Ñ‚Ñƒ")
-                        } else {
-                            tr("Continue", "Ğ”Ğ°Ğ»ĞµĞµ")
-                        },
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-            TextButton(
-                modifier = Modifier.padding(top = if (dense) 0.dp else 2.dp),
-                onClick = onSkip
-            ) {
-                Text(
-                    tr("Skip setup", "ĞŸÑ€Ğ¾Ğ¿ÑƒÑÑ‚Ğ¸Ñ‚ÑŒ Ğ½Ğ°ÑÑ‚Ñ€Ğ¾Ğ¹ĞºÑƒ"),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            if (!metrics.isNarrowPhone) {
-                Text(
-                    text = tr(
-                        "Everything can be changed later in Settings",
-                        "Ğ’ÑĞµ Ğ¿Ğ°Ñ€Ğ°Ğ¼ĞµÑ‚Ñ€Ñ‹ Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ Ğ¸Ğ·Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ Ğ¿Ğ¾Ğ·Ğ¶Ğµ Ğ² Ğ½Ğ°ÑÑ‚Ñ€Ğ¾Ğ¹ĞºĞ°Ñ…"
-                    ),
-                    modifier = Modifier.padding(top = 6.dp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
-                    textAlign = TextAlign.Center
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AppearanceSetupStep(
-    settings: BrowserSettings,
-    onSettingsChange: (BrowserSettings) -> Unit
-) {
-    StepTitle(
-        tr("Appearance", "ĞÑ„Ğ¾Ñ€Ğ¼Ğ»ĞµĞ½Ğ¸Ğµ"),
-        tr(
-            "Choose the theme and start-page background. You can change both later.",
-            "Ğ’Ñ‹Ğ±ĞµÑ€Ğ¸Ñ‚Ğµ Ñ‚ĞµĞ¼Ñƒ Ğ¸ Ñ„Ğ¾Ğ½ ÑÑ‚Ğ°Ñ€Ñ‚Ğ¾Ğ²Ğ¾Ğ¹ ÑÑ‚Ñ€Ğ°Ğ½Ğ¸Ñ†Ñ‹. Ğ’ÑÑ‘ Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ Ğ¸Ğ·Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ Ğ¿Ğ¾Ğ·Ğ¶Ğµ."
-        )
-    )
-    Spacer(modifier = Modifier.height(12.dp))
-    ThemeStep(settings, onSettingsChange, showTitle = false)
-    Spacer(modifier = Modifier.height(18.dp))
-    Text(
-        tr("Start-page background", "Ğ¤Ğ¾Ğ½ ÑÑ‚Ğ°Ñ€Ñ‚Ğ¾Ğ²Ğ¾Ğ¹ ÑÑ‚Ñ€Ğ°Ğ½Ğ¸Ñ†Ñ‹"),
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold
-    )
-    Spacer(modifier = Modifier.height(8.dp))
-    WallpaperStep(settings, onSettingsChange, showTitle = false)
-}
-
-@Composable
-private fun BrowserSetupStep(
-    settings: BrowserSettings,
-    onSettingsChange: (BrowserSettings) -> Unit
-) {
-    StepTitle(
-        tr("Browser controls", "Ğ£Ğ¿Ñ€Ğ°Ğ²Ğ»ĞµĞ½Ğ¸Ğµ Ğ±Ñ€Ğ°ÑƒĞ·ĞµÑ€Ğ¾Ğ¼"),
-        tr(
-            "Place the address bar where it is comfortable and choose your default search.",
-            "Ğ Ğ°ÑĞ¿Ğ¾Ğ»Ğ¾Ğ¶Ğ¸Ñ‚Ğµ Ğ°Ğ´Ñ€ĞµÑĞ½ÑƒÑ ÑÑ‚Ñ€Ğ¾ĞºÑƒ ÑƒĞ´Ğ¾Ğ±Ğ½Ğ¾ Ğ¸ Ğ²Ñ‹Ğ±ĞµÑ€Ğ¸Ñ‚Ğµ Ğ¿Ğ¾Ğ¸ÑĞºĞ¾Ğ²Ğ¸Ğº Ğ¿Ğ¾ ÑƒĞ¼Ğ¾Ğ»Ñ‡Ğ°Ğ½Ğ¸Ñ."
-        )
-    )
-    Spacer(modifier = Modifier.height(12.dp))
-    AddressBarStep(settings, onSettingsChange, showTitle = false)
-    Spacer(modifier = Modifier.height(18.dp))
-    Text(
-        tr("Default search", "ĞŸĞ¾Ğ¸ÑĞºĞ¾Ğ²Ğ¸Ğº Ğ¿Ğ¾ ÑƒĞ¼Ğ¾Ğ»Ñ‡Ğ°Ğ½Ğ¸Ñ"),
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.SemiBold
-    )
-    Spacer(modifier = Modifier.height(8.dp))
-    SearchStep(settings, onSettingsChange, showTitle = false)
-}
-
-@Composable
-private fun ThemeStep(
-    settings: BrowserSettings,
-    onSettingsChange: (BrowserSettings) -> Unit,
-    showTitle: Boolean = true
-) {
-    val metrics = rememberIlyroLayoutMetrics()
-    if (showTitle) {
-        StepTitle(
-            tr("Choose a theme", "Ğ’Ñ‹Ğ±ĞµÑ€Ğ¸Ñ‚Ğµ Ñ‚ĞµĞ¼Ñƒ"),
-            tr(
-                "Preview the browser, not just the name.",
-                "Ğ¡Ñ€Ğ°Ğ·Ñƒ Ğ¿Ğ¾ÑĞ¼Ğ¾Ñ‚Ñ€Ğ¸Ñ‚Ğµ, ĞºĞ°Ğº Ğ±ÑƒĞ´ĞµÑ‚ Ğ²Ñ‹Ğ³Ğ»ÑĞ´ĞµÑ‚ÑŒ Ğ±Ñ€Ğ°ÑƒĞ·ĞµÑ€."
-            )
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-    }
-
-    if (metrics.isCompact) {
-        val themes = BrowserTheme.entries
-        val firstRow = themes.take(2)
-        val bottomTheme = themes.getOrNull(2)
-
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                firstRow.forEach { theme ->
-                    ThemeVisualCard(
-                        theme = theme,
-                        selected = settings.theme == theme,
-                        modifier = Modifier.weight(1f),
-                        onClick = { onSettingsChange(settings.copy(theme = theme)) }
-                    )
-                }
-            }
-
-            bottomTheme?.let { theme ->
-                ThemeVisualCard(
-                    theme = theme,
-                    selected = settings.theme == theme,
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { onSettingsChange(settings.copy(theme = theme)) }
-                )
-            }
-        }
-    } else {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            BrowserTheme.entries.forEach { theme ->
-                ThemeVisualCard(
-                    theme = theme,
-                    selected = settings.theme == theme,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSettingsChange(settings.copy(theme = theme)) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun ThemeVisualCard(
-    theme: BrowserTheme,
-    selected: Boolean,
-    modifier: Modifier,
-    onClick: () -> Unit
-) {
-    val metrics = rememberIlyroLayoutMetrics()
-    val systemDark = isSystemInDarkTheme()
-    val isDarkPreview = when (theme) {
-        BrowserTheme.DARK -> true
-        BrowserTheme.LIGHT -> false
-        BrowserTheme.SYSTEM -> systemDark
-    }
-    val previewBackground = if (isDarkPreview) Color(0xFF101216) else Color(0xFFF7F8FA)
-    val previewSurface = if (isDarkPreview) Color(0xFF20242A) else Color.White
-    val previewText = if (isDarkPreview) Color(0xFFF2F3F5) else Color(0xFF1A1C20)
-
-    Surface(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(IlyroVisualTokens.CardRadius),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
-        border = BorderStroke(
-            if (selected) 2.dp else 1.dp,
-            if (selected) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.62f)
-            } else {
-                MaterialTheme.colorScheme.outlineVariant.copy(
-                    alpha = IlyroVisualTokens.SubtleBorderAlpha
-                )
-            }
-        ),
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp
-    ) {
-        Column(
-            modifier = Modifier.padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(if (metrics.isNarrowPhone) 88.dp else 104.dp),
-                shape = RoundedCornerShape(IlyroVisualTokens.SmallRadius),
-                color = previewBackground
-            ) {
-                Column(modifier = Modifier.padding(7.dp)) {
+                        Text(tr("YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Õ	…¬ˆ°€‹BwBÃBßBÃBĞˆ¤¤(€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€ô((€€€€€€€€€€€€€€€	ÕÑÑ½¸ (€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€€€€€¹İ•¥¡Ğ Å˜¤(€€€€€€€€€€€€€€€€€€€€€€€€¹¡•¥¡Ğ¡¥˜€¡‘•¹Í”¤€ĞØ¹‘À•±Í”€ÔÀ¹‘À¤°(€€€€€€€€€€€€€€€€€€€Í¡…Á”€ôI½Õ¹‘•‘½É¹•ÉM¡…Á”¡%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹½¹ÑÉ½±I…‘¥ÕÌ¤°(€€€€€€€€€€€€€€€€€€€½¹±¥¬€ô½¹½¹Ñ¥¹Õ”(€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€Q•áĞ (€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡ÍÑ•À€ôôÑ½Ñ…±MÑ•ÁÌ€´€Ä¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑÈ ‰MÑ…ÉĞ%1eI<ˆ°€‹BwBÃFBÃFF0ƒFBÃBÇBûFFˆ¤(€€€€€€€€€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑÈ ‰½¹Ñ¥¹Õ”ˆ°€‹BSBÃBïB×BÔˆ¤(€€€€€€€€€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€€€€€€€€€€€€€™½¹Ñ]•¥¡Ğ€ô½¹Ñ]•¥¡Ğ¹M•µ¥	½±(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô(€€€€€€€€€€€Q•áÑ	ÕÑÑ½¸ (€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Á…‘‘¥¹œ¡Ñ½À€ô¥˜€¡‘•¹Í”¤€À¹‘À•±Í”€È¹‘À¤°(€€€€€€€€€€€€€€€½¹±¥¬€ô½¹M­¥À(€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€Q•áĞ (€€€€€€€€€€€€€€€€€€€ÑÈ ‰M­¥ÀÍ•ÑÕÀˆ°€‹BFBûBÿFFFBãFF0ƒB÷BÃFFFBûBçBëFˆ¤°(€€€€€€€€€€€€€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½¹MÕÉ™…•Y…É¥…¹Ğ(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€ô(€€€€€€€€€€€¥˜€ …µ•ÑÉ¥Ì¹¥Í9…ÉÉ½İA¡½¹”¤ì(€€€€€€€€€€€€€€€Q•áĞ (€€€€€€€€€€€€€€€€€€€Ñ•áĞ€ôÑÈ (€€€€€€€€€€€€€€€€€€€€€€€€‰Ù•ÉåÑ¡¥¹œ…¸‰”¡…¹•±…Ñ•È¥¸M•ÑÑ¥¹Ìˆ°(€€€€€€€€€€€€€€€€€€€€€€€€‹BKFBÔƒBÿBÃFBÃBóB×FFF,ƒBóBûBÛB÷BøƒBãBßBóB×B÷BãFF0ƒBÿBûBßBÛBÔƒBÈƒB÷BÃFFFBûBçBëBÃFˆ(€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Á…‘‘¥¹œ¡Ñ½À€ô€Ø¹‘À¤°(€€€€€€€€€€€€€€€€€€€ÍÑå±”€ô5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹±…‰•±Mµ…±°°(€€€€€€€€€€€€€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½¹MÕÉ™…•Y…É¥…¹Ğ¹½Áä¡…±Á¡„€ô€À¸Üá˜¤°(€€€€€€€€€€€€€€€€€€€Ñ•áÑ±¥¸€ôQ•áÑ±¥¸¹•¹Ñ•È(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€ô(€€€€€€€ô(€€€ô)ô()½µÁ½Í…‰±”)ÁÉ¥Ù…Ñ”™Õ¸ÁÁ•…É…¹•M•ÑÕÁMÑ•À (€€€Í•ÑÑ¥¹Ìè	É½İÍ•ÉM•ÑÑ¥¹Ì°(€€€½¹M•ÑÑ¥¹Í¡…¹”è€¡	É½İÍ•ÉM•ÑÑ¥¹Ì¤€´øU¹¥Ğ(¤ì(€€€MÑ•ÁQ¥Ñ±” (€€€€€€€ÑÈ ‰ÁÁ•…É…¹”ˆ°€‹B{FBûFBóBïB×B÷BãBÔˆ¤°(€€€€€€€ÑÈ (€€€€€€€€€€€€‰¡½½Í”Ñ¡”Ñ¡•µ”…¹ÍÑ…ÉĞµÁ…”‰…­É½Õ¹¸e½Ô…¸¡…¹”‰½Ñ ±…Ñ•È¸ˆ°(€€€€€€€€€€€€‹BKF/BÇB×FBãFBÔƒFB×BóFƒBàƒFBûBôƒFFBÃFFBûBËBûBäƒFFFBÃB÷BãFF,¸ƒBKFFDƒBóBûBÛB÷BøƒBãBßBóB×B÷BãFF0ƒBÿBûBßBÛBÔ¸ˆ(€€€€€€€€¤(€€€€¤(€€€MÁ…•È¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹¡•¥¡Ğ ÄÈ¹‘À¤¤(€€€Q¡•µ•MÑ•À¡Í•ÑÑ¥¹Ì°½¹M•ÑÑ¥¹Í¡…¹”°Í¡½İQ¥Ñ±”€ô™…±Í”¤(€€€MÁ…•È¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹¡•¥¡Ğ Äà¹‘À¤¤(€€€Q•áĞ (€€€€€€€ÑÈ ‰MÑ…ÉĞµÁ…”‰…­É½Õ¹ˆ°€‹B“BûBôƒFFBÃFFBûBËBûBäƒFFFBÃB÷BãFF,ˆ¤°(€€€€€€€ÍÑå±”€ô5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹Ñ¥Ñ±•5•‘¥Õ´°(€€€€€€€™½¹Ñ]•¥¡Ğ€ô½¹Ñ]•¥¡Ğ¹M•µ¥	½±(€€€€¤(€€€MÁ…•È¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹¡•¥¡Ğ à¹‘À¤¤(€€€]…±±Á…Á•ÉMÑ•À¡Í•ÑÑ¥¹Ì°½¹M•ÑÑ¥¹Í¡…¹”°Í¡½İQ¥Ñ±”€ô™…±Í”¤)ô()½µÁ½Í…‰±”)ÁÉ¥Ù…Ñ”™Õ¸	É½İÍ•ÉM•ÑÕÁMÑ•À (€€€Í•ÑÑ¥¹Ìè	É½İÍ•ÉM•ÑÑ¥¹Ì°(€€€½¹M•ÑÑ¥¹Í¡…¹”è€¡	É½İÍ•ÉM•ÑÑ¥¹Ì¤€´øU¹¥Ğ(¤ì(€€€MÑ•ÁQ¥Ñ±” (€€€€€€€ÑÈ ‰	É½İÍ•È½¹ÑÉ½±Ìˆ°€‹BBÿFBÃBËBïB×B÷BãBÔƒBÇFBÃFBßB×FBûBğˆ¤°(€€€€€€€ÑÈ (€€€€€€€€€€€€‰A±…”Ñ¡”…‘‘É•ÍÌ‰…Èİ¡•É”¥Ğ¥Ì½µ™½ÉÑ…‰±”…¹¡½½Í”å½ÕÈ‘•™…Õ±ĞÍ•…É ¸ˆ°(€€€€€€€€€€€€‹BƒBÃFBÿBûBïBûBÛBãFBÔƒBÃBÓFB×FB÷FF8ƒFFFBûBëFƒFBÓBûBÇB÷BøƒBàƒBËF/BÇB×FBãFBÔƒBÿBûBãFBëBûBËBãBèƒBÿBøƒFBóBûBïFBÃB÷BãF8¸ˆ(€€€€€€€€¤(€€€€¤(€€€MÁ…•È¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹¡•¥¡Ğ ÄÈ¹‘À¤¤(€€€‘‘É•ÍÍ	…ÉMÑ•À¡Í•ÑÑ¥¹Ì°½¹M•ÑÑ¥¹Í¡…¹”°Í¡½İQ¥Ñ±”€ô™…±Í”¤(€€€MÁ…•È¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹¡•¥¡Ğ Äà¹‘À¤¤(€€€Q•áĞ (€€€€€€€ÑÈ ‰•™…Õ±ĞÍ•…É ˆ°€‹BBûBãFBëBûBËBãBèƒBÿBøƒFBóBûBïFBÃB÷BãF8ˆ¤°(€€€€€€€ÍÑå±”€ô5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹Ñ¥Ñ±•5•‘¥Õ´°(€€€€€€€™½¹Ñ]•¥¡Ğ€ô½¹Ñ]•¥¡Ğ¹M•µ¥	½±(€€€€¤(€€€MÁ…•È¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹¡•¥¡Ğ à¹‘À¤¤(€€€M•…É¡MÑ•À¡Í•ÑÑ¥¹Ì°½¹M•ÑÑ¥¹Í¡…¹”°Í¡½İQ¥Ñ±”€ô™…±Í”¤)ô()½µÁ½Í…‰±”)ÁÉ¥Ù…Ñ”™Õ¸Q¡•µ•MÑ•À (€€€Í•ÑÑ¥¹Ìè	É½İÍ•ÉM•ÑÑ¥¹Ì°(€€€½¹M•ÑÑ¥¹Í¡…¹”è€¡	É½İÍ•ÉM•ÑÑ¥¹Ì¤€´øU¹¥Ğ°(€€€Í¡½İQ¥Ñ±”è	½½±•…¸€ôÑÉÕ”(¤ì(€€€Ù…°µ•ÑÉ¥Ì€ôÉ•µ•µ‰•É%±åÉ½1…å½ÕÑ5•ÑÉ¥Ì ¤(€€€¥˜€¡Í¡½İQ¥Ñ±”¤ì(€€€€€€€MÑ•ÁQ¥Ñ±” (€€€€€€€€€€€ÑÈ ‰¡½½Í”„Ñ¡•µ”ˆ°€‹BKF/BÇB×FBãFBÔƒFB×BóFˆ¤°(€€€€€€€€€€€ÑÈ (€€€€€€€€€€€€€€€€‰AÉ•Ù¥•ÜÑ¡”‰É½İÍ•È°¹½Ğ©ÕÍĞÑ¡”¹…µ”¸ˆ°(€€€€€€€€€€€€€€€€‹B‡FBÃBßFƒBÿBûFBóBûFFBãFBÔ°ƒBëBÃBèƒBÇFBÓB×FƒBËF/BÏBïF?BÓB×FF0ƒBÇFBÃFBßB×F ¸ˆ(€€€€€€€€€€€€¤(€€€€€€€€¤(€€€€€€€MÁ…•È¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹¡•¥¡Ğ ÄØ¹‘À¤¤(€€€ô((€€€¥˜€¡µ•ÑÉ¥Ì¹¥Í½µÁ…Ğ¤ì(€€€€€€€Ù…°Ñ¡•µ•Ì€ô	É½İÍ•ÉQ¡•µ”¹•¹ÑÉ¥•Ì(€€€€€€€Ù…°™¥ÉÍÑI½Ü€ôÑ¡•µ•Ì¹Ñ…­” È¤(€€€€€€€Ù…°‰½ÑÑ½µQ¡•µ”€ôÑ¡•µ•Ì¹•Ñ=É9Õ±° È¤((€€€€€€€½±Õµ¸ (€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹™¥±±5…á]¥‘Ñ  ¤°(€€€€€€€€€€€Ù•ÉÑ¥…±ÉÉ…¹•µ•¹Ğ€ôÉÉ…¹•µ•¹Ğ¹ÍÁ…•‘	ä ÄÀ¹‘À¤(€€€€€€€€¤ì(€€€€€€€€€€€I½Ü (€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹™¥±±5…á]¥‘Ñ  ¤°(€€€€€€€€€€€€ƒ]4ÒÚ$z{-®éÜj×)) {
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -615,215 +234,7 @@ private fun WallpaperStep(
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            modifier = Modifier.size(9.dp),
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary
-                        ) {}
-                        Text(
-                            tr("Search or enter address", "ĞŸĞ¾Ğ¸ÑĞº Ğ¸Ğ»Ğ¸ Ğ°Ğ´Ñ€ĞµÑ"),
-                            modifier = Modifier.padding(start = 9.dp),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    Text(
-        homeBackgroundLabel(settings.homeBackground),
-        modifier = Modifier.padding(top = 11.dp, bottom = 7.dp),
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant
-    )
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(9.dp)
-    ) {
-        HomeBackground.entries.forEach { background ->
-            WallpaperMiniCard(
-                background = background,
-                settings = settings,
-                selected = settings.homeBackground == background,
-                compact = metrics.isCompact,
-                onClick = {
-                    if (
-                        background == HomeBackground.CUSTOM &&
-                        settings.customWallpaperUri.isNullOrBlank()
-                    ) {
-                        wallpaperPicker.launch(arrayOf("image/*"))
-                    } else {
-                        onSettingsChange(settings.copy(homeBackground = background))
-                    }
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun WallpaperMiniCard(
-    background: HomeBackground,
-    settings: BrowserSettings,
-    selected: Boolean,
-    compact: Boolean,
-    onClick: () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        modifier = Modifier.size(
-            width = if (compact) 112.dp else 122.dp,
-            height = if (compact) 80.dp else 86.dp
-        ),
-        shape = RoundedCornerShape(IlyroVisualTokens.ControlRadius),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            if (selected) 2.dp else 1.dp,
-            if (selected) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = IlyroVisualTokens.SubtleBorderAlpha)
-            }
-        ),
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            HomeWallpaper(
-                settings.copy(
-                    homeBackground = background,
-                    useSeparateDarkBackground = false,
-                    wallpaperDim = WallpaperDim.OFF,
-                    wallpaperBlur = WallpaperBlur.OFF
-                )
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f))
-                        )
-                    )
-            )
-            Text(
-                homeBackgroundLabel(background),
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(8.dp),
-                color = Color.White,
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            if (selected) {
-                SelectionBadge(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(7.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun AddressBarStep(
-    settings: BrowserSettings,
-    onSettingsChange: (BrowserSettings) -> Unit,
-    showTitle: Boolean = true
-) {
-    val metrics = rememberIlyroLayoutMetrics()
-    if (showTitle) {
-        StepTitle(
-            tr("Where should the address bar live?", "Ğ“Ğ´Ğµ Ñ€Ğ°Ğ·Ğ¼ĞµÑÑ‚Ğ¸Ñ‚ÑŒ Ğ°Ğ´Ñ€ĞµÑĞ½ÑƒÑ ÑÑ‚Ñ€Ğ¾ĞºÑƒ?"),
-            tr(
-                "Choose visually â€” you can switch it later at any time.",
-                "Ğ’Ñ‹Ğ±ĞµÑ€Ğ¸Ñ‚Ğµ Ğ²Ğ¸Ğ·ÑƒĞ°Ğ»ÑŒĞ½Ğ¾ â€” Ğ¿Ğ¾Ğ»Ğ¾Ğ¶ĞµĞ½Ğ¸Ğµ Ğ²ÑĞµĞ³Ğ´Ğ° Ğ¼Ğ¾Ğ¶Ğ½Ğ¾ Ğ¿Ğ¾Ğ¼ĞµĞ½ÑÑ‚ÑŒ Ğ¿Ğ¾Ğ·Ğ¶Ğµ."
-            )
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-    }
-
-    if (metrics.isNarrowPhone) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            ToolbarPositionCard(
-                position = ToolbarPosition.BOTTOM,
-                selected = settings.toolbarPosition == ToolbarPosition.BOTTOM,
-                modifier = Modifier.fillMaxWidth(),
-                compact = true,
-                onClick = {
-                    onSettingsChange(settings.copy(toolbarPosition = ToolbarPosition.BOTTOM))
-                }
-            )
-            ToolbarPositionCard(
-                position = ToolbarPosition.TOP,
-                selected = settings.toolbarPosition == ToolbarPosition.TOP,
-                modifier = Modifier.fillMaxWidth(),
-                compact = true,
-                onClick = {
-                    onSettingsChange(settings.copy(toolbarPosition = ToolbarPosition.TOP))
-                }
-            )
-        }
-    } else {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            ToolbarPositionCard(
-                position = ToolbarPosition.BOTTOM,
-                selected = settings.toolbarPosition == ToolbarPosition.BOTTOM,
-                modifier = Modifier.weight(1f),
-                compact = metrics.isCompact,
-                onClick = {
-                    onSettingsChange(settings.copy(toolbarPosition = ToolbarPosition.BOTTOM))
-                }
-            )
-            ToolbarPositionCard(
-                position = ToolbarPosition.TOP,
-                selected = settings.toolbarPosition == ToolbarPosition.TOP,
-                modifier = Modifier.weight(1f),
-                compact = metrics.isCompact,
-                onClick = {
-                    onSettingsChange(settings.copy(toolbarPosition = ToolbarPosition.TOP))
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun ToolbarPositionCard(
-    position: ToolbarPosition,
-    selected: Boolean,
-    modifier: Modifier,
-    compact: Boolean,
-    onClick: () -> Unit
-) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(IlyroVisualTokens.CardRadius),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
-        border = BorderStroke(
-            if (selected) 2.dp else 1.dp,
-            if (selected) {
-                MaterialTheme.colorScheme.primary.copy(alpha = 0.62f)
-            } else {
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = IlyroVisualTokens.SubtleBorderAlpha)
-            }
-        ),
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp
+                        modifier YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Ôô5½‘¥™¥•È¹Á…‘‘¥¹œ¡¡½É¥é½¹Ñ…°€ô€ÄÈ¹‘À¤°(€€€€€€€€€€€€€€€€€€€€€€€Ù•ÉÑ¥…±±¥¹µ•¹Ğ€ô±¥¹µ•¹Ğ¹•¹Ñ•ÉY•ÉÑ¥…±±ä(€€€€€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€€€€€MÕÉ™…” (€€€€€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Í¥é” ä¹‘À¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¡…Á”€ô¥É±•M¡…Á”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÁÉ¥µ…Éä(€€€€€€€€€€€€€€€€€€€€€€€€¤íô(€€€€€€€€€€€€€€€€€€€€€€€Q•áĞ (€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑÈ ‰M•…É ½È•¹Ñ•È…‘‘É•ÍÌˆ°€‹BBûBãFBèƒBãBïBàƒBÃBÓFB×Fˆ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Á…‘‘¥¹œ¡ÍÑ…ÉĞ€ô€ä¹‘À¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€ÍÑå±”€ô5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹‰½‘åMµ…±°°(€€€€€€€€€€€€€€€€€€€€€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½¹MÕÉ™…•Y…É¥…¹Ğ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€µ…á1¥¹•Ì€ô€Ä°(€€€€€€€€€€€€€€€€€€€€€€€€€€€½Ù•É™±½Ü€ôQ•áÑ=Ù•É™±½Ü¹±±¥ÁÍ¥Ì(€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô(€€€€€€€ô(€€€ô((€€€Q•áĞ (€€€€€€€¡½µ•	…­É½Õ¹‘1…‰•°¡Í•ÑÑ¥¹Ì¹¡½µ•	…­É½Õ¹¤°(€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Á…‘‘¥¹œ¡Ñ½À€ô€ÄÄ¹‘À°‰½ÑÑ½´€ô€Ü¹‘À¤°(€€€€€€€ÍÑå±”€ô5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹±…‰•±1…É”°(€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½¹MÕÉ™…•Y…É¥…¹Ğ(€€€€¤((€€€I½Ü (€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€¹™¥±±5…á]¥‘Ñ  ¤(€€€€€€€€€€€€¹¡½É¥é½¹Ñ…±MÉ½±°¡É•µ•µ‰•ÉMÉ½±±MÑ…Ñ” ¤¤°(€€€€€€€¡½É¥é½¹Ñ…±ÉÉ…¹•µ•¹Ğ€ôÉÉ…¹•µ•¹Ğ¹ÍÁ…•‘	ä ä¹‘À¤(€€€€¤ì(€€€€€€€!½µ•	…­É½Õ¹¹•¹ÑÉ¥•Ì¹™½É… ì‰…­É½Õ¹€´ø(€€€€€€€€€€€]…±±Á…Á•É5¥¹¥…É (€€€€€€€€€€€€€€€‰…­É½Õ¹€ô‰…­É½Õ¹°(€€€€€€€€€€€€€€€Í•ÑÑ¥¹Ì€ôÍ•ÑÑ¥¹Ì°(€€€€€€€€€€€€€€€Í•±•Ñ•€ôÍ•ÑÑ¥¹Ì¹¡½µ•	…­É½Õ¹€ôô‰…­É½Õ¹°(€€€€€€€€€€€€€€€½µÁ…Ğ€ôµ•ÑÉ¥Ì¹¥Í½µÁ…Ğ°(€€€€€€€€€€€€€€€½¹±¥¬€ôì(€€€€€€€€€€€€€€€€€€€¥˜€ (€€€€€€€€€€€€€€€€€€€€€€€‰…­É½Õ¹€ôô!½µ•	…­É½Õ¹¹UMQ=4€˜˜(€€€€€€€€€€€€€€€€€€€€€€€Í•ÑÑ¥¹Ì¹ÕÍÑ½µ]…±±Á…Á•ÉUÉ¤¹¥Í9Õ±±=É	±…¹¬ ¤(€€€€€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€€€€€İ…±±Á…Á•ÉA¥­•È¹±…Õ¹ ¡…ÉÉ…å=˜ ‰¥µ…”¼¨ˆ¤¤(€€€€€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€€€€€½¹M•ÑÑ¥¹Í¡…¹”¡Í•ÑÑ¥¹Ì¹½Áä¡¡½µ•	…­É½Õ¹€ô‰…­É½Õ¹¤¤(€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€¤(€€€€€€€ô(€€€ô)ô()½µÁ½Í…‰±”)ÁÉ¥Ù…Ñ”™Õ¸]…±±Á…Á•É5¥¹¥…É (€€€‰…­É½Õ¹è!½µ•	…­É½Õ¹°(€€€Í•ÑÑ¥¹Ìè	É½İÍ•ÉM•ÑÑ¥¹Ì°(€€€Í•±•Ñ•è	½½±•…¸°(€€€½µÁ…Ğè	½½±•…¸°(€€€½¹±¥¬è€ ¤€´øU¹¥Ğ(¤ì(€€€MÕÉ™…” (€€€€€€€½¹±¥¬€ô½¹±¥¬°(€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Í¥é” (€€€€€€€€€€€İ¥‘Ñ €ô¥˜€¡½µÁ…Ğ¤€ÄÄÈ¹‘À•±Í”€ÄÈÈ¹‘À°(€€€€€€€€€€€¡•¥¡Ğ€ô¥˜€¡½µÁ…Ğ¤€àÀ¹‘À•±Í”€àØ¹‘À(€€€€€€€€¤°(€€€€€€€Í¡…Á”€ôI½Õ¹‘•‘½É¹•ÉM¡…Á”¡%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹½¹ÑÉ½±I…‘¥ÕÌ¤°(€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÍÕÉ™…”°(€€€€€€€‰½É‘•È€ô	½É‘•ÉMÑÉ½­” (€€€€€€€€€€€¥˜€¡Í•±•Ñ•¤€È¹‘À•±Í”€Ä¹‘À°(€€€€€€€€€€€¥˜€¡Í•±•Ñ•¤ì(€€€€€€€€€€€€€€€5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÁÉ¥µ…Éä(€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½ÕÑ±¥¹•Y…É¥…¹Ğ¹½Áä¡…±Á¡„€ô%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹MÕ‰Ñ±•	½É‘•É±Á¡„¤(€€€€€€€€€€€ô(€€€€€€€€¤°(€€€€€€€Ñ½¹…±±•Ù…Ñ¥½¸€ô€À¹‘À°(€€€€€€€Í¡…‘½İ±•Ù…Ñ¥½¸€ô€À¹‘À(€€€€¤ì(€€€€€€€	½à¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹™¥±±5…áM¥é” ¤¤ì(€€€€€€€€€€€!½µ•]…±±Á…Á•È (€€€€€€€€€€€€€€€Í•ÑÑ¥¹Ì¹½Áä (€€€€€€€€€€€€€€€€€€€¡½µ•	…­É½Õ¹€ô‰…­É½Õ¹°(€€€€€€€€€€€€€€€€€€€ÕÍ•M•Á…É…Ñ•…É­	…­É½Õ¹€ô™…±Í”°(€€€€€€€€€€€€€€€€€€€İ…±±Á…Á•É¥´€ô]…±±Á…Á•É¥´¹=°(€€€€€€€€€€€€€€€€€€€İ…±±Á…Á•É	±ÕÈ€ô]…±±Á…Á•É	±ÕÈ¹=(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€¤(€€€€€€€€€€€	½à (€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€¹™¥±±5…áM¥é” ¤(€€€€€€€€€€€€€€€€€€€€¹‰…­É½Õ¹ (€€€€€€€€€€€€€€€€€€€€€€€	ÉÕÍ ¹Ù•ÉÑ¥…±É…‘¥•¹Ğ (€€€€€€€€€€€€€€€€€€€€€€€€€€€±¥ÍÑ=˜¡½±½È¹QÉ…¹ÍÁ…É•¹Ğ°½±½È¹	±…¬¹½Áä¡…±Á¡„€ô€À¸ÌÕ˜¤¤(€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€¤(€€€€€€€€€€€Q•áĞ (€€€€€€€€€€€€€€€¡½µ•	…­É½Õ¹‘1…‰•°¡‰…­É½Õ¹¤°(€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€¹…±¥¸¡±¥¹µ•¹Ğ¹	½ÑÑ½µMÑ…ÉĞ¤(€€€€€€€€€€€€€€€€€€€€¹Á…‘‘¥¹œ à¹‘À¤°(€€€€€€€€€€€€€€€½±½È€ô½±½È¹]¡¥Ñ”°(€€€€€€€€€€€€€€€ÍÑå±”€ô5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹±…‰•±Mµ…±°°(€€€€€€€€€€€€€€€™½¹Ñ]•¥¡Ğ€ô½¹Ñ]•¥¡Ğ¹	½±°(€€€€€€€€€€€€€€€µ…á1¥¹•Ì€ô€Ä°(€€€€€€€€€€€€€€€½Ù•É™±½Ü€ôQ•áÑ=Ù•É™±½Ü¹±±¥ÁÍ¥Ì(€€€€€€€€€€€€¤(€€€€€€€€€€€¥˜€¡Í•±•Ñ•¤ì(€€€€€€€€€€€€€€€M•±•Ñ¥½¹	…‘” (€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€€€€€¹…±¥¸¡±¥¹µ•¹Ğ¹Q½Á¹¤(€€€€€€€€€€€€€€€€€€€€€€€€¹Á…‘‘¥¹œ Ü¹‘À¤(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€ô(€€€€€€€ô(€€€ô)ô()½µÁ½Í…‰±”)ÁÉ¥Ù…Ñ”™Õ¸‘‘É•ÍÍ	…ÉMÑ•À (€€€Í•ÑÑ¥¹Ìè	É½İÍ•ÉM•ÑÑ¥¹Ì°(€€€½¹M•ÑÑ¥¹Í¡…¹”è€¡	É½İÍ•ÉM•ÑÑ¥¹Ì¤€´øU¹¥Ğ°(€€€Í¡½İQ¥Ñ±”è	½½±•…¸€ôÑÉÕ”(¤ì(€€€Ù…°µ•ÑÉ¥Ì€ôÉ•µ•µ‰•É%±åÉ½1…å½ÕÑ5•ÑÉ¥Ì ¤(€€€¥˜€¡Í¡½İS]4ÒÚ$z{-®éÜj×  shadowElevation = 0.dp
     ) {
         Column(
             modifier = Modifier.padding(10.dp),
@@ -949,198 +360,7 @@ private fun SearchStep(
         StepTitle(
         tr("Default search engine", "ĞŸĞ¾Ğ¸ÑĞºĞ¾Ğ²Ğ¸Ğº Ğ¿Ğ¾ ÑƒĞ¼Ğ¾Ğ»Ñ‡Ğ°Ğ½Ğ¸Ñ"),
         tr(
-            "Used for searches typed into the address bar.",
-            "Ğ˜ÑĞ¿Ğ¾Ğ»ÑŒĞ·ÑƒĞµÑ‚ÑÑ Ğ´Ğ»Ñ Ğ·Ğ°Ğ¿Ñ€Ğ¾ÑĞ¾Ğ² Ğ¸Ğ· Ğ°Ğ´Ñ€ĞµÑĞ½Ğ¾Ğ¹ ÑÑ‚Ñ€Ğ¾ĞºĞ¸."
-        )
-        )
-        Spacer(modifier = Modifier.height(14.dp))
-    }
-    SearchEngine.entries.forEach { engine ->
-        SearchEngineChoiceCard(
-            engine = engine,
-            subtitle = when (engine) {
-                SearchEngine.GOOGLE -> tr(
-                    "Familiar and broad results",
-                    "ĞŸÑ€Ğ¸Ğ²Ñ‹Ñ‡Ğ½Ñ‹Ğ¹ Ğ¿Ğ¾Ğ¸ÑĞº Ğ¸ ÑˆĞ¸Ñ€Ğ¾ĞºĞ°Ñ Ğ²Ñ‹Ğ´Ğ°Ñ‡Ğ°"
-                )
-                SearchEngine.YANDEX -> tr("Search with Yandex", "ĞŸĞ¾Ğ¸ÑĞº Ñ‡ĞµÑ€ĞµĞ· Ğ¯Ğ½Ğ´ĞµĞºÑ")
-                SearchEngine.DUCKDUCKGO -> tr(
-                    "Privacy-focused search",
-                    "ĞŸĞ¾Ğ¸ÑĞº Ñ ÑƒĞ¿Ğ¾Ñ€Ğ¾Ğ¼ Ğ½Ğ° Ğ¿Ñ€Ğ¸Ğ²Ğ°Ñ‚Ğ½Ğ¾ÑÑ‚ÑŒ"
-                )
-                SearchEngine.BRAVE -> tr(
-                    "Independent privacy-focused index",
-                    "ĞĞµĞ·Ğ°Ğ²Ğ¸ÑĞ¸Ğ¼Ñ‹Ğ¹ Ğ¿Ğ¾Ğ¸ÑĞº Ñ ÑƒĞ¿Ğ¾Ñ€Ğ¾Ğ¼ Ğ½Ğ° Ğ¿Ñ€Ğ¸Ğ²Ğ°Ñ‚Ğ½Ğ¾ÑÑ‚ÑŒ"
-                )
-                SearchEngine.BING -> tr("Microsoft search", "ĞŸĞ¾Ğ¸ÑĞº Microsoft")
-            },
-            selected = settings.searchEngine == engine,
-            onClick = { onSettingsChange(settings.copy(searchEngine = engine)) }
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-    }
-}
-
-@Composable
-private fun ExtensionsStep(
-    settings: BrowserSettings,
-    onSettingsChange: (BrowserSettings) -> Unit
-) {
-    val metrics = rememberIlyroLayoutMetrics()
-    StepTitle(
-        tr("Protection", "Ğ—Ğ°Ñ‰Ğ¸Ñ‚Ğ°"),
-        tr(
-            "Choose the built-in protection features you want. No extra add-ons are required.",
-            "Ğ’Ñ‹Ğ±ĞµÑ€Ğ¸Ñ‚Ğµ Ğ²ÑÑ‚Ñ€Ğ¾ĞµĞ½Ğ½Ñ‹Ğµ Ñ„ÑƒĞ½ĞºÑ†Ğ¸Ğ¸ Ğ·Ğ°Ñ‰Ğ¸Ñ‚Ñ‹. Ğ”Ğ¾Ğ¿Ğ¾Ğ»Ğ½Ğ¸Ñ‚ĞµĞ»ÑŒĞ½Ñ‹Ğµ Ñ€Ğ°ÑÑˆĞ¸Ñ€ĞµĞ½Ğ¸Ñ Ğ½Ğµ Ğ½ÑƒĞ¶Ğ½Ñ‹."
-        )
-    )
-    Spacer(modifier = Modifier.height(14.dp))
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(IlyroVisualTokens.CardRadius),
-        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.primary.copy(alpha = IlyroVisualTokens.SelectedBorderAlpha)
-        ),
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp
-    ) {
-        Row(
-            modifier = Modifier.padding(if (metrics.isNarrowPhone) 12.dp else 15.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OnboardingExtensionIcon(
-                slug = "ublock-origin",
-                fallback = "uB",
-                modifier = Modifier.size(if (metrics.isNarrowPhone) 42.dp else 48.dp)
-            )
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 12.dp)
-            ) {
-                Text(
-                    "ILYRO Shield",
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    tr(
-                        "Blocks ads and trackers with uBlock Origin",
-                        "Ğ‘Ğ»Ğ¾ĞºĞ¸Ñ€ÑƒĞµÑ‚ Ñ€ĞµĞºĞ»Ğ°Ğ¼Ñƒ Ğ¸ Ñ‚Ñ€ĞµĞºĞµÑ€Ñ‹ Ñ uBlock Origin"
-                    ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = settings.adBlockingEnabled,
-                onCheckedChange = {
-                    onSettingsChange(settings.copy(adBlockingEnabled = it))
-                }
-            )
-        }
-    }
-
-    Spacer(modifier = Modifier.height(10.dp))
-
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(IlyroVisualTokens.CardRadius),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.90f),
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = IlyroVisualTokens.SubtleBorderAlpha)
-        ),
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp
-    ) {
-        Row(
-            modifier = Modifier.padding(if (metrics.isNarrowPhone) 12.dp else 15.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            OnboardingExtensionIcon(
-                slug = "darkreader",
-                fallback = "DR",
-                modifier = Modifier.size(if (metrics.isNarrowPhone) 42.dp else 48.dp)
-            )
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 12.dp)
-            ) {
-                Text(
-                    tr("Dark theme for websites", "Ğ¢Ñ‘Ğ¼Ğ½Ğ°Ñ Ñ‚ĞµĞ¼Ğ° ÑĞ°Ğ¹Ñ‚Ğ¾Ğ²"),
-                    fontWeight = FontWeight.SemiBold,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Text(
-                    tr(
-                        "Darkens supported websites automatically. Powered by Dark Reader.",
-                        "ĞĞ²Ñ‚Ğ¾Ğ¼Ğ°Ñ‚Ğ¸Ñ‡ĞµÑĞºĞ¸ Ğ·Ğ°Ñ‚ĞµĞ¼Ğ½ÑĞµÑ‚ Ğ¿Ğ¾Ğ´Ğ´ĞµÑ€Ğ¶Ğ¸Ğ²Ğ°ĞµĞ¼Ñ‹Ğµ ÑĞ°Ğ¹Ñ‚Ñ‹. ĞĞ° Ğ±Ğ°Ğ·Ğµ Dark Reader."
-                    ),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = settings.darkWebsitesEnabled,
-                onCheckedChange = {
-                    onSettingsChange(settings.copy(darkWebsitesEnabled = it))
-                }
-            )
-        }
-    }
-}
-
-@Composable
-private fun FinishStep(settings: BrowserSettings) {
-    val metrics = rememberIlyroLayoutMetrics()
-    StepTitle(
-        tr("ILYRO is ready", "ILYRO Ğ³Ğ¾Ñ‚Ğ¾Ğ²"),
-        tr(
-            "This is how your browser will feel from the first tab.",
-            "Ğ’Ğ¾Ñ‚ ĞºĞ°Ğº Ğ±ÑƒĞ´ĞµÑ‚ Ğ²Ñ‹Ğ³Ğ»ÑĞ´ĞµÑ‚ÑŒ Ğ²Ğ°Ñˆ Ğ±Ñ€Ğ°ÑƒĞ·ĞµÑ€ ÑƒĞ¶Ğµ Ñ Ğ¿ĞµÑ€Ğ²Ğ¾Ğ¹ Ğ²ĞºĞ»Ğ°Ğ´ĞºĞ¸."
-        )
-    )
-    Spacer(modifier = Modifier.height(14.dp))
-
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(if (metrics.isNarrowPhone) 190.dp else 230.dp),
-        shape = RoundedCornerShape(IlyroVisualTokens.LargeRadius),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = IlyroVisualTokens.SubtleBorderAlpha)
-        ),
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp
-    ) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            HomeWallpaper(settings.copy(useSeparateDarkBackground = false))
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(if (metrics.isNarrowPhone) 11.dp else 14.dp)
-            ) {
-                if (settings.toolbarPosition == ToolbarPosition.TOP) {
-                    FinishToolbarPreview()
-                    Spacer(modifier = Modifier.height(9.dp))
-                }
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    shape = RoundedCornerShape(IlyroVisualTokens.CardRadius),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f)
+            "Used for searches typed intoYªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬ÔÑ¡”…‘‘É•ÍÌ‰…È¸ˆ°(€€€€€€€€€€€€‹BcFBÿBûBïF3BßFB×FFF<ƒBÓBïF<ƒBßBÃBÿFBûFBûBÈƒBãBÜƒBÃBÓFB×FB÷BûBäƒFFFBûBëBà¸ˆ(€€€€€€€€¤(€€€€€€€€¤(€€€€€€€MÁ…•È¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹¡•¥¡Ğ ÄĞ¹‘À¤¤(€€€ô(€€€M•…É¡¹¥¹”¹•¹ÑÉ¥•Ì¹™½É… ì•¹¥¹”€´ø(€€€€€€€M•…É¡¹¥¹•¡½¥•…É (€€€€€€€€€€€•¹¥¹”€ô•¹¥¹”°(€€€€€€€€€€€ÍÕ‰Ñ¥Ñ±”€ôİ¡•¸€¡•¹¥¹”¤ì(€€€€€€€€€€€€€€€M•…É¡¹¥¹”¹==1€´øÑÈ (€€€€€€€€€€€€€€€€€€€€‰…µ¥±¥…È…¹‰É½…É•ÍÕ±ÑÌˆ°(€€€€€€€€€€€€€€€€€€€€‹BFBãBËF/FB÷F/BäƒBÿBûBãFBèƒBàƒF#BãFBûBëBÃF<ƒBËF/BÓBÃFBÀˆ(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€M•…É¡¹¥¹”¹e9`€´øÑÈ ‰M•…É İ¥Ñ e…¹‘•àˆ°€‹BBûBãFBèƒFB×FB×BÜƒB¿B÷BÓB×BëFˆ¤(€€€€€€€€€€€€€€€M•…É¡¹¥¹”¹U-U-<€´øÑÈ (€€€€€€€€€€€€€€€€€€€€‰AÉ¥Ù…äµ™½ÕÍ•Í•…É ˆ°(€€€€€€€€€€€€€€€€€€€€‹BBûBãFBèƒFƒFBÿBûFBûBğƒB÷BÀƒBÿFBãBËBÃFB÷BûFFF0ˆ(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€M•…É¡¹¥¹”¹	IY€´øÑÈ (€€€€€€€€€€€€€€€€€€€€‰%¹‘•Á•¹‘•¹ĞÁÉ¥Ù…äµ™½ÕÍ•¥¹‘•àˆ°(€€€€€€€€€€€€€€€€€€€€‹BwB×BßBÃBËBãFBãBóF/BäƒBÿBûBãFBèƒFƒFBÿBûFBûBğƒB÷BÀƒBÿFBãBËBÃFB÷BûFFF0ˆ(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€M•…É¡¹¥¹”¹	%9€´øÑÈ ‰5¥É½Í½™ĞÍ•…É ˆ°€‹BBûBãFBè5¥É½Í½™Ğˆ¤(€€€€€€€€€€€ô°(€€€€€€€€€€€Í•±•Ñ•€ôÍ•ÑÑ¥¹Ì¹Í•…É¡¹¥¹”€ôô•¹¥¹”°(€€€€€€€€€€€½¹±¥¬€ôì½¹M•ÑÑ¥¹Í¡…¹”¡Í•ÑÑ¥¹Ì¹½Áä¡Í•…É¡¹¥¹”€ô•¹¥¹”¤¤ô(€€€€€€€€¤(€€€€€€€MÁ…•È¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹¡•¥¡Ğ à¹‘À¤¤(€€€ô)ô()½µÁ½Í…‰±”)ÁÉ¥Ù…Ñ”™Õ¸áÑ•¹Í¥½¹ÍMÑ•À (€€€Í•ÑÑ¥¹Ìè	É½İÍ•ÉM•ÑÑ¥¹Ì°(€€€½¹M•ÑÑ¥¹Í¡…¹”è€¡	É½İÍ•ÉM•ÑÑ¥¹Ì¤€´øU¹¥Ğ(¤ì(€€€Ù…°µ•ÑÉ¥Ì€ôÉ•µ•µ‰•É%±åÉ½1…å½ÕÑ5•ÑÉ¥Ì ¤(€€€MÑ•ÁQ¥Ñ±” (€€€€€€€ÑÈ ‰AÉ½Ñ•Ñ¥½¸ˆ°€‹B_BÃF'BãFBÀˆ¤°(€€€€€€€ÑÈ (€€€€€€€€€€€€‰¡½½Í”Ñ¡”‰Õ¥±Ğµ¥¸ÁÉ½Ñ•Ñ¥½¸™•…ÑÕÉ•Ìå½Ôİ…¹Ğ¸9¼•áÑÉ„…‘µ½¹Ì…É”É•ÅÕ¥É•¸ˆ°(€€€€€€€€€€€€‹BKF/BÇB×FBãFBÔƒBËFFFBûB×B÷B÷F/BÔƒFFB÷BëFBãBàƒBßBÃF'BãFF,¸ƒBSBûBÿBûBïB÷BãFB×BïF3B÷F/BÔƒFBÃFF#BãFB×B÷BãF<ƒB÷BÔƒB÷FBÛB÷F,¸ˆ(€€€€€€€€¤(€€€€¤(€€€MÁ…•È¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹¡•¥¡Ğ ÄĞ¹‘À¤¤((€€€MÕÉ™…” (€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹™¥±±5…á]¥‘Ñ  ¤°(€€€€€€€Í¡…Á”€ôI½Õ¹‘•‘½É¹•ÉM¡…Á”¡%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹…É‘I…‘¥ÕÌ¤°(€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÁÉ¥µ…Éä¹½Áä¡…±Á¡„€ô€À¸Àá˜¤°(€€€€€€€‰½É‘•È€ô	½É‘•ÉMÑÉ½­” (€€€€€€€€€€€€Ä¹‘À°(€€€€€€€€€€€5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÁÉ¥µ…Éä¹½Áä¡…±Á¡„€ô%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹M•±•Ñ•‘	½É‘•É±Á¡„¤(€€€€€€€€¤°(€€€€€€€Ñ½¹…±±•Ù…Ñ¥½¸€ô€À¹‘À°(€€€€€€€Í¡…‘½İ±•Ù…Ñ¥½¸€ô€À¹‘À(€€€€¤ì(€€€€€€€I½Ü (€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Á…‘‘¥¹œ¡¥˜€¡µ•ÑÉ¥Ì¹¥Í9…ÉÉ½İA¡½¹”¤€ÄÈ¹‘À•±Í”€ÄÔ¹‘À¤°(€€€€€€€€€€€Ù•ÉÑ¥…±±¥¹µ•¹Ğ€ô±¥¹µ•¹Ğ¹•¹Ñ•ÉY•ÉÑ¥…±±ä(€€€€€€€€¤ì(€€€€€€€€€€€=¹‰½…É‘¥¹áÑ•¹Í¥½¹%½¸ (€€€€€€€€€€€€€€€Í±Õœ€ô€‰Õ‰±½¬µ½É¥¥¸ˆ°(€€€€€€€€€€€€€€€™…±±‰…¬€ô€‰Õˆ°(€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Í¥é”¡¥˜€¡µ•ÑÉ¥Ì¹¥Í9…ÉÉ½İA¡½¹”¤€ĞÈ¹‘À•±Í”€Ğà¹‘À¤(€€€€€€€€€€€€¤(€€€€€€€€€€€½±Õµ¸ (€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€¹İ•¥¡Ğ Å˜¤(€€€€€€€€€€€€€€€€€€€€¹Á…‘‘¥¹œ¡ÍÑ…ÉĞ€ô€ÄÈ¹‘À¤(€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€Q•áĞ (€€€€€€€€€€€€€€€€€€€€‰%1eI<M¡¥•±ˆ°(€€€€€€€€€€€€€€€€€€€™½¹Ñ]•¥¡Ğ€ô½¹Ñ]•¥¡Ğ¹	½±°(€€€€€€€€€€€€€€€€€€€ÍÑå±”€ô5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹Ñ¥Ñ±•5•‘¥Õ´(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€Q•áĞ (€€€€€€€€€€€€€€€€€€€ÑÈ (€€€€€€€€€€€€€€€€€€€€€€€€‰	±½­Ì…‘Ì…¹ÑÉ…­•ÉÌİ¥Ñ Õ	±½¬=É¥¥¸ˆ°(€€€€€€€€€€€€€€€€€€€€€€€€‹BGBïBûBëBãFFB×FƒFB×BëBïBÃBóFƒBàƒFFB×BëB×FF,ƒFÕ	±½¬=É¥¥¸ˆ(€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€€€µ…á1¥¹•Ì€ô€È°(€€€€€€€€€€€€€€€€€€€½Ù•É™±½Ü€ôQ•áÑ=Ù•É™±½Ü¹±±¥ÁÍ¥Ì°(€€€€€€€€€€€€€€€€€€€ÍÑå±”€ô5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹‰½‘åMµ…±°°(€€€€€€€€€€€€€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½¹MÕÉ™…•Y…É¥…¹Ğ(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€ô(€€€€€€€€€€€Mİ¥Ñ  (€€€€€€€€€€€€€€€¡•­•€ôÍ•ÑÑ¥¹Ì¹…‘	±½­¥¹¹…‰±•°(€€€€€€€€€€€€€€€½¹¡•­•‘¡…¹”€ôì(€€€€€€€€€€€€€€€€€€€½¹M•ÑÑ¥¹Í¡…¹”¡Í•ÑÑ¥¹Ì¹½Áä¡…‘	±½­¥¹¹…‰±•€ô¥Ğ¤¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€¤(€€€€€€€ô(€€€ô((€€€MÁ…•È¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹¡•¥¡Ğ ÄÀ¹‘À¤¤((€€€MÕÉ™…” (€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹™¥±±5…á]¥‘Ñ  ¤°(€€€€€€€Í¡…Á”€ôI½Õ¹‘•‘½É¹•ÉM¡…Á”¡%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹…É‘I…‘¥ÕÌ¤°(€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÍÕÉ™…”¹½Áä¡…±Á¡„€ô€À¸äÁ˜¤°(€€€€€€€‰½É‘•È€ô	½É‘•ÉMÑÉ½­” (€€€€€€€€€€€€Ä¹‘À°(€€€€€€€€€€€5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½ÕÑ±¥¹•Y…É¥…¹Ğ¹½Áä¡…±Á¡„€ô%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹MÕ‰Ñ±•	½É‘•É±Á¡„¤(€€€€€€€€¤°(€€€€€€€Ñ½¹…±±•Ù…Ñ¥½¸€ô€À¹‘À°(€€€€€€€Í¡…‘½İ±•Ù…Ñ¥½¸€ô€À¹‘À(€€€€¤ì(€€€€€€€I½Ü (€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Á…‘‘¥¹œ¡¥˜€¡µ•ÑÉ¥Ì¹¥Í9…ÉÉ½İA¡½¹”¤€ÄÈ¹‘À•±Í”€ÄÔ¹‘À¤°(€€€€€€€€€€€Ù•ÉÑ¥…±±¥¹µ•¹Ğ€ô±¥¹µ•¹Ğ¹•¹Ñ•ÉY•ÉÑ¥…±±ä(€€€€€€€€¤ì(€€€€€€€€€€€=¹‰½…É‘¥¹áÑ•¹Í¥½¹%½¸ (€€€€€€€€€€€€€€€Í±Õœ€ô€‰‘…É­É•…‘•Èˆ°(€€€€€€€€€€€€€€€™…±±‰…¬€÷]4ÒÚ$z{-®éÜj×e.surface.copy(alpha = 0.78f)
                 ) {
                     Column(
                         modifier = Modifier.padding(14.dp),

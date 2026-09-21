@@ -18,3 +18,31 @@ internal object SyncConflictPolicy {
         !currentFingerprint.isNullOrBlank() &&
         lastSyncedFingerprint != currentFingerprint
 }
+
+/**
+ * Orders remote snapshots using the logical revision, not a device wall clock. Android devices
+ * can have stale or manually adjusted clocks; a newer wall-clock value must not overwrite a
+ * snapshot that has a higher logical revision.
+ */
+internal object SyncOrderingPolicy {
+    fun fingerprint(snapshot: SyncSnapshot): String = SyncPayloadFingerprint.of(
+        buildString {
+            append(snapshot.revision)
+            append('\u0000')
+            append(snapshot.deviceId)
+            append('\u0000')
+            append(snapshot.payload)
+        }
+    )
+
+    fun isRemoteNewer(
+        snapshot: SyncSnapshot,
+        lastRevision: Long,
+        lastFingerprint: String?
+    ): Boolean {
+        if (lastRevision == Long.MIN_VALUE) return true
+        if (snapshot.revision > lastRevision) return true
+        if (snapshot.revision < lastRevision) return false
+        return fingerprint(snapshot) != lastFingerprint
+    }
+}

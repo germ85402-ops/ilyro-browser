@@ -1,288 +1,79 @@
-package com.ilyro.browser.ui
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíß½úN‹Z–‹­¦ëeŠw¬ÕÁ…­…”½´¹¥±åÉ¼¹‰É½İÍ•È¹Õ¤()¥µÁ½ÉĞ…¹‘É½¥¹½¹Ñ•¹Ğ¹½¹Ñ•áĞ)¥µÁ½ÉĞ…¹‘É½¥¹É…Á¡¥Ì¹	¥Ñµ…À)¥µÁ½ÉĞ…¹‘É½¥¹É…Á¡¥Ì¹	¥Ñµ…Á…Ñ½Éä)¥µÁ½ÉĞ…¹‘É½¥¹¹•Ğ¹UÉ¤)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹½É½ÕÑ¥¹•M½Á”)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹½É½ÕÑ¥¹•MÑ…ÉĞ)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹•™•ÉÉ•)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹¥ÍÁ…Ñ¡•ÉÌ)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹MÕÁ•ÉÙ¥Í½É)½ˆ)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹…Íå¹Œ)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹±…Õ¹ )¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹İ¥Ñ¡½¹Ñ•áĞ)¥µÁ½ÉĞ©…Ù„¹¥¼¹¥±”)¥µÁ½ÉĞ©…Ù„¹¥¼¹¥±•=ÕÑÁÕÑMÑÉ•…´)¥µÁ½ÉĞ©…Ù„¹¹•Ğ¹!ÑÑÁUI1½¹¹•Ñ¥½¸)¥µÁ½ÉĞ©…Ù„¹¹•Ğ¹UI0)¥µÁ½ÉĞ©…Ù„¹¹•Ğ¹UI1¹½‘•È)¥µÁ½ÉĞ©…Ù„¹¹¥¼¹¡…ÉÍ•Ğ¹MÑ…¹‘…É‘¡…ÉÍ•ÑÌ)¥µÁ½ÉĞ©…Ù„¹Í•ÕÉ¥Ñä¹5•ÍÍ…•¥•ÍĞ)¥µÁ½ÉĞ©…Ù„¹ÕÑ¥°¹1¥¹­•‘!…Í¡5…À)¥µÁ½ÉĞ©…Ù„¹ÕÑ¥°¹½¹ÕÉÉ•¹Ğ¹Q¥µ•U¹¥Ğ((¼¨¨(€¨A•ÉÍ¥ÍÑ•¹Ğ™…Ù¥½¸…¡”Í¡…É•‰äÑ¡”¡½µ”ÅÕ¥¬±¥¹­Ì…¹Í•…É µ•¹¥¹”Í•±•Ñ½È¸(€¨(€¨Q¡”ÁÉ•Ù¥½ÕÌ¥µÁ±•µ•¹Ñ…Ñ¥½¸½¹±ä­•ÁĞ‰¥Ñµ…ÁÌ™½ÈÑ¡”±¥™•Ñ¥µ”½˜Ñ¡”ÁÉ½•ÍÌ°İ¡¥ µ•…¹Ğ„(€¨½±ÍÑ…ÉĞ…±İ…åÌÍ¡½İ•±•ÑÑ•È™…±±‰…­Ì…¹Ñ¡•¸Ù¥Í¥‰±äÉ•Á±…•Ñ¡•´…™Ñ•È…¹½Ñ¡•È¹•Ñİ½É¬(€¨É•ÅÕ•ÍĞ¸¥Í¬É•…‘Ì…¹‰¥Ñµ…À‘•½‘¥¹œ…É”¹½Ü­•ÁĞ½™˜Ñ¡”µ…¥¸Ñ¡É•…°İ¡¥±”Ñ¡”¥¸µµ•µ½Éä(€¨…¡”ÍÑ¥±°…Ù½¥‘ÌÉ•Á•…Ñ•İ½É¬‘ÕÉ¥¹œ„Í•ÍÍ¥½¸…¹ÍÑ…±”•¹ÑÉ¥•ÌÉ•™É•Í ¥¸Ñ¡”‰…­É½Õ¹¸(€¨¼)¥¹Ñ•É¹…°½‰©•Ğ	É½İÍ•É%½¹…¡”ì(€€€ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°!}%H€ô€‰‰É½İÍ•Èµ¥½¹ÌµØÄˆ(€€€ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°5a}%M-}9QI%L€ô€ØĞ(€€€ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°5a}55=Ie}9QI%L€ô€ÈĞ(€€€ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°5a}%1UI}9QI%L€ô€ØĞ(€€€ÁÉ¥Ù…Ñ”Ù…°É•™É•Í¡•5Ì€ôQ¥µ•U¹¥Ğ¹eL¹Ñ½5¥±±¥Ì Ü¤(€€€ÁÉ¥Ù…Ñ”Ù…°É•ÑÉå•±…å5Ì€ôQ¥µ•U¹¥Ğ¹5%9UQL¹Ñ½5¥±±¥Ì ÄÀ¤((€€€ÁÉ¥Ù…Ñ”Ù…°Í½Á”€ô½É½ÕÑ¥¹•M½Á”¡MÕÁ•ÉÙ¥Í½É)½ˆ ¤€¬¥ÍÁ…Ñ¡•ÉÌ¹%<¤(€€€ÁÉ¥Ù…Ñ”Ù…°±½¬€ô¹ä ¤(€€€ÁÉ¥Ù…Ñ”Ù…°‰¥Ñµ…ÁÌ€ô½‰©•Ğ€è1¥¹­•‘!…Í¡5…ÀñMÑÉ¥¹œ°	¥Ñµ…Àø (€€€€€€€5a}55=Ie}9QI%L°(€€€€€€€€À¸ÜÕ˜°(€€€€€€€ÑÉÕ”(€€€€¤ì(€€€€€€€½Ù•ÉÉ¥‘”™Õ¸É•µ½Ù•±‘•ÍÑ¹ÑÉä¡•±‘•ÍĞè5ÕÑ…‰±•5…À¹5ÕÑ…‰±•¹ÑÉäñMÑÉ¥¹œ°	¥Ñµ…Àøü¤è	½½±•…¸€ô(€€€€€€€€€€€Í¥é”€ø5a}55=Ie}9QI%L(€€€ô(€€€ÁÉ¥Ù…Ñ”Ù…°¥¹±¥¡Ğ€ôµÕÑ…‰±•5…Á=˜ñMÑÉ¥¹œ°•™•ÉÉ•ñ	¥Ñµ…Àüøø ¤(€€€ÁÉ¥Ù…Ñ”Ù…°™…¥±•‘Ğ€ôµÕÑ…‰±•5…Á=˜ñMÑÉ¥¹œ°1½¹œø ¤((€€€Y½±…Ñ¥±”(€€€ÁÉ¥Ù…Ñ”Ù…È…ÁÁ½¹Ñ•áĞè½¹Ñ•áĞü€ô¹Õ±°((€€€™Õ¸¥¹¥Ñ¥…±¥é”¡½¹Ñ•áĞè½¹Ñ•áĞ°ÅÕ¥­1¥¹­UÉ±Ìè1¥ÍĞñMÑÉ¥¹œø¤ì(€€€€€€€¥˜€¡…ÁÁ½¹Ñ•áĞ€ôô¹Õ±°¤ì(€€€€€€€€€€€Íå¹¡É½¹¥é•¡±½¬¤ì(€€€€€€€€€€€€€€€¥˜€¡…ÁÁ½¹Ñ•áĞ€ôô¹Õ±°¤…ÁÁ½¹Ñ•áĞ€ô½¹Ñ•áĞ¹…ÁÁ±¥…Ñ¥½¹½¹Ñ•áĞ(€€€€€€€€€€€ô(€€€€€€€ô((€€€€€€€Ù…°Ñ…É•ÑÌ€ô€¡ÅÕ¥­1¥¹­UÉ±Ì€¬M•…É¡¹¥¹”¹•¹ÑÉ¥•Ì¹µ…À èéÍ•…É¡¹¥¹•M¥Ñ•UÉ°¤¤(€€€€€€€€€€€€¹µ…À èéÍ¥Ñ•%‘•¹Ñ¥ÑåUÉ°¤(€€€€€€€€€€€€¹™¥±Ñ•Èì¥Ğ¹¥Í9½Ñ	±…¹¬ ¤ô(€€€€€€€€€€€€¹‘¥ÍÑ¥¹Ğ ¤((€€€€€€€€¼¼¥Í¬É•…‘Ì…¹‰¥Ñµ…À‘•½‘¥¹œ¡…ÁÁ•¸½¸Ñ¡”%<Í½Á”¸Q¡”™¥ÉÍĞ½µÁ½Í”™É…µ”ÕÍ•Ì„(€€€€€€€€¼¼Á±…•¡½±‘•Èİ¡•¸Ñ¡”İ…É´µÕÀ¡…Ì¹½Ğ½µÁ±•Ñ•å•Ğ°…Ù½¥‘¥¹œµ…¥¸µÑ¡É•…$½<‘ÕÉ¥¹œ(€€€€€€€€¼¼Ñ¥Ù¥ÑäÉ•…Ñ¥½¸…¹½µÁ½Í¥Ñ¥½¸¸(€€€€€€€Ñ…É•ÑÌ¹™½É…  èéÁÉ•™•Ñ ¤(€€€€€€€Í½Á”¹±…Õ¹ ìÑÉ¥µ¥Í­…¡” ¤ô(€€€ô((€€€™Õ¸Á••¬¡ÕÉ°èMÑÉ¥¹œ¤è	¥Ñµ…Àüì(€€€€€€€Ù…°­•ä€ôÍ¥Ñ•%‘•¹Ñ¥ÑåUÉ°¡ÕÉ°¤(€€€€€€€¥˜€¡­•ä¹¥Í	±…¹¬ ¤¤É•ÑÕÉ¸¹Õ±°((€€€€€€€Íå¹¡É½¹¥é•¡±½¬¤ì(€€€€€€€€€€€‰¥Ñµ…ÁÍm­•åtü¹±•ĞìÉ•ÑÕÉ¸¥Ğô(€€€€€€€ô(€€€€€€€É•ÑÕÉ¸¹Õ±°(€€€ô((€€€™Õ¸Á••¬¡•¹¥¹”èM•…É¡¹¥¹”¤è	¥Ñµ…Àü€ôÁ••¬¡Í•…É¡¹¥¹•M¥Ñ•UÉ°¡•¹¥¹”¤¤((€€€ÍÕÍÁ•¹™Õ¸±½…‘=¹”¡ÕÉ°èMÑÉ¥¹œ¤è	¥Ñµ…Àüì(€€€€€€€Ù…°­•ä€ôÍ¥Ñ•%‘•¹Ñ¥ÑåUÉ°¡ÕÉ°¤(€€€€€€€¥˜€¡­•ä¹¥Í	±…¹¬ ¤¤É•ÑÕÉ¸¹Õ±°(€€€€€€€Ù…°©½ˆ€ôÍå¹¡É½¹¥é•¡±½¬¤ì(€€€€€€€€€€€‰¥Ñµ…ÁÍm­•åtü¹±•ĞìÉ•ÑÕÉ¸¥Ğô(€€€€€€€€€€€¥¹±¥¡Ñm­•åt€üèÉÕ¸ì(€€€€€€€€€€€€€€€Ù…°¹½Ü€ôMåÍÑ•´¹ÕÉÉ•¹ÑQ¥µ•5¥±±¥Ì ¤(€€€€€€€€€€€€€€€Ù…°±…ÍÑ…¥±ÕÉ”€ô™…¥±•‘Ñm­•åt€üè€Á0(€€€€€€€€€€€€€€€¥˜€¡¹½Ü€´±…ÍÑ…¥±ÕÉ”€ğÉ•ÑÉå•±…å5Ì¤É•ÑÕÉ¸¹Õ±°((€€€€€€€€€€€€€€€Í½Á”¹…Íå¹Œ¡ÍÑ…ÉĞ€ô½É½ÕÑ¥¹•MÑ…ÉĞ¹1id¤ì(€€€€€€€€€€€€€€€€€€€Ù…°…¡•€ô…ÁÁ½¹Ñ•áĞü¹±•Ğì½¹Ñ•áĞ€´ø(€€€€€€€€€€€€€€€€€€€€€€€İ¥Ñ¡½¹Ñ•áĞ¡¥ÍÁ…Ñ¡•ÉÌ¹%<¤ìÉ•…‘É½µ¥Í¬¡½¹Ñ•áĞ°­•ä¤ô(€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€¥˜€¡…¡•€„ô¹Õ±°¤ì(€€€€€€€€€€€€€€€€€€€€€€€Íå¹¡É½¹¥é•¡±½¬¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€‰¥Ñµ…ÁÍm­•åt€ô…¡•(€€€€€€€€€€€€€€€€€€€€€€€€€€€™…¥±•‘Ğ¹É•µ½Ù”¡­•ä¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€¥¹±¥¡Ğ¹É•µ½Ù”¡­•ä¤(€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€É•ÑÕÉ¹…Íå¹Œ…¡•(€€€€€€€€€€€€€€€€€€€ô((€€€€€€€€€€€€€€€€€€€Ù…°±½…‘•€ô™•Ñ¡¹‘A•ÉÍ¥ÍĞ¡­•ä¤(€€€€€€€€€€€€€€€€€€€Íå¹¡É½¹¥é•¡±½¬¤ì(€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡±½…‘•€„ô¹Õ±°¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€‰¥Ñµ…ÁÍm­•åt€ô±½…‘•(€€€€€€€€€€€€€€€€€€€€€€€€€€€™…¥±•‘Ğ¹É•µ½Ù”¡­•ä¤(€€€€€€€€€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€É•½É‘…¥±ÕÉ•1½­•¡­•ä¤(€€€€€€€€€€€€€€€€€€€€€ƒ½ú¶‰Ëkºwµç^™HHPVÑRST‘WÑS•’QTÊH™]\›‚ˆ˜Z[Y]™[šY\ÂˆœÛÜYHÈ]˜[YHBˆZÙJ˜Z[Y]œÚ^™HHPVÑRST‘WÑS•’QTÊBˆ™›Ü‘XXÚÈ˜Z[Y]œ™[[İ™J]šÙ^JHBˆB‚ˆš]˜]Hİ\Ü[™[ˆ™]Ú[™\œÚ\İ
+Ú]U\›ˆİš[™ÊNˆš]X\ÈHÚ]ÛÛ^
+\Ü]Ú\œË’SÊHÂˆ˜[ÛÛ^H\ÛÛ^Îˆ™]\›Ú]ÛÛ^[ˆ˜[š]X\H™]ÚÚ]Q˜]šXÛÛŠÚ]U\›
+HÎˆ™]\›Ú]ÛÛ^[ˆ[Ø]Ú[™ÈÈÜš]UÑ\ÚÊÛÛ^Ú]U\›š]X\
+HBˆš]X\ˆB‚ˆš]˜]H[ˆ™XYœ›ÛQ\ÚÊÛÛ^ˆÛÛ^\›ˆİš[™ÊNˆš]X\ÈÂˆ˜[š[HHØXÚQš[JÛÛ^\›
+BˆYˆ
+Yš[Kš\Ñš[Hš[K›[™İ
 
-import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.net.Uri
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineStart
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.io.File
-import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
-import java.util.LinkedHashMap
-import java.util.concurrent.TimeUnit
+HH
+H™]\›ˆ[ˆ˜[XÛÙYH[Ø]Ú[™ÈÈš]X\˜XİÜK™XÛÙQš[Jš[K˜XœÛÛ]T]
+HK™Ù]Ü“[
 
-/**
- * Persistent favicon cache shared by the home quick links and search-engine selector.
- *
- * The previous implementation only kept bitmaps for the lifetime of the process, which meant a
- * cold start always showed letter fallbacks and then visibly replaced them after another network
- * request. We now decode the tiny cached icons before Compose is attached, keep them in memory for
- * the process, and refresh stale entries in the background without forcing an on-screen swap.
- */
-internal object BrowserIconCache {
-    private const val CACHE_DIR = "browser-icons-v1"
-    private const val MAX_DISK_ENTRIES = 64
-    private const val MAX_MEMORY_ENTRIES = 24
-    private const val MAX_FAILURE_ENTRIES = 64
-    private val refreshAgeMs = TimeUnit.DAYS.toMillis(7)
-    private val retryDelayMs = TimeUnit.MINUTES.toMillis(10)
+BˆYˆ
+XÛÙYOH[
+H™]\›ˆXÛÙYˆ[Ø]Ú[™ÈÈš[K™[]J
+HBˆ™]\›ˆ[ˆB‚ˆš]˜]H[ˆÜš]UÑ\ÚÊÛÛ^ˆÛÛ^\›ˆİš[™Ëš]X\ˆš]X\
+HÂˆ˜[\™XİÜHHØXÚQ\™XİÜJÛÛ^
+BˆYˆ
+Y\™XİÜK™^\İÊ
+JH\™XİÜK›ZÙ\œÊ
+Bˆ˜[\İ[˜][ÛˆHØXÚQš[JÛÛ^\›
+Bˆ˜[[\Ü˜\HHš[J\™XİÜK\İ[˜][Û‹›˜[YH
+È‹\ŠB‚ˆš[Sİ]]İ™X[J[\Ü˜\JK\ÙHÈİ]]O‚ˆÚXÚÊš]X\˜ÛÛ\™\ÜÊš]X\ÛÛ\™\ÜÑ›Ü›X]”‘ËLİ]]
+JBˆİ]]™™œŞ[˜Ê
+BˆB‚ˆYˆ
+][\Ü˜\Kœ™[˜[YUÊ\İ[˜][ÛŠJHÂˆ[\Ü˜\K˜ÛÜUÊ\İ[˜][Û‹İ™\Üš]HHYJBˆ[\Ü˜\K™[]J
+BˆBˆ\İ[˜][Û‹œÙ]\İ[ÙYšYY
+Ş\İ[K˜İ\œ™[[YSZ[\Ê
+JBˆB‚ˆš]˜]H[ˆš[Q\ÚĞØXÚJ
+HÂˆ˜[ÛÛ^H\ÛÛ^Îˆ™]\›‚ˆ˜[\™XİÜHHØXÚQ\™XİÜJÛÛ^
+Bˆ˜[š[\ÈH\™XİÜK›\İš[\ÈÈš[HOˆš[Kš\Ñš[H	‰ˆYš[K›˜[YK™[™ÕÚ]
+‹\ŠHBˆËœÛÜYQ\ØÙ[™[™Êš[N›\İ[ÙYšYY
+BˆÎˆ™]\›‚ˆš[\Ë™›Ü
+PVÑTÒ×ÑS•’QTÊK™›Ü‘XXÚÈ[Ø]Ú[™ÈÈ]™[]J
+HHBˆ\™XİÜK›\İš[\ÈÈš[HOˆš[K›˜[YK™[™ÕÚ]
+‹\ŠHBˆË™›Ü‘XXÚÈ[Ø]Ú[™ÈÈ]™[]J
+HHBˆB‚ˆš]˜]H[ˆØXÚQ\™XİÜJÛÛ^ˆÛÛ^
+Nˆš[HHš[JÛÛ^™š[\Ñ\‹ĞPÒWÑTŠB‚ˆš]˜]H[ˆØXÚQš[JÛÛ^ˆÛÛ^\›ˆİš[™ÊNˆš[HBˆš[JØXÚQ\™XİÜJÛÛ^
+KÚLMŠ\›
+H
+È‹œ™ÈŠB‚ˆš]˜]H[ˆÚLMŠ˜[YNˆİš[™ÊNˆİš[™ÈHY\ÜØYÙQYÙ\İ™Ù][œİ[˜ÙJ”ÒKLMˆŠBˆ™YÙ\İ
+˜[YKĞ]P\œ˜^Jİ[™\™Ú\œÙ]Ë•U—Î
+JBˆš›Ú[•Ôİš[™ÊÙ\\˜]ÜˆHˆŠHÈ]HOˆ‰L‹™›Ü›X]
+]JHB‚ˆš]˜]H[ˆÚ]RY[]U\›
+˜]Õ\›ˆİš[™ÊNˆİš[™ÈÂˆ˜[˜[YHH˜]Õ\›š[J
+BˆYˆ
+˜[YKš\Ğ›[šÊ
+JH™]\›ˆˆ‚ˆ˜[\šHH[Ø]Ú[™ÈÈ\šKœ\œÙJ˜[YJHK™Ù]Ü“[
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val lock = Any()
-    private val bitmaps = object : LinkedHashMap<String, Bitmap>(
-        MAX_MEMORY_ENTRIES,
-        0.75f,
-        true
-    ) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>?): Boolean =
-            size > MAX_MEMORY_ENTRIES
-    }
-    private val inFlight = mutableMapOf<String, Deferred<Bitmap?>>()
-    private val failedAt = mutableMapOf<String, Long>()
+HÎˆ™]\›ˆ˜[YBˆ˜[ØÚ[YHH\šKœØÚ[YOË›İÙ\˜Ø\ÙJ
+Bˆ˜[ÜİH\šKšÜİË›İÙ\˜Ø\ÙJ
+BˆYˆ
 
-    @Volatile
-    private var appContext: Context? = null
+ØÚ[YHOHšˆ	‰ˆØÚ[YHOHšÈŠHÜİš\Ó[Ü›[šÊ
+JH™]\›ˆ˜[YBˆ˜[ÜH\šKœÜˆ˜[Y˜][ÜH
+ØÚ[YHOHšˆ	‰ˆÜOH
+H
+ØÚ[YHOHšÈˆ	‰ˆÜOHÊBˆ™]\›ˆZ[İš[™ÈÂˆ\[™
+ØÚ[YJBˆ\[™
+‹ËÈŠBˆ\[™
+Üİ
+BˆYˆ
+ÜOHLH	‰ˆYY˜][Ü
+HÂˆ\[™
+	Î‰ÊBˆ\[™
+Ü
+BˆBˆ\[™
+	ËÉÊBˆBˆB‚ˆš]˜]H[ˆÙX\˜Ú[™Ú[™TÚ]U\›
+[™Ú[™NˆÙX\˜Ú[™Ú[™JNˆİš[™ÈHÚ[ˆ
+[™Ú[™JHÂˆÙX\˜Ú[™Ú[™K‘ÓÓÑÓHOˆšÎ‹ËİİİË™ÛÛÙÛK˜ÛÛKÈ‚ˆÙX\˜Ú[™Ú[™K–PS‘VOˆšÎ‹ËŞX[™^˜ÛÛKÈ‚ˆÙX\˜Ú[™Ú[™K‘PÒÑPÒÑÓÈOˆšÎ‹ËÙXÚÙXÚÙÛË˜ÛÛKÈ‚ˆÙX\˜Ú[™Ú[™K”U‘HOˆšÎ‹ËÜÙX\˜Ú˜œ˜]™K˜ÛÛKÈ‚ˆÙX\˜Ú[™Ú[™K’S‘ÈOˆšÎ‹ËİİİË˜š[™Ë˜ÛÛKÈ‚ˆB‚ˆš]˜]H[ˆ™]ÚÚ]Q˜]šXÛÛŠÚ]U\›ˆİš[™ÊNˆš]X\ÈH[Ø]Ú[™ÈÂˆ˜[[˜ÛÙYHT“[˜ÛÙ\‹™[˜ÛÙJÚ]U\›İ[™\™Ú\œÙ]Ë•U—ÎÔİš[™Ê
+JBˆ˜[ÛÛ›™Xİ[ÛˆH
+T“
+šÎ‹ËİİİË™ÛÛÙÛK˜ÛÛKÜÌ‹Ù˜]šXÛÛœÏÜŞLL	™ÛXZ[—İ\›I[˜ÛÙYŠBˆ›Ü[ÛÛ›™Xİ[ÛŠ
+H\ÈT“ÛÛ›™Xİ[ÛŠK˜\HÂˆÛÛ›™Xİ[Y[İ]H×ÍLˆ™XY[Y[İ]H×ÍLˆ[œİ[˜ÙQ›ÛİÔ™Y\™XİÈHYBˆ™\]Y\İY]ÙH‘ÑU‚ˆÙ]™\]Y\İ›Ü\JXØÙ\‹š[XYÙKÊˆŠBˆÙ]™\]Y\İ›Ü\J•\Ù\‹PYÙ[‹’ST“ËÌŒM‹Œˆ[™›ÚYŠBˆBˆHÂˆYˆ
+ÛÛ›™Xİ[Û‹œ™\ÜÛœÙPÛÙHZ[ˆŒ‹ŒNJH™]\›[Ø]Ú[™È[ˆÛÛ›™Xİ[Û‹š[œ]İ™X[K\ÙJš]X\˜XİÜN™XÛÙTİ™X[JBˆHš[˜[HÂˆÛÛ›™Xİ[Û‹™\ØÛÛ›™Xİ
 
-    fun initialize(context: Context, quickLinkUrls: List<String>) {
-        if (appContext == null) {
-            synchronized(lock) {
-                if (appContext == null) appContext = context.applicationContext
-            }
-        }
+BˆBˆK™Ù]Ü“[
 
-        val targets = (quickLinkUrls + SearchEngine.entries.map(::searchEngineSiteUrl))
-            .map(::siteIdentityUrl)
-            .filter { it.isNotBlank() }
-            .distinct()
-
-        // These files are tiny (normally a few KB). Reading them before setContent keeps cold-start
-        // Compose frames stable: cached icons are already in RAM before the home page is composed.
-        targets.forEach(::peek)
-
-        // Missing icons are fetched once; stale icons are refreshed silently. The currently shown
-        // cached bitmap is deliberately not invalidated, so there is no visible favicon "flash".
-        targets.forEach(::prefetch)
-        scope.launch { trimDiskCache() }
-    }
-
-    fun peek(url: String): Bitmap? {
-        val key = siteIdentityUrl(url)
-        if (key.isBlank()) return null
-
-        synchronized(lock) {
-            bitmaps[key]?.let { return it }
-        }
-
-        val context = appContext ?: return null
-        val loaded = readFromDisk(context, key) ?: return null
-        synchronized(lock) {
-            bitmaps[key] = loaded
-        }
-        return loaded
-    }
-
-    fun peek(engine: SearchEngine): Bitmap? = peek(searchEngineSiteUrl(engine))
-
-    suspend fun loadOnce(url: String): Bitmap? {
-        val key = siteIdentityUrl(url)
-        if (key.isBlank()) return null
-        peek(key)?.let { return it }
-
-        val now = System.currentTimeMillis()
-        val job = synchronized(lock) {
-            bitmaps[key]?.let { return it }
-            val lastFailure = failedAt[key] ?: 0L
-            if (now - lastFailure < retryDelayMs) return null
-
-            inFlight[key] ?: scope.async(start = CoroutineStart.LAZY) {
-                val loaded = fetchAndPersist(key)
-                synchronized(lock) {
-                    if (loaded != null) {
-                        bitmaps[key] = loaded
-                        failedAt.remove(key)
-                    } else {
-                        recordFailureLocked(key)
-                    }
-                    inFlight.remove(key)
-                }
-                loaded
-            }.also { newJob ->
-                inFlight[key] = newJob
-                newJob.start()
-            }
-        }
-        return job.await()
-    }
-
-    suspend fun loadOnce(engine: SearchEngine): Bitmap? = loadOnce(searchEngineSiteUrl(engine))
-
-    fun prefetch(url: String) {
-        val key = siteIdentityUrl(url)
-        if (key.isBlank()) return
-        val cached = peek(key)
-        if (cached == null) {
-            scope.launch { loadOnce(key) }
-            return
-        }
-
-        val context = appContext ?: return
-        val file = cacheFile(context, key)
-        if (!file.exists() || System.currentTimeMillis() - file.lastModified() < refreshAgeMs) return
-        scheduleRefresh(key)
-    }
-
-    private fun scheduleRefresh(url: String) {
-        synchronized(lock) {
-            if (inFlight[url] != null) return
-            val job = scope.async(start = CoroutineStart.LAZY) {
-                val loaded = fetchAndPersist(url)
-                synchronized(lock) {
-                    if (loaded != null) {
-                        bitmaps[url] = loaded
-                        failedAt.remove(url)
-                    } else {
-                        recordFailureLocked(url)
-                    }
-                    inFlight.remove(url)
-                }
-                loaded
-            }
-            inFlight[url] = job
-            job.start()
-        }
-    }
-
-    fun trimMemory() {
-        synchronized(lock) {
-            // Do not recycle: Compose may still be drawing one of these bitmaps in the current
-            // frame. Dropping the cache reference lets Android reclaim it safely once unused.
-            bitmaps.clear()
-            val now = System.currentTimeMillis()
-            failedAt.keys
-                .filter { key -> now - (failedAt[key] ?: now) >= retryDelayMs }
-                .forEach(failedAt::remove)
-        }
-    }
-
-    private fun recordFailureLocked(url: String) {
-        failedAt[url] = System.currentTimeMillis()
-        if (failedAt.size <= MAX_FAILURE_ENTRIES) return
-        failedAt.entries
-            .sortedBy { it.value }
-            .take(failedAt.size - MAX_FAILURE_ENTRIES)
-            .forEach { failedAt.remove(it.key) }
-    }
-
-    private suspend fun fetchAndPersist(siteUrl: String): Bitmap? = withContext(Dispatchers.IO) {
-        val context = appContext ?: return@withContext null
-        val bitmap = fetchSiteFavicon(siteUrl) ?: return@withContext null
-        runCatching { writeToDisk(context, siteUrl, bitmap) }
-        bitmap
-    }
-
-    private fun readFromDisk(context: Context, url: String): Bitmap? {
-        val file = cacheFile(context, url)
-        if (!file.isFile || file.length() <= 0L) return null
-        val decoded = runCatching { BitmapFactory.decodeFile(file.absolutePath) }.getOrNull()
-        if (decoded != null) return decoded
-        runCatching { file.delete() }
-        return null
-    }
-
-    private fun writeToDisk(context: Context, url: String, bitmap: Bitmap) {
-        val directory = cacheDirectory(context)
-        if (!directory.exists()) directory.mkdirs()
-        val destination = cacheFile(context, url)
-        val temporary = File(directory, destination.name + ".tmp")
-
-        FileOutputStream(temporary).use { output ->
-            check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
-            output.fd.sync()
-        }
-
-        if (!temporary.renameTo(destination)) {
-            temporary.copyTo(destination, overwrite = true)
-            temporary.delete()
-        }
-        destination.setLastModified(System.currentTimeMillis())
-    }
-
-    private fun trimDiskCache() {
-        val context = appContext ?: return
-        val directory = cacheDirectory(context)
-        val files = directory.listFiles { file -> file.isFile && !file.name.endsWith(".tmp") }
-            ?.sortedByDescending(File::lastModified)
-            ?: return
-        files.drop(MAX_DISK_ENTRIES).forEach { runCatching { it.delete() } }
-        directory.listFiles { file -> file.name.endsWith(".tmp") }
-            ?.forEach { runCatching { it.delete() } }
-    }
-
-    private fun cacheDirectory(context: Context): File = File(context.filesDir, CACHE_DIR)
-
-    private fun cacheFile(context: Context, url: String): File =
-        File(cacheDirectory(context), sha256(url) + ".png")
-
-    private fun sha256(value: String): String = MessageDigest.getInstance("SHA-256")
-        .digest(value.toByteArray(StandardCharsets.UTF_8))
-        .joinToString(separator = "") { byte -> "%02x".format(byte) }
-
-    private fun siteIdentityUrl(rawUrl: String): String {
-        val value = rawUrl.trim()
-        if (value.isBlank()) return ""
-        val uri = runCatching { Uri.parse(value) }.getOrNull() ?: return value
-        val scheme = uri.scheme?.lowercase()
-        val host = uri.host?.lowercase()
-        if ((scheme != "http" && scheme != "https") || host.isNullOrBlank()) return value
-        val port = uri.port
-        val defaultPort = (scheme == "http" && port == 80) || (scheme == "https" && port == 443)
-        return buildString {
-            append(scheme)
-            append("://")
-            append(host)
-            if (port != -1 && !defaultPort) {
-                append(':')
-                append(port)
-            }
-            append('/')
-        }
-    }
-
-    private fun searchEngineSiteUrl(engine: SearchEngine): String = when (engine) {
-        SearchEngine.GOOGLE -> "https://www.google.com/"
-        SearchEngine.YANDEX -> "https://yandex.com/"
-        SearchEngine.DUCKDUCKGO -> "https://duckduckgo.com/"
-        SearchEngine.BRAVE -> "https://search.brave.com/"
-        SearchEngine.BING -> "https://www.bing.com/"
-    }
-
-    private fun fetchSiteFavicon(siteUrl: String): Bitmap? = runCatching {
-        val encoded = URLEncoder.encode(siteUrl, StandardCharsets.UTF_8.toString())
-        val connection = (URL("https://www.google.com/s2/favicons?sz=128&domain_url=$encoded")
-            .openConnection() as HttpURLConnection).apply {
-            connectTimeout = 3_500
-            readTimeout = 3_500
-            instanceFollowRedirects = true
-            requestMethod = "GET"
-            setRequestProperty("Accept", "image/*")
-            setRequestProperty("User-Agent", "ILYRO/0.16.26 Android")
-        }
-        try {
-            if (connection.responseCode !in 200..299) return@runCatching null
-            connection.inputStream.use(BitmapFactory::decodeStream)
-        } finally {
-            connection.disconnect()
-        }
-    }.getOrNull()
-}
+BŸB

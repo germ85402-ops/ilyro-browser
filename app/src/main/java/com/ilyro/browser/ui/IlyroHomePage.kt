@@ -1,190 +1,4 @@
-package com.ilyro.browser.ui
-
-import android.content.Context
-import android.graphics.Bitmap
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image as ComposeImage
-import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlin.math.abs
-
-/**
- * ILYRO Visual 4 start page.
- *
- * Home stays the expressive part of the browser, but its spacing and density now
- * follow the same Compact / Medium / Expanded model as the rest of the interface.
- */
-@Composable
-internal fun IlyroHomePage(
-    settings: BrowserSettings,
-    searchEngine: SearchEngine,
-    history: List<HistoryItem>,
-    isPrivate: Boolean,
-    onSearchEngineChange: (SearchEngine) -> Unit,
-    onNavigate: (String) -> Unit
-) {
-    val metrics = rememberIlyroLayoutMetrics()
-    val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("ilyro_browser", Context.MODE_PRIVATE) }
-    val quickLinks = remember {
-        mutableStateListOf<QuickLink>().apply { addAll(QuickLinkStore.restore(prefs)) }
-    }
-    var query by remember { mutableStateOf("") }
-    var editMode by remember { mutableStateOf(false) }
-    var showAddDialog by remember { mutableStateOf(false) }
-    var editingQuickLink by remember { mutableStateOf<QuickLink?>(null) }
-
-    val darkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val activeBackground = if (darkTheme && settings.useSeparateDarkBackground) {
-        settings.darkHomeBackground
-    } else {
-        settings.homeBackground
-    }
-    val wallpaperActive = activeBackground != HomeBackground.NONE
-    val privateHomeTint by animateColorAsState(
-        targetValue = if (isPrivate) Color(0xFF8B5CF6).copy(alpha = 0.045f) else Color.Transparent,
-        animationSpec = tween(IlyroVisualTokens.MotionStandardMs),
-        label = "private-home-tint"
-    )
-
-    val densityExtra = when (settings.uiDensity) {
-        UiDensity.COMPACT -> (-2).dp
-        UiDensity.STANDARD -> 0.dp
-        UiDensity.COMFORTABLE -> 4.dp
-    }
-    val horizontalPadding = (metrics.horizontalPadding + densityExtra).coerceAtLeast(10.dp)
-    val topSpacing = when {
-        metrics.isNarrowPhone -> 14.dp
-        metrics.isCompact && settings.uiDensity == UiDensity.COMPACT -> 18.dp
-        metrics.isCompact -> 24.dp
-        metrics.isMedium -> 30.dp
-        settings.uiDensity == UiDensity.COMFORTABLE -> 42.dp
-        else -> 36.dp
-    }
-
-    fun persistLinks() = QuickLinkStore.save(prefs, quickLinks)
-
-    fun moveLink(from: Int, to: Int) {
-        if (from !in quickLinks.indices || to !in quickLinks.indices || from == to) return
-        val item = quickLinks.removeAt(from)
-        quickLinks.add(to, item)
-        persistLinks()
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        HomeWallpaper(settings)
-
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(privateHomeTint)
-                .padding(horizontal = horizontalPadding),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.height(topSpacing))
-
-            HomeBrandBlock(
-                isPrivate = isPrivate,
-                wallpaperActive = wallpaperActive
-            )
-
-            Spacer(modifier = Modifier.height(if (metrics.isNarrowPhone) 12.dp else 18.dp))
-
-            IlyroHomeOmnibox(
-                value = query,
-                onValueChange = { query = it },
-                searchEngine = searchEngine,
-                history = history,
-                isPrivate = isPrivate,
-                onSearchEngineChange = onSearchEngineChange,
-                onNavigate = { input ->
-                    if (input.isNotBlank()) {
-                        query = input
-                        onNavigate(input)
-                    }
-                },
-                modifier = Modifier
-                    .widthIn(max = if (settings.uiDensity == UiDensity.COMPACT) 700.dp else 760.dp)
-                    .fillMaxWidth()
-            )
-
-            if (isPrivate) {
-                Spacer(modifier = Modifier.height(9.dp))
-                PrivateHomeNotice()
-            }
-
-            if (settings.showQuickAccess) {
-                Spacer(
-                    modifier = Modifier.height(
-                        if (metrics.isNarrowPhone) 14.dp else metrics.sectionGap
-                    )
-                )
-                QuickAccessPanel(
-                    settings = settings,
-                    links = quickLinks,
-                    wallpaperActive = wallpaperActive,
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬ÕÁ…­…”½´¹¥±åÉ¼¹‰É½İÍ•È¹Õ¤()¥µÁ½ÉĞ…¹‘É½¥¹½¹Ñ•¹Ğ¹½¹Ñ•áĞ)¥µÁ½ÉĞ…¹‘É½¥¹É…Á¡¥Ì¹	¥Ñµ…À)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹…¹¥µ…Ñ•½±½ÉÍMÑ…Ñ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹½É”¹Ñİ••¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹	½É‘•ÉMÑÉ½­”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹%µ…”…Ì½µÁ½Í•%µ…”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹‰…­É½Õ¹)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹•ÍÑÕÉ•Ì¹‘•Ñ•ÑÉ…•ÍÑÕÉ•Í™Ñ•É1½¹AÉ•ÍÌ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹ÉÉ…¹•µ•¹Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹	½à)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹	½á]¥Ñ¡½¹ÍÑÉ…¥¹ÑÌ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹½±Õµ¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹I½Ü)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹MÁ…•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹™¥±±5…áM¥é”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹™¥±±5…á]¥‘Ñ )¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹¡•¥¡Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹Á…‘‘¥¹œ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹Í¥é”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹İ¥‘Ñ¡%¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…éä¹É¥¹É¥‘•±±Ì)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…éä¹É¥¹1…éåY•ÉÑ¥…±É¥)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…éä¹É¥¹¥Ñ•µÍ%¹‘•á•)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹Í¡…Á”¹¥É±•M¡…Á”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹Í¡…Á”¹I½Õ¹‘•‘½É¹•ÉM¡…Á”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹%½¹Ì)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹‘)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹±½Í”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹‘¥Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹Y¥Í¥‰¥±¥Ñå=™˜)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹±•ÉÑ¥…±½œ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹%½¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹%½¹	ÕÑÑ½¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹5…Ñ•É¥…±Q¡•µ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹=ÕÑ±¥¹•‘Q•áÑ¥•±)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹MÕÉ™…”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹Q•áĞ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹Q•áÑ	ÕÑÑ½¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹½µÁ½Í…‰±”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹1…Õ¹¡•‘™™•Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹•ÑY…±Õ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹µÕÑ…‰±•MÑ…Ñ•1¥ÍÑ=˜)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹µÕÑ…‰±•MÑ…Ñ•=˜)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹É•µ•µ‰•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹É•µ•µ‰•ÉUÁ‘…Ñ•‘MÑ…Ñ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹Í•ÑY…±Õ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹±¥¹µ•¹Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹5½‘¥™¥•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹•½µ•ÑÉä¹=™™Í•Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹É…Á¡¥Ì¹½±½È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹É…Á¡¥Ì¹M¡…‘½Ü)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹É…Á¡¥Ì¹…Í%µ…•	¥Ñµ…À)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹É…Á¡¥Ì¹É…Á¡¥Í1…å•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹É…Á¡¥Ì¹±Õµ¥¹…¹”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹¥¹ÁÕĞ¹Á½¥¹Ñ•È¹Á½¥¹Ñ•É%¹ÁÕĞ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹±…å½ÕĞ¹½¹Ñ•¹ÑM…±”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹±…å½ÕĞ¹½¹M¥é•¡…¹•)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Á±…Ñ™½É´¹1½…±½¹Ñ•áĞ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Ñ•áĞ¹™½¹Ğ¹½¹Ñ]•¥¡Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Ñ•áĞ¹ÍÑå±”¹Q•áÑ±¥¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Õ¹¥Ğ¹‘À)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Õ¹¥Ğ¹ÍÀ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹é%¹‘•à)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹½É½ÕÑ¥¹•M½Á”)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹•™•ÉÉ•)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹¥ÍÁ…Ñ¡•ÉÌ)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹MÕÁ•ÉÙ¥Í½É)½ˆ)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹…Íå¹Œ)¥µÁ½ÉĞ­½Ñ±¥¸¹µ…Ñ ¹…‰Ì((¼¨¨(€¨%1eI<Y¥ÍÕ…°€ĞÍÑ…ÉĞÁ…”¸(€¨(€¨!½µ”ÍÑ…åÌÑ¡”•áÁÉ•ÍÍ¥Ù”Á…ÉĞ½˜Ñ¡”‰É½İÍ•È°‰ÕĞ¥ÑÌÍÁ…¥¹œ…¹‘•¹Í¥Ñä¹½Ü(€¨™½±±½ÜÑ¡”Í…µ”½µÁ…Ğ€¼5•‘¥Õ´€¼áÁ…¹‘•µ½‘•°…ÌÑ¡”É•ÍĞ½˜Ñ¡”¥¹Ñ•É™…”¸(€¨¼)½µÁ½Í…‰±”)¥¹Ñ•É¹…°™Õ¸%±åÉ½!½µ•A…” (€€€Í•ÑÑ¥¹Ìè	É½İÍ•ÉM•ÑÑ¥¹Ì°(€€€Í•…É¡¹¥¹”èM•…É¡¹¥¹”°(€€€¡¥ÍÑ½Éäè1¥ÍĞñ!¥ÍÑ½Éå%Ñ•´ø°(€€€¥ÍAÉ¥Ù…Ñ”è	½½±•…¸°(€€€½¹M•…É¡¹¥¹•¡…¹”è€¡M•…É¡¹¥¹”¤€´øU¹¥Ğ°(€€€½¹9…Ù¥…Ñ”è€¡MÑÉ¥¹œ¤€´øU¹¥Ğ(¤ì(€€€Ù…°µ•ÑÉ¥Ì€ôÉ•µ•µ‰•É%±åÉ½1…å½ÕÑ5•ÑÉ¥Ì ¤(€€€Ù…°½¹Ñ•áĞ€ô1½…±½¹Ñ•áĞ¹ÕÉÉ•¹Ğ(€€€Ù…°ÁÉ•™Ì€ôÉ•µ•µ‰•Èì½¹Ñ•áĞ¹•ÑM¡…É•‘AÉ•™•É•¹•Ì ‰¥±åÉ½}‰É½İÍ•Èˆ°½¹Ñ•áĞ¹5=}AI%YQ¤ô(€€€Ù…°ÅÕ¥­1¥¹­Ì€ôÉ•µ•µ‰•Èì(€€€€€€€µÕÑ…‰±•MÑ…Ñ•1¥ÍÑ=˜ñEÕ¥­1¥¹¬ø ¤¹…ÁÁ±äì…‘‘±°¡EÕ¥­1¥¹­MÑ½É”¹É•ÍÑ½É”¡ÁÉ•™Ì¤¤ô(€€€ô(€€€Ù…ÈÅÕ•Éä‰äÉ•µ•µ‰•ÈìµÕÑ…‰±•MÑ…Ñ•=˜ ˆˆ¤ô(€€€Ù…È•‘¥Ñ5½‘”‰äÉ•µ•µ‰•ÈìµÕÑ…‰±•MÑ…Ñ•=˜¡™…±Í”¤ô(€€€Ù…ÈÍ¡½İ‘‘¥…±½œ‰äÉ•µ•µ‰•ÈìµÕÑ…‰±•MÑ…Ñ•=˜¡™…±Í”¤ô(€€€Ù…È•‘¥Ñ¥¹EÕ¥­1¥¹¬‰äÉ•µ•µ‰•ÈìµÕÑ…‰±•MÑ…Ñ•=˜ñEÕ¥­1¥¹¬üø¡¹Õ±°¤ô((€€€Ù…°‘…É­Q¡•µ”€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹‰…­É½Õ¹¹±Õµ¥¹…¹” ¤€ğ€À¸Õ˜(€€€Ù…°…Ñ¥Ù•	…­É½Õ¹€ô¥˜€¡‘…É­Q¡•µ”€˜˜Í•ÑÑ¥¹Ì¹ÕÍ•M•Á…É…Ñ•…É­	…­É½Õ¹¤ì(€€€€€€€Í•ÑÑ¥¹Ì¹‘…É­!½µ•	…­É½Õ¹(€€€ô•±Í”ì(€€€€€€€Í•ÑÑ¥¹Ì¹¡½µ•	…­É½Õ¹(€€€ô(ƒ]4ÒÚ$z{-®éÜj× wallpaperActive = wallpaperActive,
                     editMode = editMode,
                     onEditModeChange = { editMode = it },
                     onAdd = { showAddDialog = true },
@@ -310,178 +124,7 @@ private fun PrivateHomeNotice() {
                 imageVector = Icons.Rounded.VisibilityOff,
                 contentDescription = null,
                 modifier = Modifier.size(IlyroVisualTokens.SmallIconSize),
-                tint = Color(0xFF8B5CF6)
-            )
-            Text(
-                text = tr("History is not saved", "Ğ˜ÑÑ‚Ğ¾Ñ€Ğ¸Ñ Ğ½Ğµ ÑĞ¾Ñ…Ñ€Ğ°Ğ½ÑĞµÑ‚ÑÑ"),
-                modifier = Modifier.padding(start = 8.dp),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-    }
-}
-
-@Composable
-private fun QuickAccessPanel(
-    settings: BrowserSettings,
-    links: List<QuickLink>,
-    wallpaperActive: Boolean,
-    editMode: Boolean,
-    onEditModeChange: (Boolean) -> Unit,
-    onAdd: () -> Unit,
-    onOpen: (String) -> Unit,
-    onEdit: (QuickLink) -> Unit,
-    onRemove: (QuickLink) -> Unit,
-    onMove: (Int, Int) -> Unit
-) {
-    val metrics = rememberIlyroLayoutMetrics()
-    val dense = settings.uiDensity == UiDensity.COMPACT
-
-    Surface(
-        modifier = Modifier
-            .widthIn(max = if (dense) 900.dp else 1040.dp)
-            .fillMaxWidth(),
-        shape = RoundedCornerShape(if (dense) 22.dp else IlyroVisualTokens.LargeRadius),
-        color = MaterialTheme.colorScheme.surface.copy(
-            alpha = if (wallpaperActive) 0.84f else 0.92f
-        ),
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = IlyroVisualTokens.SubtleBorderAlpha)
-        ),
-        tonalElevation = 0.dp,
-        shadowElevation = if (wallpaperActive && !metrics.isCompact) 3.dp else 0.dp
-    ) {
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    horizontal = if (metrics.isNarrowPhone) 9.dp else if (dense) 11.dp else 14.dp,
-                    vertical = if (metrics.isNarrowPhone) 9.dp else if (dense) 10.dp else 13.dp
-                )
-        ) {
-            val baseColumns = when {
-                maxWidth < 360.dp -> 3
-                maxWidth < 520.dp -> 4
-                maxWidth < 700.dp -> 5
-                maxWidth < 900.dp -> 6
-                else -> 8
-            }
-            val columns = when (settings.shortcutSize) {
-                HomeShortcutSize.SMALL -> (baseColumns + 1).coerceAtMost(9)
-                HomeShortcutSize.STANDARD -> baseColumns
-                HomeShortcutSize.LARGE -> (baseColumns - 1).coerceAtLeast(if (maxWidth < 360.dp) 3 else 3)
-            }
-            val itemCount = links.size
-            val tileHeight = when (settings.shortcutSize) {
-                HomeShortcutSize.SMALL -> if (metrics.isNarrowPhone) 62 else if (dense) 66 else 72
-                HomeShortcutSize.STANDARD -> when {
-                    metrics.isNarrowPhone -> 72
-                    dense && columns >= 6 -> 78
-                    dense -> 82
-                    columns >= 6 -> 86
-                    else -> 92
-                }
-                HomeShortcutSize.LARGE -> if (metrics.isNarrowPhone) 86 else if (dense) 96 else 104
-            }
-
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = tr("Quick access", "Ğ‘Ñ‹ÑÑ‚Ñ€Ñ‹Ğ¹ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿"),
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-
-                    if (links.size < 12) {
-                        if (metrics.isNarrowPhone) {
-                            IconButton(onClick = onAdd) {
-                                Icon(
-                                    Icons.Rounded.Add,
-                                    contentDescription = tr("Add", "Ğ”Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ"),
-                                    modifier = Modifier.size(IlyroVisualTokens.IconSize)
-                                )
-                            }
-                        } else {
-                            TextButton(onClick = onAdd) {
-                                Icon(
-                                    Icons.Rounded.Add,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(IlyroVisualTokens.SmallIconSize)
-                                )
-                                Text(
-                                    tr("Add", "Ğ”Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ"),
-                                    modifier = Modifier.padding(start = 5.dp)
-                                )
-                            }
-                        }
-                    }
-
-                    if (editMode) {
-                        TextButton(onClick = { onEditModeChange(false) }) {
-                            Text(tr("Done", "Ğ“Ğ¾Ñ‚Ğ¾Ğ²Ğ¾"))
-                        }
-                    } else {
-                        IconButton(onClick = { onEditModeChange(true) }) {
-                            Icon(
-                                Icons.Rounded.Edit,
-                                contentDescription = tr("Edit quick access", "Ğ˜Ğ·Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ Ğ±Ñ‹ÑÑ‚Ñ€Ñ‹Ğ¹ Ğ´Ğ¾ÑÑ‚ÑƒĞ¿"),
-                                modifier = Modifier.size(IlyroVisualTokens.IconSize)
-                            )
-                        }
-                    }
-                }
-
-                if (itemCount > 0) {
-                    val gap = if (metrics.isNarrowPhone) 6 else 8
-                    val rows = (itemCount + columns - 1) / columns
-                    val gridHeight = (
-                        rows * tileHeight +
-                            (rows - 1).coerceAtLeast(0) * gap
-                        ).dp
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(columns),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(gridHeight),
-                        horizontalArrangement = Arrangement.spacedBy(gap.dp),
-                        verticalArrangement = Arrangement.spacedBy(gap.dp),
-                        userScrollEnabled = false
-                    ) {
-                        itemsIndexed(links, key = { _, link -> link.id }) { index, link ->
-                            QuickSiteCard(
-                                site = link,
-                                index = index,
-                                count = links.size,
-                                columns = columns,
-                                editMode = editMode,
-                                shortcutSize = settings.shortcutSize,
-                                showLabel = settings.showShortcutLabels,
-                                narrow = metrics.isNarrowPhone,
-                                gridGapDp = gap,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(tileHeight.dp),
-                                onClick = { onOpen(link.url) },
-                                onEdit = { onEdit(link) },
-                                onRemove = { onRemove(link) },
-                                onMove = { target -> onMove(index, target) }
-                            )
-                        }
-
-                    }
-                }
-
-                if (editMode && !metrics.isNarrowPhone) {
-                    Text(
-                        text = tr(
-                            "Long-press and drag a shortcut to reorder it.",
+                tintYªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Ô€ô½±½È ÁááÕØ¤(€€€€€€€€€€€€¤(€€€€€€€€€€€Q•áĞ (€€€€€€€€€€€€€€€Ñ•áĞ€ôÑÈ ‰!¥ÍÑ½Éä¥Ì¹½ĞÍ…Ù•ˆ°€‹BcFFBûFBãF<ƒB÷BÔƒFBûFFBÃB÷F?B×FFF<ˆ¤°(€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Á…‘‘¥¹œ¡ÍÑ…ÉĞ€ô€à¹‘À¤°(€€€€€€€€€€€€€€€ÍÑå±”€ô5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹±…‰•±1…É”°(€€€€€€€€€€€€€€€™½¹Ñ]•¥¡Ğ€ô½¹Ñ]•¥¡Ğ¹M•µ¥	½±(€€€€€€€€€€€€¤(€€€€€€€ô(€€€ô)ô()½µÁ½Í…‰±”)ÁÉ¥Ù…Ñ”™Õ¸EÕ¥­•ÍÍA…¹•° (€€€Í•ÑÑ¥¹Ìè	É½İÍ•ÉM•ÑÑ¥¹Ì°(€€€±¥¹­Ìè1¥ÍĞñEÕ¥­1¥¹¬ø°(€€€İ…±±Á…Á•ÉÑ¥Ù”è	½½±•…¸°(€€€•‘¥Ñ5½‘”è	½½±•…¸°(€€€½¹‘¥Ñ5½‘•¡…¹”è€¡	½½±•…¸¤€´øU¹¥Ğ°(€€€½¹‘è€ ¤€´øU¹¥Ğ°(€€€½¹=Á•¸è€¡MÑÉ¥¹œ¤€´øU¹¥Ğ°(€€€½¹‘¥Ğè€¡EÕ¥­1¥¹¬¤€´øU¹¥Ğ°(€€€½¹I•µ½Ù”è€¡EÕ¥­1¥¹¬¤€´øU¹¥Ğ°(€€€½¹5½Ù”è€¡%¹Ğ°%¹Ğ¤€´øU¹¥Ğ(¤ì(€€€Ù…°µ•ÑÉ¥Ì€ôÉ•µ•µ‰•É%±åÉ½1…å½ÕÑ5•ÑÉ¥Ì ¤(€€€Ù…°‘•¹Í”€ôÍ•ÑÑ¥¹Ì¹Õ¥•¹Í¥Ñä€ôôU¥•¹Í¥Ñä¹=5AP((€€€MÕÉ™…” (€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€¹İ¥‘Ñ¡%¸¡µ…à€ô¥˜€¡‘•¹Í”¤€äÀÀ¹‘À•±Í”€ÄÀĞÀ¹‘À¤(€€€€€€€€€€€€¹™¥±±5…á]¥‘Ñ  ¤°(€€€€€€€Í¡…Á”€ôI½Õ¹‘•‘½É¹•ÉM¡…Á”¡¥˜€¡‘•¹Í”¤€ÈÈ¹‘À•±Í”%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹1…É•I…‘¥ÕÌ¤°(€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÍÕÉ™…”¹½Áä (€€€€€€€€€€€…±Á¡„€ô¥˜€¡İ…±±Á…Á•ÉÑ¥Ù”¤€À¸àÑ˜•±Í”€À¸äÉ˜(€€€€€€€€¤°(€€€€€€€‰½É‘•È€ô	½É‘•ÉMÑÉ½­” (€€€€€€€€€€€€Ä¹‘À°(€€€€€€€€€€€5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½ÕÑ±¥¹•Y…É¥…¹Ğ¹½Áä¡…±Á¡„€ô%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹MÕ‰Ñ±•	½É‘•É±Á¡„¤(€€€€€€€€¤°(€€€€€€€Ñ½¹…±±•Ù…Ñ¥½¸€ô€À¹‘À°(€€€€€€€Í¡…‘½İ±•Ù…Ñ¥½¸€ô¥˜€¡İ…±±Á…Á•ÉÑ¥Ù”€˜˜€…µ•ÑÉ¥Ì¹¥Í½µÁ…Ğ¤€Ì¹‘À•±Í”€À¹‘À(€€€€¤ì(€€€€€€€	½á]¥Ñ¡½¹ÍÑÉ…¥¹ÑÌ (€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€¹™¥±±5…á]¥‘Ñ  ¤(€€€€€€€€€€€€€€€€¹Á…‘‘¥¹œ (€€€€€€€€€€€€€€€€€€€¡½É¥é½¹Ñ…°€ô¥˜€¡µ•ÑÉ¥Ì¹¥Í9…ÉÉ½İA¡½¹”¤€ä¹‘À•±Í”¥˜€¡‘•¹Í”¤€ÄÄ¹‘À•±Í”€ÄĞ¹‘À°(€€€€€€€€€€€€€€€€€€€Ù•ÉÑ¥…°€ô¥˜€¡µ•ÑÉ¥Ì¹¥Í9…ÉÉ½İA¡½¹”¤€ä¹‘À•±Í”¥˜€¡‘•¹Í”¤€ÄÀ¹‘À•±Í”€ÄÌ¹‘À(€€€€€€€€€€€€€€€€¤(€€€€€€€€¤ì(€€€€€€€€€€€Ù…°‰…Í•½±Õµ¹Ì€ôİ¡•¸ì(€€€€€€€€€€€€€€€µ…á]¥‘Ñ €ğ€ÌØÀ¹‘À€´ø€Ì(€€€€€€€€€€€€€€€µ…á]¥‘Ñ €ğ€ÔÈÀ¹‘À€´ø€Ğ(€€€€€€€€€€€€€€€µ…á]¥‘Ñ €ğ€ÜÀÀ¹‘À€´ø€Ô(€€€€€€€€€€€€€€€µ…á]¥‘Ñ €ğ€äÀÀ¹‘À€´ø€Ø(€€€€€€€€€€€€€€€•±Í”€´ø€à(€€€€€€€€€€€ô(€€€€€€€€€€€Ù…°½±Õµ¹Ì€ôİ¡•¸€¡Í•ÑÑ¥¹Ì¹Í¡½ÉÑÕÑM¥é”¤ì(€€€€€€€€€€€€€€€!½µ•M¡½ÉÑÕÑM¥é”¹M510€´ø€¡‰…Í•½±Õµ¹Ì€¬€Ä¤¹½•É•Ñ5½ÍĞ ä¤(€€€€€€€€€€€€€€€!½µ•M¡½ÉÑÕÑM¥é”¹MQ9I€´ø‰…Í•½±Õµ¹Ì(€€€€€€€€€€€€€€€!½µ•M¡½ÉÑÕÑM¥é”¹1I€´ø€¡‰…Í•½±Õµ¹Ì€´€Ä¤¹½•É•Ñ1•…ÍĞ¡¥˜€¡µ…á]¥‘Ñ €ğ€ÌØÀ¹‘À¤€Ì•±Í”€Ì¤(€€€€€€€€€€€ô(€€€€€€€€€€€Ù…°¥Ñ•µ½Õ¹Ğ€ô±¥¹­Ì¹Í¥é”(€€€€€€€€€€€Ù…°Ñ¥±•!•¥¡Ğ€ôİ¡•¸€¡Í•ÑÑ¥¹Ì¹Í¡½ÉÑÕÑM¥é”¤ì(€€€€€€€€€€€€€€€!½µ•M¡½ÉÑÕÑM¥é”¹M510€´ø¥˜€¡µ•ÑÉ¥Ì¹¥Í9…ÉÉ½İA¡½¹”¤€ØÈ•±Í”¥˜€¡‘•¹Í”¤€ØØ•±Í”€ÜÈ(€€€€€€€€€€€€€€€!½µ•M¡½ÉÑÕÑM¥é”¹MQ9I€´øİ¡•¸ì(€€€€€€€€€€€€€€€€€€€µ•ÑÉ¥Ì¹¥Í9…ÉÉ½İA¡½¹”€´ø€ÜÈ(€€€€€€€€€€€€€€€€€€€‘•¹Í”€˜˜½±Õµ¹Ì€øô€Ø€´ø€Üà(€€€€€€€€€€€€€€€€€€€‘•¹Í”€´ø€àÈ(€€€€€€€€€€€€€€€€€€€½±Õµ¹Ì€øô€Ø€´ø€àØ(€€€€€€€€€€€€€€€€€€€•±Í”€´ø€äÈ(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€!½µ•M¡½ÉÑÕÑM¥é”¹1I€´ø¥˜€¡µ•ÑÉ¥Ì¹¥Í9…ÉÉ½İA¡½¹”¤€àØ•±Í”¥˜€¡‘•¹Í”¤€äØ•±Í”€ÄÀĞ(€€€€€€€€€€€ô((€€€€€€€€€€€½±Õµ¸¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹™¥±±5…á]¥‘Ñ  ¤¤ì(€€€€€€€€€€€€€€€I½Ü (€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹™¥±±5…á]¥‘Ñ  ¤°(€€€€€€€€€€€€€€€€€€€Ù•ÉÑ¥…±±¥¹µ•¹Ğ€ô±¥¹µ•¹Ğ¹•¹Ñ•ÉY•ÉÑ¥…±±ä(€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€Q•áĞ (€€€€€€€€€€€€€€€€€€€€€€€Ñ•áĞ€ôÑÈ ‰EÕ¥¬…•ÍÌˆ°€‹BGF/FFFF/BäƒBÓBûFFFBüˆ¤°(€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹İ•¥¡Ğ Å˜¤°(€€€€€€€€€€€€€€€€€€€€€€€ÍÑå±”€ô5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹Ñ¥Ñ±•5•‘¥Õ´°(€€€€€€€€€€€€€€€€€€€€€€€™½¹Ñ]•¥¡Ğ€ô½¹Ñ]•¥¡Ğ¹	½±°(€€€€€€€€€€€€€€€€€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½¹MÕÉ™…”(€€€€€€€€€€€€€€€€€€€€¤((€€€€€€€€€€€€€€€€€€€¥˜€¡±¥¹­Ì¹Í¥é”€ğ€ÄÈ¤ì(€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡µ•ÑÉ¥Ì¹¥Í9…ÉÉ½İA¡½¹”¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€%½¹	ÕÑÑ½¸¡½¹±¥¬€ô½¹‘¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€%½¸ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€%½¹Ì¹I½Õ¹‘•¹‘°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹Ñ•¹Ñ•ÍÉ¥ÁÑ¥½¸€ôÑÈ ‰‘ˆ°€‹BSBûBÇBÃBËBãFF0ˆ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Í¥é”¡%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹%½¹M¥é”¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€Q•áÑ	ÕÑÑ½¸¡½¹±¥¬€ô½¹‘¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€%½¸ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€%½¹Ì¹I½Õ¹‘•¹‘°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹Ñ•¹Ñ•ÍÉ¥ÁÑ¥½¸€ô¹Õ±°°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Í¥é”¡%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹Mµ…±±%½¹M¥é”¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Q•áĞ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑÈ ‰‘ˆ°€‹BSBûBÇBÃBËBãFF0ˆ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€ƒ]4ÒÚ$z{-®éÜj×shortcut to reorder it.",
                             "Ğ—Ğ°Ğ¶Ğ¼Ğ¸Ñ‚Ğµ ÑÑ€Ğ»Ñ‹Ğº Ğ¸ Ğ¿ĞµÑ€ĞµÑ‚Ğ°Ñ‰Ğ¸Ñ‚Ğµ ĞµĞ³Ğ¾, Ñ‡Ñ‚Ğ¾Ğ±Ñ‹ Ğ¸Ğ·Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ Ğ¿Ğ¾Ñ€ÑĞ´Ğ¾Ğº."
                         ),
                         modifier = Modifier.padding(top = 8.dp),
@@ -597,253 +240,5 @@ private fun QuickSiteCard(
             Color.Transparent
         },
         tonalElevation = 0.dp,
-        shadowElevation = if (dragging) 5.dp else 0.dp
-    ) {
-        Box {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 5.dp, vertical = if (narrow) 5.dp else 7.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Box(
-                    modifier = Modifier.size(iconSize),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Surface(
-                        modifier = Modifier.fillMaxSize(),
-                        shape = RoundedCornerShape(IlyroVisualTokens.SmallRadius),
-                        color = MaterialTheme.colorScheme.surface,
-                        border = BorderStroke(
-                            1.dp,
-                            MaterialTheme.colorScheme.outlineVariant.copy(
-                                alpha = IlyroVisualTokens.SubtleBorderAlpha
-                            )
-                        ),
-                        tonalElevation = 0.dp,
-                        shadowElevation = 0.dp
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            QuickSiteIcon(site)
-                        }
-                    }
-
-                    if (editMode) {
-                        Surface(
-                            onClick = onEdit,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .size(if (narrow) 22.dp else 24.dp),
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            border = BorderStroke(
-                                1.dp,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-                            ),
-                            tonalElevation = 0.dp,
-                            shadowElevation = 1.dp
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Rounded.Edit,
-                                    contentDescription = tr("Edit quick link", "Ğ˜Ğ·Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ Ğ±Ñ‹ÑÑ‚Ñ€Ñ‹Ğ¹ ÑĞ°Ğ¹Ñ‚"),
-                                    modifier = Modifier.size(12.dp),
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                        }
-                    }
-                }
-                if (showLabel) {
-                    Spacer(modifier = Modifier.height(if (narrow) 4.dp else 6.dp))
-                    Text(
-                        text = site.label,
-                        maxLines = 1,
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-
-            if (editMode) {
-                Surface(
-                    onClick = onRemove,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(1.dp)
-                        .size(if (narrow) 30.dp else 34.dp),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-                    border = BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.outlineVariant.copy(
-                            alpha = IlyroVisualTokens.SubtleBorderAlpha
-                        )
-                    ),
-                    tonalElevation = 0.dp,
-                    shadowElevation = 1.dp
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Rounded.Close,
-                            contentDescription = tr("Remove quick link", "Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ğ±Ñ‹ÑÑ‚Ñ€Ñ‹Ğ¹ ÑĞ°Ğ¹Ñ‚"),
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AddQuickLinkCard(modifier: Modifier, onClick: () -> Unit) {
-    Surface(
-        onClick = onClick,
-        modifier = modifier,
-        shape = RoundedCornerShape(IlyroVisualTokens.ControlRadius),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.22f),
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = IlyroVisualTokens.SubtleBorderAlpha)
-        ),
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(26.dp))
-            Text(
-                tr("Add", "Ğ”Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ"),
-                modifier = Modifier.padding(top = 4.dp),
-                style = MaterialTheme.typography.bodySmall,
-                fontWeight = FontWeight.Medium
-            )
-        }
-    }
-}
-
-@Composable
-private fun QuickLinkEditorDialog(
-    title: String,
-    confirmLabel: String,
-    initialLabel: String = "",
-    initialUrl: String = "",
-    onDismiss: () -> Unit,
-    onSave: (String, String) -> Unit
-) {
-    var label by remember(initialLabel, initialUrl) { mutableStateOf(initialLabel) }
-    var url by remember(initialLabel, initialUrl) { mutableStateOf(initialUrl) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(title) },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = label,
-                    onValueChange = { label = it },
-                    singleLine = true,
-                    shape = RoundedCornerShape(IlyroVisualTokens.ControlRadius),
-                    label = { Text(tr("Name", "ĞĞ°Ğ·Ğ²Ğ°Ğ½Ğ¸Ğµ")) }
-                )
-                OutlinedTextField(
-                    value = url,
-                    onValueChange = { url = it },
-                    modifier = Modifier.padding(top = 10.dp),
-                    singleLine = true,
-                    shape = RoundedCornerShape(IlyroVisualTokens.ControlRadius),
-                    label = { Text(tr("Website", "Ğ¡Ğ°Ğ¹Ñ‚")) },
-                    placeholder = { Text("example.com") }
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onSave(label, url) },
-                enabled = label.isNotBlank() && url.isNotBlank()
-            ) {
-                Text(confirmLabel)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(tr("Cancel", "ĞÑ‚Ğ¼ĞµĞ½Ğ°"))
-            }
-        }
-    )
-}
-
-@Composable
-private fun QuickSiteIcon(site: QuickLink) {
-    var bitmap by remember(site.url) { mutableStateOf(QuickSiteIconCache.peek(site.url)) }
-
-    LaunchedEffect(site.url) {
-        if (bitmap == null) bitmap = QuickSiteIconCache.loadOnce(site.url)
-    }
-
-    if (bitmap != null) {
-        ComposeImage(
-            bitmap = bitmap!!.asImageBitmap(),
-            contentDescription = site.label,
-            modifier = Modifier.size(30.dp),
-            contentScale = ContentScale.Fit
-        )
-    } else {
-        Text(
-            text = site.label.take(2).uppercase(),
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
-        )
-    }
-}
-
-private object QuickSiteIconCache {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val bitmaps = mutableMapOf<String, Bitmap>()
-    private val attempted = mutableSetOf<String>()
-    private val inFlight = mutableMapOf<String, Deferred<Bitmap?>>()
-
-    @Synchronized
-    fun peek(url: String): Bitmap? = bitmaps[url]
-        ?: BrowserIconCache.peek(url)?.also { bitmaps[url] = it }
-
-    suspend fun loadOnce(url: String): Bitmap? {
-        val job = synchronized(this) {
-            bitmaps[url]?.let { return it }
-            BrowserIconCache.peek(url)?.let {
-                bitmaps[url] = it
-                return it
-            }
-            inFlight[url]?.let { return@synchronized it }
-            if (url in attempted) return null
-
-            attempted.add(url)
-            scope.async {
-                val loaded = BrowserIconCache.loadOnce(url)
-                synchronized(this@QuickSiteIconCache) {
-                    if (loaded != null) bitmaps[url] = loaded
-                    inFlight.remove(url)
-                }
-                loaded
-            }.also { inFlight[url] = it }
-        }
-        return job.await()
-    }
-}
-
-private fun normalizeQuickLinkUrl(raw: String): String {
-    val value = raw.trim()
-    if (value.isBlank()) return ""
-    return if (value.startsWith("http://", true) || value.startsWith("https://", true)) {
-        value
-    } else {
-        "https://$value"
-    }
-}
+   YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíßN÷N‹Z–‹­¦ëeŠw¬Ô€€€€Í¡…‘½İ±•Ù…Ñ¥½¸€ô¥˜€¡‘É…¥¹œ¤€Ô¹‘À•±Í”€À¹‘À(€€€€¤ì(€€€€€€€	½àì(€€€€€€€€€€€½±Õµ¸ (€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€¹™¥±±5…áM¥é” ¤(€€€€€€€€€€€€€€€€€€€€¹Á…‘‘¥¹œ¡¡½É¥é½¹Ñ…°€ô€Ô¹‘À°Ù•ÉÑ¥…°€ô¥˜€¡¹…ÉÉ½Ü¤€Ô¹‘À•±Í”€Ü¹‘À¤°(€€€€€€€€€€€€€€€¡½É¥é½¹Ñ…±±¥¹µ•¹Ğ€ô±¥¹µ•¹Ğ¹•¹Ñ•É!½É¥é½¹Ñ…±±ä°(€€€€€€€€€€€€€€€Ù•ÉÑ¥…±ÉÉ…¹•µ•¹Ğ€ôÉÉ…¹•µ•¹Ğ¹•¹Ñ•È(€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€	½à (€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Í¥é”¡¥½¹M¥é”¤°(€€€€€€€€€€€€€€€€€€€½¹Ñ•¹Ñ±¥¹µ•¹Ğ€ô±¥¹µ•¹Ğ¹•¹Ñ•È(€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€MÕÉ™…” (€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹™¥±±5…áM¥é” ¤°(€€€€€€€€€€€€€€€€€€€€€€€Í¡…Á”€ôI½Õ¹‘•‘½É¹•ÉM¡…Á”¡%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹Mµ…±±I…‘¥ÕÌ¤°(€€€€€€€€€€€€€€€€€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÍÕÉ™…”°(€€€€€€€€€€€€€€€€€€€€€€€‰½É‘•È€ô	½É‘•ÉMÑÉ½­” (€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ä¹‘À°(€€€€€€€€€€€€€€€€€€€€€€€€€€€5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½ÕÑ±¥¹•Y…É¥…¹Ğ¹½Áä (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€…±Á¡„€ô%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹MÕ‰Ñ±•	½É‘•É±Á¡„(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€€€€€€€Ñ½¹…±±•Ù…Ñ¥½¸€ô€À¹‘À°(€€€€€€€€€€€€€€€€€€€€€€€Í¡…‘½İ±•Ù…Ñ¥½¸€ô€À¹‘À(€€€€€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€€€€€	½à¡½¹Ñ•¹Ñ±¥¹µ•¹Ğ€ô±¥¹µ•¹Ğ¹•¹Ñ•È¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€EÕ¥­M¥Ñ•%½¸¡Í¥Ñ”¤(€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€ô((€€€€€€€€€€€€€€€€€€€¥˜€¡•‘¥Ñ5½‘”¤ì(€€€€€€€€€€€€€€€€€€€€€€€MÕÉ™…” (€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹±¥¬€ô½¹‘¥Ğ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹…±¥¸¡±¥¹µ•¹Ğ¹	½ÑÑ½µ¹¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹Í¥é”¡¥˜€¡¹…ÉÉ½Ü¤€ÈÈ¹‘À•±Í”€ÈĞ¹‘À¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¡…Á”€ô¥É±•M¡…Á”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÁÉ¥µ…Éå½¹Ñ…¥¹•È°(€€€€€€€€€€€€€€€€€€€€€€€€€€€‰½É‘•È€ô	½É‘•ÉMÑÉ½­” (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ä¹‘À°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÁÉ¥µ…Éä¹½Áä¡…±Á¡„€ô€À¸ÈÉ˜¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ½¹…±±•Ù…Ñ¥½¸€ô€À¹‘À°(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¡…‘½İ±•Ù…Ñ¥½¸€ô€Ä¹‘À(€€€€€€€€€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€	½à¡½¹Ñ•¹Ñ±¥¹µ•¹Ğ€ô±¥¹µ•¹Ğ¹•¹Ñ•È¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€%½¸ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€%½¹Ì¹I½Õ¹‘•¹‘¥Ğ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹Ñ•¹Ñ•ÍÉ¥ÁÑ¥½¸€ôÑÈ ‰‘¥ĞÅÕ¥¬±¥¹¬ˆ°€‹BcBßBóB×B÷BãFF0ƒBÇF/FFFF/BäƒFBÃBçFˆ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Í¥é” ÄÈ¹‘À¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ¥¹Ğ€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½¹AÉ¥µ…Éå½¹Ñ…¥¹•È(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€¥˜€¡Í¡½İ1…‰•°¤ì(€€€€€€€€€€€€€€€€€€€MÁ…•È¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹¡•¥¡Ğ¡¥˜€¡¹…ÉÉ½Ü¤€Ğ¹‘À•±Í”€Ø¹‘À¤¤(€€€€€€€€€€€€€€€€€€€Q•áĞ (€€€€€€€€€€€€€€€€€€€€€€€Ñ•áĞ€ôÍ¥Ñ”¹±…‰•°°(€€€€€€€€€€€€€€€€€€€€€€€µ…á1¥¹•Ì€ô€Ä°(€€€€€€€€€€€€€€€€€€€€€€€Ñ•áÑ±¥¸€ôQ•áÑ±¥¸¹•¹Ñ•È°(€€€€€€€€€€€€€€€€€€€€€€€ÍÑå±”€ô5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹‰½‘åMµ…±°°(€€€€€€€€€€€€€€€€€€€€€€€™½¹Ñ]•¥¡Ğ€ô½¹Ñ]•¥¡Ğ¹5•‘¥Õ´(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô((€€€€€€€€€€€¥˜€¡•‘¥Ñ5½‘”¤ì(€€€€€€€€€€€€€€€MÕÉ™…” (€€€€€€€€€€€€€€€€€€€½¹±¥¬€ô½¹I•µ½Ù”°(€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€€€€€¹…±¥¸¡±¥¹µ•¹Ğ¹Q½Á¹¤(€€€€€€€€€€€€€€€€€€€€€€€€¹Á…‘‘¥¹œ Ä¹‘À¤(€€€€€€€€€€€€€€€€€€€€€€€€¹Í¥é”¡¥˜€¡¹…ÉÉ½Ü¤€ÌÀ¹‘À•±Í”€ÌĞ¹‘À¤°(€€€€€€€€€€€€€€€€€€€Í¡…Á”€ô¥É±•M¡…Á”°(€€€€€€€€€€€€€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÍÕÉ™…”¹½Áä¡…±Á¡„€ô€À¸äÑ˜¤°(€€€€€€€€€€€€€€€€€€€‰½É‘•È€ô	½É‘•ÉMÑÉ½­” (€€€€€€€€€€€€€€€€€€€€€€€€Ä¹‘À°(€€€€€€€€€€€€€€€€€€€€€€€5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½ÕÑ±¥¹•Y…É¥…¹Ğ¹½Áä (€€€€€€€€€€€€€€€€€€€€€€€€€€€…±Á¡„€ô%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹MÕ‰Ñ±•	½É‘•É±Á¡„(€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€€€Ñ½¹…±±•Ù…Ñ¥½¸€ô€À¹‘À°(€€€€€€€€€€€€€€€€€€€Í¡…‘½İ±•Ù…Ñ¥½¸€ô€Ä¹‘À(€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€	½à¡½¹Ñ•¹Ñ±¥¹µ•¹Ğ€ô±¥¹µ•¹Ğ¹•¹Ñ•È¤ì(€€€€€€€€€€€€€€€€€€€€€€€%½¸ (€€€€€€€€€€€€€€€€€€€€€€€€€€€%½¹Ì¹I½Õ¹‘•¹±½Í”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹Ñ•¹Ñ•ÍÉ¥ÁÑ¥½¸€ôÑÈ ‰I•µ½Ù”ÅÕ¥¬±¥¹¬ˆ°€‹BBÓBÃBïBãFF0ƒBÇF/FFFF/BäƒFBÃBçFˆ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Í¥é” ÄØ¹‘À¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ¥¹Ğ€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½¹MÕÉ™…”(€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô(€€€€€€€ô(€€€ô)ô()½µÁ½Í…‰±”)ÁÉ¥Ù…Ñ”™Õ¸‘‘EÕ¥­1¥¹­…É¡µ½‘¥™¥•Èè5½‘¥™¥•È°½¹±¥¬è€ ¤€´øU¹¥Ğ¤ì(€€€M×½í¢G§²ÚîÆ­yÖ÷&FW"Ò&÷&FW%7G&ö¶R€¢æGÀ¢ÖFW&–ÅF†VÖRæ6öÆ÷%66†VÖRæ÷WFÆ–æUf&–çBæ6÷’†Ç†Ò–Ç—&õf—7VÅFö¶Vç2å7V'FÆT&÷&FW$Ç†¢’À¢FöæÄVÆWfF–öâÒæGÀ¢6†F÷tVÆWfF–öâÒæG ¢’°¢6öÇVÖâ€¢ÖöF–f–W"ÒÖöF–f–W"æf–ÆÄÖ…6—¦R‚’À¢†÷&—¦öçFÄÆ–væÖVçBÒÆ–væÖVçBä6VçFW$†÷&—¦öçFÆÇ’À¢fW'F–6Ä'&ævVÖVçBÒ'&ævVÖVçBä6VçFW ¢’°¢–6öâ„–6öç2å&÷VæFVBäFBÂ6öçFVçDFW67&—F–öâÒçVÆÂÂÖöF–f–W"ÒÖöF–f–W"ç6—¦Rƒ#bæG’¢FW‡B€¢G"‚$FB"Â-	Mí--Â"’À¢ÖöF–f–W"ÒÖöF–f–W"çFF–ær‡F÷ÒBæG’À¢7G–ÆRÒÖFW&–ÅF†VÖRçG—öw&‡’æ&öG•6ÖÆÂÀ¢föçEvV–v‡BÒföçEvV–v‡BäÖVF—VĞ¢¢Ğ¢Ğ§Ğ ¤6ö×÷6&ÆP§&—fFRgVâV–6´Æ–æ´VF—F÷$F–Æör€¢F—FÆS¢7G&–ærÀ¢6öæf—&ÔÆ&VÃ¢7G&–ærÀ¢–æ—F–ÄÆ&VÃ¢7G&–ærÒ""À¢–æ—F–ÅW&Ã¢7G&–ærÒ""À¢öäF—6Ö—73¢‚’ÓâVæ—BÀ¢öå6fS¢…7G&–ærÂ7G&–ær’ÓâVæ—@¢’°¢f"Æ&VÂ'’&VÖVÖ&W"†–æ—F–ÄÆ&VÂÂ–æ—F–ÅW&Â’²×WF&ÆU7FFTöb†–æ—F–ÄÆ&VÂ’Ğ¢f"W&Â'’&VÖVÖ&W"†–æ—F–ÄÆ&VÂÂ–æ—F–ÅW&Â’²×WF&ÆU7FFTöb†–æ—F–ÅW&Â’Ğ ¢ÆW'DF–Æör€¢öäF—6Ö—75&WVW7BÒöäF—6Ö—72À¢F—FÆRÒ²FW‡B‡F—FÆR’ÒÀ¢FW‡BÒ°¢6öÇVÖâ°¢÷WFÆ–æVEFW‡Df–VÆB€¢fÇVRÒÆ&VÂÀ¢öåfÇVT6†ævRÒ²Æ&VÂÒ—BÒÀ¢6–ævÆTÆ–æRÒG'VRÀ¢6†RÒ&÷VæFVD6÷&æW%6†R„–Ç—&õf—7VÅFö¶Vç2ä6öçG&öÅ&F—W2’À¢Æ&VÂÒ²FW‡B‡G"‚$æÖR"Â-	İ}-İR"’’Ğ¢¢÷WFÆ–æVEFW‡Df–VÆB€¢fÇVRÒW&ÂÀ¢öåfÇVT6†ævRÒ²W&ÂÒ—BÒÀ¢ÖöF–f–W"ÒÖöF–f–W"çFF–ær‡F÷ÒæG’À¢6–ævÆTÆ–æRÒG'VRÀ¢6†RÒ&÷VæFVD6÷&æW%6†R„–Ç—&õf—7VÅFö¶Vç2ä6öçG&öÅ&F—W2’À¢Æ&VÂÒ²FW‡B‡G"‚%vV'6—FR"Â-
+""’’ÒÀ¢Æ6V†öÆFW"Ò²FW‡B‚&W†×ÆRæ6öÒ"’Ğ¢¢Ğ¢ÒÀ¢6öæf—&Ô'WGFöâÒ°¢FW‡D'WGFöâ€¢öä6Æ–6²Ò²öå6fR†Æ&VÂÂW&Â’ÒÀ¢Væ&ÆVBÒÆ&VÂæ—4æ÷D&Ææ²‚’bbW&Âæ—4æ÷D&Ææ²‚¢’°¢FW‡B†6öæf—&ÔÆ&VÂ¢Ğ¢ÒÀ¢F—6Ö—74'WGFöâÒ°¢FW‡D'WGFöâ†öä6Æ–6²ÒöäF—6Ö—72’°¢FW‡B‡G"‚$6æ6VÂ"Â-	í-Í]İ"’¢Ğ¢Ğ¢§Ğ ¤6ö×÷6&ÆP§&—fFRgVâV–6µ6—FT–6öâ‡6—FS¢V–6´Æ–æ²’°¢f"&—FÖ'’&VÖVÖ&W"‡6—FRçW&Â’²×WF&ÆU7FFTöb…V–6µ6—FT–6öä66†RçVV²‡6—FRçW&Â’’Ğ ¢ÆVæ6†VDVffV7B‡6—FRçW&Â’°¢–b†&—FÖÓÒçVÆÂ’&—FÖÒV–6µ6—FT–6öä66†RæÆöDöæ6R‡6—FRçW&Â¢Ğ ¢–b†&—FÖÒçVÆÂ’°¢6ö×÷6T–ÖvR€¢&—FÖÒ&—FÖæ4–ÖvT&—FÖ‚’À¢6öçFVçDFW67&—F–öâÒ6—FRæÆ&VÂÀ¢ÖöF–f–W"ÒÖöF–f–W"ç6—¦Rƒ3æG’À¢6öçFVçE66ÆRÒ6öçFVçE66ÆRäf—@¢¢ÒVÇ6R°¢FW‡B€¢FW‡BÒ6—FRæÆ&VÂçF¶Rƒ"’çWW&66R‚’À¢föçEvV–v‡BÒföçEvV–v‡Bä&öÆBÀ¢6öÆ÷"ÒÖFW&–ÅF†VÖRæ6öÆ÷%66†VÖRæöå7W&f6P¢¢Ğ§Ğ §&—fFRö&¦V7BV–6µ6—FT–6öä66†R°¢&—fFRfÂ66÷RÒ6÷&÷WF–æU66÷R…7WW'f—6÷$¦ö"‚’²F—7F6†W'2ä”ò¢&—fFRfÂ&—FÖ2Ò×WF&ÆTÖöcÅ7G&–ærÂ&—FÖâ‚¢&—fFRfÂ–äfÆ–v‡BÒ×WF&ÆTÖöcÅ7G&–ærÂFVfW'&VCÄ&—FÖóãâ‚ ¢7–æ6‡&öæ—¦V@¢gVâVV²‡W&Ã¢7G&–ær“¢&—FÖòÒ&—FÖ5·W&ÅĞ¢ó¢'&÷w6W$–6öä66†RçVV²‡W&Â“òæÇ6ò²&—FÖ5·W&ÅÒÒ—BĞ ¢7W7VæBgVâÆöDöæ6R‡W&Ã¢7G&–ær“¢&—FÖò°¢fÂ¦ö"Ò7–æ6‡&öæ—¦VB‡F†—2’°¢&—FÖ5·W&ÅÓòæÆWB²&WGW&â—BĞ¢'&÷w6W$–6öä66†RçVV²‡W&Â“òæÆWB°¢&—FÖ5·W&ÅÒÒ—@¢&WGW&â—@¢Ğ¢–äfÆ–v‡E·W&ÅÓòæÆWB²&WGW&ä7–æ6‡&öæ—¦VB—BĞ¢66÷Ræ7–æ2°¢fÂÆöFVBÒ'&÷w6W$–6öä66†RæÆöDöæ6R‡W&Â¢7–æ6‡&öæ—¦VB‡F†—4V–6µ6—FT–6öä66†R’°¢–b†ÆöFVBÒçVÆÂ’&—FÖ5·W&ÅÒÒÆöFV@¢–äfÆ–v‡Bç&VÖ÷fR‡W&Â¢Ğ¢ÆöFV@¢ÒæÇ6ò²–äfÆ–v‡E·W&ÅÒÒ—BĞ¢Ğ¢&WGW&â¦ö"æv—B‚¢Ğ§Ğ §&—fFRgVâæ÷&ÖÆ—¦UV–6´Æ–æµW&Â‡&s¢7G&–ær“¢7G&–ær°¢fÂfÇVRÒ&rçG&–Ò‚¢–b‡fÇVRæ—4&Ææ²‚’’&WGW&â" ¢&WGW&â–b‡fÇVRç7F'G5v—F‚‚&‡GG¢òò"ÂG'VR’ÇÂfÇVRç7F'G5v—F‚‚&‡GG3¢òò"ÂG'VR’’°¢fÇVP¢ÒVÇ6R°¢&‡GG3¢òòGfÇVR ¢Ğ§Ğ

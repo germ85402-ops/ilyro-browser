@@ -1,185 +1,4 @@
-package com.ilyro.browser.ui
-
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.app.Service
-import android.content.Context
-import android.content.Intent
-import android.content.pm.ServiceInfo
-import android.os.Build
-import android.os.Handler
-import android.os.IBinder
-import android.os.Looper
-import androidx.core.app.ServiceCompat
-import androidx.core.content.ContextCompat
-import com.ilyro.browser.ACTION_OPEN_DOWNLOADS
-import com.ilyro.browser.R
-import java.lang.ref.WeakReference
-import java.util.concurrent.ConcurrentHashMap
-
-class DownloadKeepAliveService : Service() {
-    private data class TrackedDownload(
-        val name: String,
-        val downloadedBytes: Long = 0L,
-        val totalBytes: Long = -1L,
-        val paused: Boolean = false
-    )
-
-    private val activeDownloads = linkedMapOf<Long, TrackedDownload>()
-    private val mainHandler = Handler(Looper.getMainLooper())
-
-    override fun onCreate() {
-        super.onCreate()
-        instanceRef = WeakReference(this)
-        ensureChannel(this)
-    }
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_PAUSE, ACTION_RESUME -> {
-                val id = intent.getLongExtra(EXTRA_ID, Long.MIN_VALUE)
-                if (id != Long.MIN_VALUE) {
-                    val pause = intent.action == ACTION_PAUSE
-                    val changed = controlHandler?.invoke(id, pause) == true
-                    if (changed) setPausedTracked(id, pause)
-                }
-                if (activeDownloads.isEmpty()) stopSelf(startId)
-                return START_NOT_STICKY
-            }
-            ACTION_CANCEL -> {
-                val id = intent.getLongExtra(EXTRA_ID, Long.MIN_VALUE)
-                if (id != Long.MIN_VALUE) {
-                    val changed = cancelHandler?.invoke(id) == true
-                    if (changed) Companion.finish(this, id)
-                }
-                if (activeDownloads.isEmpty()) stopSelf(startId)
-                return START_NOT_STICKY
-            }
-            ACTION_TRACK -> Unit
-            else -> {
-                if (activeDownloads.isEmpty()) stopSelf(startId)
-                return START_NOT_STICKY
-            }
-        }
-
-        val id = intent.getLongExtra(EXTRA_ID, Long.MIN_VALUE)
-        if (id == Long.MIN_VALUE) {
-            if (activeDownloads.isEmpty()) stopSelf(startId)
-            return START_NOT_STICKY
-        }
-
-        // A foreground-service start that Android rejected can still race with a previously
-        // queued ACTION_TRACK. Keep the marker until replace()/finish() consumes it so a
-        // provisional download id can be translated to the real persisted record safely.
-        if (foregroundUnavailableIds.contains(id)) {
-            activeIds.remove(id)
-            getSystemService(NotificationManager::class.java).apply {
-                cancel(individualNotificationId(id))
-                cancel(NOTIFICATION_ID)
-            }
-            stopSelf(startId)
-            return START_NOT_STICKY
-        }
-
-        // A tiny file can finish before Android delivers the foreground-service start command.
-        startedIds.add(id)
-        if (finishedBeforeStart.remove(id)) {
-            startedIds.remove(id)
-            if (activeDownloads.isEmpty()) {
-                getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
-                stopSelf(startId)
-            }
-            return START_NOT_STICKY
-        }
-
-        val name = intent.getStringExtra(EXTRA_NAME)?.takeIf { it.isNotBlank() } ?: "Download"
-        val current = activeDownloads[id]
-        activeDownloads[id] = current?.copy(name = name) ?: TrackedDownload(name = name)
-        promote()
-        return START_NOT_STICKY
-    }
-
-    override fun onBind(intent: Intent?): IBinder? = null
-
-    override fun onTimeout(startId: Int, fgsType: Int) {
-        // Android 15+ gives dataSync foreground services only a short grace period after
-        // timeout. Persist resumable Gecko/HLS work as Paused first, then stop the service
-        // immediately so the platform cannot raise RemoteServiceException.
-        if (fgsType and ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC != 0) {
-            pauseTrackedForForegroundStop()
-        }
-        stopAfterForegroundLoss()
-    }
-
-    override fun onDestroy() {
-        if (liveService() === this) instanceRef = null
-        val manager = getSystemService(NotificationManager::class.java)
-        activeDownloads.keys.forEach { manager.cancel(individualNotificationId(it)) }
-        activeDownloads.clear()
-        activeIds.clear()
-        startedIds.clear()
-        super.onDestroy()
-    }
-
-    private fun updateTracked(id: Long, fileName: String, downloaded: Long, total: Long) {
-        mainHandler.post {
-            val current = activeDownloads[id] ?: return@post
-            activeDownloads[id] = current.copy(
-                name = fileName.takeIf { it.isNotBlank() } ?: current.name,
-                downloadedBytes = downloaded.coerceAtLeast(0L),
-                totalBytes = total
-            )
-            promote()
-        }
-    }
-
-    private fun setPausedTracked(id: Long, paused: Boolean) {
-        mainHandler.post {
-            val current = activeDownloads[id] ?: return@post
-            activeDownloads[id] = current.copy(paused = paused)
-            promote()
-        }
-    }
-
-    private fun replaceTracked(oldId: Long, newId: Long, fileName: String) {
-        mainHandler.post {
-            val manager = getSystemService(NotificationManager::class.java)
-            val previous = activeDownloads.remove(oldId)
-            val current = activeDownloads[newId]
-            val name = fileName.takeIf { it.isNotBlank() }
-                ?: current?.name
-                ?: previous?.name
-                ?: "Download"
-            activeDownloads[newId] = when {
-                current != null -> current.copy(name = name)
-                previous != null -> previous.copy(name = name)
-                else -> TrackedDownload(name = name)
-            }
-            manager.cancel(individualNotificationId(oldId))
-            finishedBeforeStart.remove(newId)
-            promote()
-        }
-    }
-
-    private fun finishTracked(id: Long) {
-        mainHandler.post {
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.cancel(individualNotificationId(id))
-            val existed = activeDownloads.remove(id) != null
-            if (existed) finishedBeforeStart.remove(id)
-            if (activeDownloads.isEmpty()) {
-                stopForeground(STOP_FOREGROUND_REMOVE)
-                manager.cancel(NOTIFICATION_ID)
-                stopSelf()
-            } else {
-                promote()
-            }
-        }
-    }
-
-    private fun pauseTrackedForForegroundStop() {
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬ÕÁ…­…”½´¹¥±åÉ¼¹‰É½İÍ•È¹Õ¤()¥µÁ½ÉĞ…¹‘É½¥¹…ÁÀ¹9½Ñ¥™¥…Ñ¥½¸)¥µÁ½ÉĞ…¹‘É½¥¹…ÁÀ¹9½Ñ¥™¥…Ñ¥½¹¡…¹¹•°)¥µÁ½ÉĞ…¹‘É½¥¹…ÁÀ¹9½Ñ¥™¥…Ñ¥½¹5…¹…•È)¥µÁ½ÉĞ…¹‘É½¥¹…ÁÀ¹A•¹‘¥¹%¹Ñ•¹Ğ)¥µÁ½ÉĞ…¹‘É½¥¹…ÁÀ¹M•ÉÙ¥”)¥µÁ½ÉĞ…¹‘É½¥¹½¹Ñ•¹Ğ¹½¹Ñ•áĞ)¥µÁ½ÉĞ…¹‘É½¥¹½¹Ñ•¹Ğ¹%¹Ñ•¹Ğ)¥µÁ½ÉĞ…¹‘É½¥¹½¹Ñ•¹Ğ¹Á´¹M•ÉÙ¥•%¹™¼)¥µÁ½ÉĞ…¹‘É½¥¹½Ì¹	Õ¥±)¥µÁ½ÉĞ…¹‘É½¥¹½Ì¹!…¹‘±•È)¥µÁ½ÉĞ…¹‘É½¥¹½Ì¹%	¥¹‘•È)¥µÁ½ÉĞ…¹‘É½¥¹½Ì¹1½½Á•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½É”¹…ÁÀ¹M•ÉÙ¥•½µÁ…Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½É”¹½¹Ñ•¹Ğ¹½¹Ñ•áÑ½µÁ…Ğ)¥µÁ½ÉĞ½´¹¥±åÉ¼¹‰É½İÍ•È¹Q%=9}=A9}=]91=L)¥µÁ½ÉĞ½´¹¥±åÉ¼¹‰É½İÍ•È¹H)¥µÁ½ÉĞ©…Ù„¹±…¹œ¹É•˜¹]•…­I•™•É•¹”)¥µÁ½ÉĞ©…Ù„¹ÕÑ¥°¹½¹ÕÉÉ•¹Ğ¹½¹ÕÉÉ•¹Ñ!…Í¡5…À()±…ÍÌ½İ¹±½…‘-••Á±¥Ù•M•ÉÙ¥”€èM•ÉÙ¥” ¤ì(€€€ÁÉ¥Ù…Ñ”‘…Ñ„±…ÍÌQÉ…­•‘½İ¹±½… (€€€€€€€Ù…°¹…µ”èMÑÉ¥¹œ°(€€€€€€€Ù…°‘½İ¹±½…‘•‘	åÑ•Ìè1½¹œ€ô€Á0°(€€€€€€€Ù…°Ñ½Ñ…±	åÑ•Ìè1½¹œ€ô€´Å0°(€€€€€€€Ù…°Á…ÕÍ•è	½½±•…¸€ô™…±Í”(€€€€¤((€€€ÁÉ¥Ù…Ñ”Ù…°…Ñ¥Ù•½İ¹±½…‘Ì€ô±¥¹­•‘5…Á=˜ñ1½¹œ°QÉ…­•‘½İ¹±½…ø ¤(€€€ÁÉ¥Ù…Ñ”Ù…°µ…¥¹!…¹‘±•È€ô!…¹‘±•È¡1½½Á•È¹•Ñ5…¥¹1½½Á•È ¤¤((€€€½Ù•ÉÉ¥‘”™Õ¸½¹É•…Ñ” ¤ì(€€€€€€€ÍÕÁ•È¹½¹É•…Ñ” ¤(€€€€€€€¥¹ÍÑ…¹•I•˜€ô]•…­I•™•É•¹”¡Ñ¡¥Ì¤(€€€€€€€•¹ÍÕÉ•¡…¹¹•°¡Ñ¡¥Ì¤(€€€ô((€€€½Ù•ÉÉ¥‘”™Õ¸½¹MÑ…ÉÑ½µµ…¹¡¥¹Ñ•¹Ğè%¹Ñ•¹Ğü°™±…Ìè%¹Ğ°ÍÑ…ÉÑ%è%¹Ğ¤è%¹Ğì(€€€€€€€İ¡•¸€¡¥¹Ñ•¹Ğü¹…Ñ¥½¸¤ì(€€€€€€€€€€€Q%=9}AUM°Q%=9}IMU5€´øì(€€€€€€€€€€€€€€€Ù…°¥€ô¥¹Ñ•¹Ğ¹•Ñ1½¹áÑÉ„¡aQI}%°1½¹œ¹5%9}Y1U¤(€€€€€€€€€€€€€€€¥˜€¡¥€„ô1½¹œ¹5%9}Y1U¤ì(€€€€€€€€€€€€€€€€€€€Ù…°Á…ÕÍ”€ô¥¹Ñ•¹Ğ¹…Ñ¥½¸€ôôQ%=9}AUM(€€€€€€€€€€€€€€€€€€€Ù…°¡…¹•€ô½¹ÑÉ½±!…¹‘±•Èü¹¥¹Ù½­”¡¥°Á…ÕÍ”¤€ôôÑÉÕ”(€€€€€€€€€€€€€€€€€€€¥˜€¡¡…¹•¤Í•ÑA…ÕÍ•‘QÉ…­•¡¥°Á…ÕÍ”¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€¥˜€¡…Ñ¥Ù•½İ¹±½…‘Ì¹¥ÍµÁÑä ¤€˜˜…Ñ¥Ù•%‘Ì¹¥ÍµÁÑä ¤¤ÍÑ½ÁM•±˜¡ÍÑ…ÉÑ%¤(€€€€€€€€€€€€€€€É•ÑÕÉ¸MQIQ}9=Q}MQ%-d(€€€€€€€€€€€ô(€€€€€€€€€€€Q%=9}90€´øì(€€€€€€€€€€€€€€€Ù…°¥€ô¥¹Ñ•¹Ğ¹•Ñ1½¹áÑÉ„¡aQI}%°1½¹œ¹5%9}Y1U¤(€€€€€€€€€€€€€€€¥˜€¡¥€„ô1½¹œ¹5%9}Y1U¤ì(€€€€€€€€€€€€€€€€€€€Ù…°¡…¹•€ô…¹•±!…¹‘±•Èü¹¥¹Ù½­”¡¥¤€ôôÑÉÕ”(€€€€€€€€€€€€€€€€€€€¥˜€¡¡…¹•¤½µÁ…¹¥½¸¹™¥¹¥Í ¡Ñ¡¥Ì°¥¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€¥˜€¡…Ñ¥Ù•½İ¹±½…‘Ì¹¥ÍµÁÑä ¤€˜˜…Ñ¥Ù•%‘Ì¹¥ÍµÁÑä ¤¤ÍÑ½ÁM•±˜¡ÍÑ…ÉÑ%¤(€€€€€€€€€€€€€€€É•ÑÕÉ¸MQIQ}9=Q}MQ%-d(€€€€€€€€€€€ô(€€€€€€€€€€€Q%=9}QI,€´øU¹¥Ğ(€€€€€€€€€€€•±Í”€´øì(€€€€€€€€€€€€€€€¥˜€¡…Ñ¥Ù•½İ¹±½…‘Ì¹¥ÍµÁÑä ¤€˜˜…Ñ¥Ù•%‘Ì¹¥ÍµÁÑä ¤¤ÍÑ½ÁM•±˜¡ÍÑ…ÉÑ%¤(€€€€€€€€€€€€€€€É•ÑÕÉ¸MQIQ}9=Q}MQ%-d(€€€€€€€€€€€ô(€€€€€€€ô((€€€€€€€Ù…°¥€ô¥¹Ñ•¹Ğ¹•Ñ1½¹áÑÉ„¡aQI}%°1½¹œ¹5%9}Y1U¤(€€€€€€€¥˜€¡¥€ôô1½¹œ¹5%9}Y1U¤ì(€€€€€€€€€€€¥˜€¡…Ñ¥Ù•½İ¹±½…‘Ì¹¥ÍµÁÑä ¤€˜˜…Ñ¥Ù•%‘Ì¹¥ÍµÁÑä ¤¤ÍÑ½ÁM•±˜¡ÍÑ…ÉÑ%¤(€€€€€€€€€€€É•ÑÕÉ¸MQIQ}9=Q}MQ%-d(€€€€€€€ô((€€€€€€€€¼¼™½É•É½Õ¹µÍ•ÉÙ¥”ÍÑ…ÉĞÑ¡…Ğ¹‘É½¥É•©•Ñ•…¸ÍÑ¥±°É…”İ¥Ñ „ÁÉ•Ù¥½ÕÍ±ä(€€€€€€€€¼¼ÅÕ•Õ•Q%=9}QI,¸-••ÀÑ¡”µ…É­•ÈÕ¹Ñ¥°É•Á±…” ¤½™¥¹¥Í  ¤½¹ÍÕµ•Ì¥ĞÍ¼„(€€€€€€€€¼¼ÁÉ½Ù¥Í¥½¹…°‘½İ¹±½…¥…¸‰”ÑÉ…¹Í±…Ñ•Ñ¼Ñ¡”É•…°Á•ÉÍ¥ÍÑ•É•½ÉÍ…™•±ä¸(€€€€€€€¥˜€¡™½É•É½Õ¹‘U¹…Ù…¥±…‰±•%‘Ì¹½¹Ñ…¥¹Ì¡¥¤¤ì(€€€€€€€€€€€…Ñ¥Ù•%‘Ì¹É•µ½Ù”¡¥¤(€€€€€€€€€€€•ÑMåÍÑ•µM•ÉÙ¥”¡9½Ñ¥™¥…Ñ¥½¹5…¹…•Èèé±…ÍÌ¹©…Ù„¤¹…ÁÁ±äì(€€€€€€€€€€€€€€€…¹•°¡¥¹‘¥Ù¥‘Õ…±9½Ñ¥™¥…Ñ¥½¹%¡¥¤¤(€€€€€€€€€€€€€€€…¹•°¡9=Q%%Q%=9}%¤(€€€€€€€€€€€ô(€€€€€€€€€€€€¼¼ÍÑ…±”Q%=9}QI,µ…ä‰•±½¹œÑ¼„™…¥±•ÁÉ½Ù¥Í¥½¹…°¥İ¡¥±”…¹½Ñ¡•È‘½İ¹±½…(€€€€€€€€€€€€¼¼¥Ì…±É•…‘äÑÉ…­•€¡½È¥ÌÍÑ¥±°İ…¥Ñ¥¹œ™½È¥ÑÌ½İ¸ÍÑ…ÉĞ½µµ…¹¤¸MÑ½ÁÁ¥¹œ¡•É”(€€€€€€€€€€€€¼¼İ½Õ±‘É½À™½É•É½Õ¹ÍÕÁÁ½ÉĞ™½ÈÑ¡…ĞÕ¹É•±…Ñ•‘½İ¹±½…¸(€€€€€€€€€€€¥˜€¡…Ñ¥Ù•½İ¹±½…‘Ì¹¥ÍµÁÑä ¤€˜˜…Ñ¥Ù•%‘Ì¹¥ÍµÁÑä ¤¤ì(€€€€€€€€€€€€€€€ÍÑ½ÁM•±˜¡ÍÑ…ÉÑ%¤(€€€€€€€€€€€ô•±Í”¥˜€¡…Ñ¥Ù•½İ¹±½…‘Ì¹¥Í9½ÑµÁÑä ¤¤ì(€€€€€€€€€€€€€€€ÁÉ½µ½Ñ” ¤(€€€€€€€€€€€ô(€€€€€€€€€€€É•ÑÕÉ¸MQIQ}9=Q}MQ%-d(€€€€€€€ô((€€€€€€€€¼¼Ñ¥¹ä™¥±”…¸™¥¹¥Í ‰•™½É”¹‘É½¥‘•±¥Ù•ÉÌÑ¡”™½É•É½Õ¹µÍ•ÉÙ¥”ÍÑ…ÉĞ½µµ…¹¸(€€€€€€€ÍÑ…ÉÑ•‘%‘Ì¹…‘¡¥¤(€€€€€€€¥˜€¡™¥¹¥Í¡•‘	•™½É•MÑ…ÉĞ¹É•µ½Ù”¡¥¤¤ì(€€€€€€€€€€€ÍÑ…ÉÑ•‘%‘Ì¹É•µ½Ù”¡¥¤(€€€€€€€€€€€¥˜€¡…Ñ¥Ù•½İ¹±½…‘Ì¹¥ÍµÁÑä ¤¤ì(€€€€€€€€€€€€€€€•ÑMåÍÑ•µM•ÉÙ¥”¡9½Ñ¥™¥…Ñ¥½¹5…¹…•Èèé±…ÍÌ¹©…Ù„¤¹…¹•°¡9=Q%%Q%=9}%¤(€€€€€€€€€€€€€€€¥˜€¡…Ñ¥Ù•%‘Ì¹¥ÍµÁÑä ¤¤ÍÑ½ÁM•±˜¡ÍÑ…ÉÑ%¤(€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€ÁÉ½µ½Ñ” ¤(€€€€€€€€€€€ô(€€€€€€€€€€€É•ÑÕÉ¸MQIQ}9=Q}MQ%-d(€€€€€€€ô((€€€€€€€Ù…°¹…µ”€ô¥¹Ñ•¹Ğ¹•ÑMÑÉ¥¹áÑÉ„¡aQI}95¤ü¹Ñ…­•%˜ì¥Ğ¹¥Í9½Ñ	±…¹¬ ¤ô€üè€‰½İ¹±½…ˆ(€€€€€€€Ù…°ÕÉÉ•¹Ğ€ô…Ñ¥Ù•½İ¹±½…‘Ím¥‘t(€€€€€€€…Ñ¥Ù•½İ¹±½…‘Ím¥‘t€ôÕÉÉ•¹Ğü¹½Áä¡¹…µ”€ô¹…µ”¤€üèQÉ…­•‘½İ¹±½…¡¹…µ”€ô¹…µ”¤(€€€€€€€ÁÉ½µ½Ñ” ¤(€€€€€€€É•ÑÕÉ¸MQIQ}9=Q}MQ%-d(€€€ô((€€€½Ù•ÉÉ¥‘”™Õ¸½¹	¥¹¡§]4ÒÚ$z{-®éÜj×n pauseTrackedForForegroundStop() {
         activeDownloads.entries.toList().forEach { (id, item) ->
             if (item.paused) return@forEach
             val paused = runCatching { controlHandler?.invoke(id, true) == true }
@@ -291,186 +110,8 @@ class DownloadKeepAliveService : Service() {
         } else {
             builder
                 .setContentText("Downloading â€¢ ${formatBytes(item.downloadedBytes)}")
-                .setProgress(0, 0, true)
-        }
-        builder
-            .addAction(
-                Notification.Action.Builder(
-                    android.R.drawable.ic_media_pause,
-                    "Pause",
-                    controlPendingIntent(id, false)
-                ).build()
-            )
-            .addAction(
-                Notification.Action.Builder(
-                    android.R.drawable.ic_menu_close_clear_cancel,
-                    "Cancel",
-                    cancelPendingIntent(id)
-                ).build()
-            )
-        return builder.build()
-    }
-
-    private fun promote() {
-        val manager = getSystemService(NotificationManager::class.java)
-        val count = activeDownloads.size
-        if (count <= 0) return
-
-        val foregroundNotification = if (count == 1) {
-            val (id, item) = activeDownloads.entries.first()
-            manager.cancel(individualNotificationId(id))
-            buildDownloadNotification(id, item)
-        } else {
-            activeDownloads.forEach { (id, item) ->
-                manager.notify(individualNotificationId(id), buildDownloadNotification(id, item))
-            }
-            Notification.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_stat_ilyro_download)
-                .setContentTitle("ILYRO Â· $count downloads")
-                .setContentText("Manage downloads in ILYRO")
-                .setOnlyAlertOnce(true)
-                .setOngoing(true)
-                .setCategory(Notification.CATEGORY_PROGRESS)
-                .setProgress(0, 0, true)
-                .apply { launchPendingIntent()?.let(::setContentIntent) }
-                .build()
-        }
-
-        val serviceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-        } else {
-            0
-        }
-        val promoted = runCatching {
-            ServiceCompat.startForeground(this, NOTIFICATION_ID, foregroundNotification, serviceType)
-        }.isSuccess
-        if (!promoted) {
-            pauseTrackedForForegroundStop()
-            stopAfterForegroundLoss()
-        }
-    }
-
-    private fun formatBytes(bytes: Long): String = Companion.formatBytes(bytes)
-
-    companion object {
-        private const val CHANNEL_ID = "ilyro_background_downloads"
-        private const val NOTIFICATION_ID = 0x494C59
-        private const val ACTION_TRACK = "com.ilyro.browser.action.TRACK_DOWNLOAD"
-        private const val ACTION_PAUSE = "com.ilyro.browser.action.PAUSE_DOWNLOAD"
-        private const val ACTION_RESUME = "com.ilyro.browser.action.RESUME_DOWNLOAD"
-        private const val ACTION_CANCEL = "com.ilyro.browser.action.CANCEL_DOWNLOAD"
-        private const val EXTRA_ID = "download_id"
-        private const val EXTRA_NAME = "download_name"
-
-        @Volatile
-        private var instanceRef: WeakReference<DownloadKeepAliveService>? = null
-        @Volatile
-        private var controlHandler: ((Long, Boolean) -> Boolean)? = null
-        @Volatile
-        private var cancelHandler: ((Long) -> Boolean)? = null
-
-        private fun liveService(): DownloadKeepAliveService? = instanceRef?.get()
-
-        private const val MAX_FINISHED_BEFORE_START_IDS = 128
-        private const val MAX_FOREGROUND_UNAVAILABLE_IDS = 128
-        private val finishedBeforeStart = ConcurrentHashMap.newKeySet<Long>()
-        private val foregroundUnavailableIds = ConcurrentHashMap.newKeySet<Long>()
-        private val activeIds = ConcurrentHashMap.newKeySet<Long>()
-        private val startedIds = ConcurrentHashMap.newKeySet<Long>()
-
-        fun hasActiveDownloads(): Boolean = activeIds.isNotEmpty()
-
-        fun setControlHandler(handler: (Long, Boolean) -> Boolean) {
-            controlHandler = handler
-        }
-
-        fun setCancelHandler(handler: (Long) -> Boolean) {
-            cancelHandler = handler
-        }
-
-        fun track(context: Context, id: Long, fileName: String): Boolean {
-            val appContext = context.applicationContext
-            finishedBeforeStart.remove(id)
-            foregroundUnavailableIds.remove(id)
-            activeIds.add(id)
-            ensureChannel(appContext)
-
-            // Post a visible starting notification synchronously. The service then promotes the
-            // exact same notification to foreground status, removing the perceptible startup lag.
-            postStartingNotification(appContext, id, fileName)
-
-            val intent = Intent(appContext, DownloadKeepAliveService::class.java)
-                .setAction(ACTION_TRACK)
-                .putExtra(EXTRA_ID, id)
-                .putExtra(EXTRA_NAME, fileName)
-            val started = runCatching {
-                ContextCompat.startForegroundService(appContext, intent)
-                true
-            }.getOrDefault(false)
-
-            if (!started) {
-                activeIds.remove(id)
-                startedIds.remove(id)
-                finishedBeforeStart.remove(id)
-                markForegroundUnavailable(id)
-
-                // Real persisted ids can be paused immediately. Provisional ids stay marked and
-                // replace() pauses the real record once Gecko/HLS resolves it.
-                val paused = runCatching { controlHandler?.invoke(id, true) == true }
-                    .getOrDefault(false)
-                if (paused) foregroundUnavailableIds.remove(id)
-
-                appContext.getSystemService(NotificationManager::class.java).apply {
-                    cancel(individualNotificationId(id))
-                    cancel(NOTIFICATION_ID)
-                }
-            }
-            return started
-        }
-
-        fun replace(context: Context, oldId: Long, newId: Long, fileName: String) {
-            if (oldId == newId) return
-            val appContext = context.applicationContext
-            val foregroundWasUnavailable = foregroundUnavailableIds.remove(oldId)
-            activeIds.remove(oldId)
-
-            if (foregroundWasUnavailable) {
-                startedIds.remove(oldId)
-                finishedBeforeStart.remove(oldId)
-                activeIds.remove(newId)
-                val paused = runCatching { controlHandler?.invoke(newId, true) == true }
-                    .getOrDefault(false)
-                if (!paused) markForegroundUnavailable(newId)
-                appContext.getSystemService(NotificationManager::class.java).apply {
-                    cancel(individualNotificationId(oldId))
-                    cancel(individualNotificationId(newId))
-                    cancel(NOTIFICATION_ID)
-                }
-                return
-            }
-
-            activeIds.add(newId)
-
-            val live = liveService()
-            val oldStartAlreadyDelivered = startedIds.remove(oldId)
-            if (oldStartAlreadyDelivered || live != null) {
-                startedIds.add(newId)
-            }
-            // Ignore a stale ACTION_TRACK only when the provisional start has not arrived yet.
-            if (oldStartAlreadyDelivered) {
-                finishedBeforeStart.remove(oldId)
-            } else {
-                markFinishedBeforeStart(oldId)
-            }
-            finishedBeforeStart.remove(newId)
-            ensureChannel(appContext)
-
-            if (live != null) {
-                live.replaceTracked(oldId, newId, fileName)
-            } else {
-                postStartingNotification(appContext, newId, fileName)
-                val intent = Intent(appContext, DownloadKeepAliveService::class.java)
-                    .setAction(ACTION_TRACK)
+                .setProgress(0, 0, true)YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Ô(€€€€€€€ô(€€€€€€€‰Õ¥±‘•È(€€€€€€€€€€€€¹…‘‘Ñ¥½¸ (€€€€€€€€€€€€€€€9½Ñ¥™¥…Ñ¥½¸¹Ñ¥½¸¹	Õ¥±‘•È (€€€€€€€€€€€€€€€€€€€…¹‘É½¥¹H¹‘É…İ…‰±”¹¥}µ•‘¥…}Á…ÕÍ”°(€€€€€€€€€€€€€€€€€€€€‰A…ÕÍ”ˆ°(€€€€€€€€€€€€€€€€€€€½¹ÑÉ½±A•¹‘¥¹%¹Ñ•¹Ğ¡¥°™…±Í”¤(€€€€€€€€€€€€€€€€¤¹‰Õ¥± ¤(€€€€€€€€€€€€¤(€€€€€€€€€€€€¹…‘‘Ñ¥½¸ (€€€€€€€€€€€€€€€9½Ñ¥™¥…Ñ¥½¸¹Ñ¥½¸¹	Õ¥±‘•È (€€€€€€€€€€€€€€€€€€€…¹‘É½¥¹H¹‘É…İ…‰±”¹¥}µ•¹Õ}±½Í•}±•…É}…¹•°°(€€€€€€€€€€€€€€€€€€€€‰…¹•°ˆ°(€€€€€€€€€€€€€€€€€€€…¹•±A•¹‘¥¹%¹Ñ•¹Ğ¡¥¤(€€€€€€€€€€€€€€€€¤¹‰Õ¥± ¤(€€€€€€€€€€€€¤(€€€€€€€É•ÑÕÉ¸‰Õ¥±‘•È¹‰Õ¥± ¤(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸ÁÉ½µ½Ñ” ¤ì(€€€€€€€Ù…°µ…¹…•È€ô•ÑMåÍÑ•µM•ÉÙ¥”¡9½Ñ¥™¥…Ñ¥½¹5…¹…•Èèé±…ÍÌ¹©…Ù„¤(€€€€€€€Ù…°½Õ¹Ğ€ô…Ñ¥Ù•½İ¹±½…‘Ì¹Í¥é”(€€€€€€€¥˜€¡½Õ¹Ğ€ğô€À¤É•ÑÕÉ¸((€€€€€€€Ù…°™½É•É½Õ¹‘9½Ñ¥™¥…Ñ¥½¸€ô¥˜€¡½Õ¹Ğ€ôô€Ä¤ì(€€€€€€€€€€€Ù…°€¡¥°¥Ñ•´¤€ô…Ñ¥Ù•½İ¹±½…‘Ì¹•¹ÑÉ¥•Ì¹™¥ÉÍĞ ¤(€€€€€€€€€€€µ…¹…•È¹…¹•°¡¥¹‘¥Ù¥‘Õ…±9½Ñ¥™¥…Ñ¥½¹%¡¥¤¤(€€€€€€€€€€€‰Õ¥±‘½İ¹±½…‘9½Ñ¥™¥…Ñ¥½¸¡¥°¥Ñ•´¤(€€€€€€€ô•±Í”ì(€€€€€€€€€€€…Ñ¥Ù•½İ¹±½…‘Ì¹™½É… ì€¡¥°¥Ñ•´¤€´ø(€€€€€€€€€€€€€€€µ…¹…•È¹¹½Ñ¥™ä¡¥¹‘¥Ù¥‘Õ…±9½Ñ¥™¥…Ñ¥½¹%¡¥¤°‰Õ¥±‘½İ¹±½…‘9½Ñ¥™¥…Ñ¥½¸¡¥°¥Ñ•´¤¤(€€€€€€€€€€€ô(€€€€€€€€€€€9½Ñ¥™¥…Ñ¥½¸¹	Õ¥±‘•È¡Ñ¡¥Ì°!991}%¤(€€€€€€€€€€€€€€€€¹Í•ÑMµ…±±%½¸¡H¹‘É…İ…‰±”¹¥}ÍÑ…Ñ}¥±åÉ½}‘½İ¹±½…¤(€€€€€€€€€€€€€€€€¹Í•Ñ½¹Ñ•¹ÑQ¥Ñ±” ‰%1eI<ƒ
+Ü€‘½Õ¹Ğ‘½İ¹±½…‘Ìˆ¤(€€€€€€€€€€€€€€€€¹Í•Ñ½¹Ñ•¹ÑQ•áĞ ‰5…¹…”‘½İ¹±½…‘Ì¥¸%1eI<ˆ¤(€€€€€€€€€€€€€€€€¹Í•Ñ=¹±å±•ÉÑ=¹”¡ÑÉÕ”¤(€€€€€€€€€€€€€€€€¹Í•Ñ=¹½¥¹œ¡ÑÉÕ”¤(€€€€€€€€€€€€€€€€¹Í•Ñ…Ñ•½Éä¡9½Ñ¥™¥…Ñ¥½¸¹Q=Ie}AI=IML¤(€€€€€€€€€€€€€€€€¹Í•ÑAÉ½É•ÍÌ À°€À°ÑÉÕ”¤(€€€€€€€€€€€€€€€€¹…ÁÁ±äì±…Õ¹¡A•¹‘¥¹%¹Ñ•¹Ğ ¤ü¹±•Ğ èéÍ•Ñ½¹Ñ•¹Ñ%¹Ñ•¹Ğ¤ô(€€€€€€€€€€€€€€€€¹‰Õ¥± ¤(€€€€€€€ô((€€€€€€€Ù…°Í•ÉÙ¥•QåÁ”€ô¥˜€¡	Õ¥±¹YIM%=8¹M-}%9P€øô	Õ¥±¹YIM%=9}=L¹D¤ì(€€€€€€€€€€€M•ÉÙ¥•%¹™¼¹=II=U9}MIY%}QeA}Q}Me9(€€€€€€€ô•±Í”ì(€€€€€€€€€€€€À(€€€€€€€ô(€€€€€€€Ù…°ÁÉ½µ½Ñ•€ôÉÕ¹…Ñ¡¥¹œì(€€€€€€€€€€€M•ÉÙ¥•½µÁ…Ğ¹ÍÑ…ÉÑ½É•É½Õ¹¡Ñ¡¥Ì°9=Q%%Q%=9}%°™½É•É½Õ¹‘9½Ñ¥™¥…Ñ¥½¸°Í•ÉÙ¥•QåÁ”¤(€€€€€€€ô¹¥ÍMÕ•ÍÌ(€€€€€€€¥˜€ …ÁÉ½µ½Ñ•¤ì(€€€€€€€€€€€Á…ÕÍ•QÉ…­•‘½É½É•É½Õ¹‘MÑ½À ¤(€€€€€€€€€€€ÍÑ½Á™Ñ•É½É•É½Õ¹‘1½ÍÌ ¤(€€€€€€€ô(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸™½Éµ…Ñ	åÑ•Ì¡‰åÑ•Ìè1½¹œ¤èMÑÉ¥¹œ€ô½µÁ…¹¥½¸¹™½Éµ…Ñ	åÑ•Ì¡‰åÑ•Ì¤((€€€½µÁ…¹¥½¸½‰©•Ğì(€€€€€€€ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°!991}%€ô€‰¥±åÉ½}‰…­É½Õ¹‘}‘½İ¹±½…‘Ìˆ(€€€€€€€ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°9=Q%%Q%=9}%€ô€ÁàĞäÑÔä(€€€€€€€ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°Q%=9}QI,€ô€‰½´¹¥±åÉ¼¹‰É½İÍ•È¹…Ñ¥½¸¹QI-}=]91=ˆ(€€€€€€€ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°Q%=9}AUM€ô€‰½´¹¥±åÉ¼¹‰É½İÍ•È¹…Ñ¥½¸¹AUM}=]91=ˆ(€€€€€€€ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°Q%=9}IMU5€ô€‰½´¹¥±åÉ¼¹‰É½İÍ•È¹…Ñ¥½¸¹IMU5}=]91=ˆ(€€€€€€€ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°Q%=9}90€ô€‰½´¹¥±åÉ¼¹‰É½İÍ•È¹…Ñ¥½¸¹91}=]91=ˆ(€€€€€€€ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°aQI}%€ô€‰‘½İ¹±½…‘}¥ˆ(€€€€€€€ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°aQI}95€ô€‰‘½İ¹±½…‘}¹…µ”ˆ((€€€€€€€Y½±…Ñ¥±”(€€€€€€€ÁÉ¥Ù…Ñ”Ù…È¥¹ÍÑ…¹•I•˜è]•…­I•™•É•¹”ñ½İ¹±½…‘-••Á±¥Ù•M•ÉÙ¥”øü€ô¹Õ±°(€€€€€€€Y½±…Ñ¥±”(€€€€€€€ÁÉ¥Ù…Ñ”Ù…È½¹ÑÉ½±!…¹‘±•Èè€ ¡1½¹œ°	½½±•…¸¤€´ø	½½±•…¸¤ü€ô¹Õ±°(€€€€€€€Y½±…Ñ¥±”(€€€€€€€ÁÉ¥Ù…Ñ”Ù…È…¹•±!…¹‘±•Èè€ ¡1½¹œ¤€´ø	½½±•…¸¤ü€ô¹Õ±°((€€€€€€€ÁÉ¥Ù…Ñ”™Õ¸±¥Ù•M•ÉÙ¥” ¤è½İ¹±½…‘-••Á±¥Ù•M•ÉÙ¥”ü€ô¥¹ÍÑ…¹•I•˜ü¹•Ğ ¤((€€€€€€€ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°5a}%9%M!}	=I}MQIQ}%L€ô€ÄÈà(€€€€€€€ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°5a}=II=U9}U9Y%1	1}%L€ô€ÄÈà(€€€€€€€ÁÉ¥Ù…Ñ”Ù…°™¥¹¥Í¡•‘	•™½É•MÑ…ÉĞ€ô½¹ÕÉÉ•¹Ñ!…Í¡5…À¹¹•İ-•åM•Ğñ1½¹œø ¤(€€€€€€€ÁÉ¥Ù…Ñ”Ù…°™½É•É½Õ¹‘U¹…Ù…¥±…‰±•%‘Ì€ô½¹ÕÉÉ•¹Ñ!…Í¡5…À¹¹•İ-•åM•Ğñ1½¹œø ¤(€€€€€€€ÁÉ¥Ù…Ñ”Ù…°…Ñ¥Ù•%‘Ì€ô½¹ÕÉÉ•¹Ñ!…Í¡5…À¹¹•İ-•åM•Ğñ1½¹œø ¤(€€€€€€€ÁÉ¥Ù…Ñ”Ù…°ÍÑ…ÉÑ•‘%‘Ì€ô½¹ÕÉÉ•¹Ñ!…Í¡5…À¹¹•İ-•åM•Ğñ1½¹œø ¤((€€€€€€€™Õ¸¡…ÍÑ¥Ù•½İ¹±½…‘Ì ¤è	½½±•…¸€ô…Ñ¥Ù•%‘Ì¹¥Í9½ÑµÁÑä ¤((€€€€€€€™Õ¸Í•Ñ½¹ÑÉ½±!…¹‘±•È¡¡…¹‘±•Èè€¡1½¹œ°	½½±•…¸¤€´ø	½½±•…¸¤ì(€€€€€€€€€€€½¹ÑÉ½±!…¹‘±•È€ô¡…¹‘±•È(€€€€€€€ô((€€€€€€€™Õ¸Í•Ñ…¹•±!…¹‘±•È¡¡…¹‘±•Èè€¡1½¹œ¤€´ø	½½±•…¸¤ì(€€€€€€€€€€€…¹•±!…¹‘±•È€ô¡…¹‘±•È(€€€€€€€ô((€€€€€€€™Õ¸ÑÉ…¬¡½¹Ñ•áĞè½¹Ñ•áĞ°¥è1½¹œ°™¥±•9…µ”èMÑÉ¥¹œ¤è	½½±•…¸ì(€€€€€€€€€€€Ù…°…ÁÁ½¹Ñ•áĞ€ô½¹Ñ•áĞ¹…ÁÁ±¥…Ñ¥½¹½¹Ñ•áĞ(€€€€€€€€€€€™¥¹¥Í¡•‘	•™½É•MÑ…ÉĞ¹É•µ½Ù”¡¥¤(€€€€€€€€€€€™½É•É½Õ¹‘U¹…Ù…¥±…‰±•%‘Ì¹É•µ½Ù”¡¥¤(€€€€€€€€€€€…Ñ¥Ù•%‘Ì¹…‘¡¥¤(€€€€€€€€€€€•¹ÍÕÉ•¡…¹¹•°¡…ÁÁ½¹Ñ•áĞ¤((€€€€€€€€€€€€¼¼A½ÍĞ„Ù¥Í¥‰±”ÍÑ…ÉÑ¥¹œ¹½Ñ¥™¥…Ñ¥½¸Íå¹¡É½¹½ÕÍ±ä¸Q¡”Í•ÉÙ¥”Ñ¡•¸ÁÉ½µ½Ñ•ÌÑ¡”(€€€€€€€€€€€€¼¼•á…ĞÍ…µ”¹½Ñ¥™¥…Ñ¥½¸Ñ¼™½É•É½Õ¹ÍÑ…ÑÕÌ°É•µ½Ù¥¹œÑ¡”Á•É•ÁÑ¥‰±”ÍÑ…ÉÑÕÀ±…œ¸(€€€€€€€€€€€Á½ÍÑMÑ…ÉÑ¥¹9½Ñ¥™¥…Ñ¥½¸¡…ÁÁ½¹Ñ•áĞ°¥°™¥±•9…µ”¤((€€€€€€€€€€€Ù…°¥¹Ñ•¹Ğ€ô%¹Ñ•¹Ğ¡…ÁÁ½¹Ñ•áĞ°½İ¹±½…‘-••Á±¥Ù•M•ÉÙ¥”èé±…ÍÌ¹©…Ù„¤(€€€€€€ƒ]4ÒÚ$z{-®éÜj×ACK)
                     .putExtra(EXTRA_ID, newId)
                     .putExtra(EXTRA_NAME, fileName)
                 runCatching { ContextCompat.startForegroundService(appContext, intent) }

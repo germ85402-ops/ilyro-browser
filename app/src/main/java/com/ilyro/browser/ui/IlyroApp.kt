@@ -1,163 +1,4 @@
-@file:OptIn(org.mozilla.geckoview.ExperimentalGeckoViewApi::class)
-
-package com.ilyro.browser.ui
-
-import com.ilyro.browser.sync.BrowserAutoSyncScheduler
-
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-
-import android.Manifest
-import android.content.Context
-import android.app.Activity
-import android.content.ContextWrapper
-import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.net.Uri
-import android.os.Build
-import android.view.View
-import android.view.ViewGroup
-import android.view.MotionEvent
-import android.view.ViewConfiguration
-import android.widget.Toast
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsBottomHeight
-import androidx.compose.foundation.layout.windowInsetsTopHeight
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.AddToHomeScreen
-import androidx.compose.material.icons.rounded.Article
-import androidx.compose.material.icons.rounded.Bookmark
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.Fullscreen
-import androidx.compose.material.icons.rounded.DesktopWindows
-import androidx.compose.material.icons.rounded.Extension
-import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.Security
-import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material.icons.rounded.MoreHoriz
-import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Share
-import androidx.compose.material.icons.rounded.Star
-import androidx.compose.material.icons.rounded.StarBorder
-import androidx.compose.material.icons.rounded.Translate
-import androidx.compose.material.icons.rounded.VideoLibrary
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import org.mozilla.geckoview.AllowOrDeny
-import org.mozilla.geckoview.GeckoResult
-import org.mozilla.geckoview.GeckoRuntime
-import org.mozilla.geckoview.ContentBlocking
-import org.mozilla.geckoview.GeckoRuntimeSettings
-import org.mozilla.geckoview.GeckoSession
-import org.mozilla.geckoview.GeckoSessionSettings
-import org.mozilla.geckoview.GeckoView
-import org.mozilla.geckoview.StorageController
-import org.mozilla.geckoview.TranslationsController
-import org.mozilla.geckoview.WebResponse
-import androidx.core.app.ActivityCompat
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.LifecycleOwner
-import com.ilyro.browser.ExternalNavigationCoordinator
-import com.ilyro.browser.NativeBrowserHostCoordinator
-import com.ilyro.browser.BrowserUiCommandCoordinator
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Õ™¥±”é=ÁÑ%¸¡½Éœ¹µ½é¥±±„¹•­½Ù¥•Ü¹áÁ•É¥µ•¹Ñ…±•­½Y¥•İÁ¤èé±…ÍÌ¤()Á…­…”½´¹¥±åÉ¼¹‰É½İÍ•È¹Õ¤()¥µÁ½ÉĞ½´¹¥±åÉ¼¹‰É½İÍ•È¹Íå¹Œ¹	É½İÍ•ÉÕÑ½Må¹M¡•‘Õ±•È()¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹…ÕÑ½µ¥ÉÉ½É•¹É½Õ¹‘•¹ÉÉ½İ½Éİ…É()¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹…ÕÑ½µ¥ÉÉ½É•¹É½Õ¹‘•¹ÉÉ½İ	…¬()¥µÁ½ÉĞ…¹‘É½¥¹5…¹¥™•ÍĞ)¥µÁ½ÉĞ…¹‘É½¥¹½¹Ñ•¹Ğ¹½¹Ñ•áĞ)¥µÁ½ÉĞ…¹‘É½¥¹…ÁÀ¹Ñ¥Ù¥Ñä)¥µÁ½ÉĞ…¹‘É½¥¹½¹Ñ•¹Ğ¹½¹Ñ•áÑ]É…ÁÁ•È)¥µÁ½ÉĞ…¹‘É½¥¹½¹Ñ•¹Ğ¹Á´¹A…­…•5…¹…•È)¥µÁ½ÉĞ…¹‘É½¥¹É…Á¡¥Ì¹	¥Ñµ…À)¥µÁ½ÉĞ…¹‘É½¥¹É…Á¡¥Ì¹	¥Ñµ…Á…Ñ½Éä)¥µÁ½ÉĞ…¹‘É½¥¹¹•Ğ¹UÉ¤)¥µÁ½ÉĞ…¹‘É½¥¹½Ì¹	Õ¥±)¥µÁ½ÉĞ…¹‘É½¥¹Ù¥•Ü¹Y¥•Ü)¥µÁ½ÉĞ…¹‘É½¥¹Ù¥•Ü¹Y¥•İÉ½ÕÀ)¥µÁ½ÉĞ…¹‘É½¥¹Ù¥•Ü¹5½Ñ¥½¹Ù•¹Ğ)¥µÁ½ÉĞ…¹‘É½¥¹Ù¥•Ü¹Y¥•İ½¹™¥ÕÉ…Ñ¥½¸)¥µÁ½ÉĞ…¹‘É½¥¹İ¥‘•Ğ¹Q½…ÍĞ)¥µÁ½ÉĞ…¹‘É½¥‘à¹…Ñ¥Ù¥Ñä¹½µÁ½Í”¹	…­!…¹‘±•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹…Ñ¥Ù¥Ñä¹½µÁ½Í”¹É•µ•µ‰•É1…Õ¹¡•É½ÉÑ¥Ù¥ÑåI•ÍÕ±Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹…Ñ¥Ù¥Ñä¹É•ÍÕ±Ğ¹½¹ÑÉ…Ğ¹Ñ¥Ù¥ÑåI•ÍÕ±Ñ½¹ÑÉ…ÑÌ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹¹¥µ…Ñ•‘Y¥Í¥‰¥±¥Ñä)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹…¹¥µ…Ñ•½±½ÉÍMÑ…Ñ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹½É”¹…¹¥µ…Ñ•±½…ÑÍMÑ…Ñ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹™…‘•%¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹™…‘•=ÕĞ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹Í±¥‘•%¹Y•ÉÑ¥…±±ä)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹Í±¥‘•=ÕÑY•ÉÑ¥…±±ä)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹½É”¹Ñİ••¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹	½É‘•ÉMÑÉ½­”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹%µ…”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±¥­…‰±”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹¡½É¥é½¹Ñ…±MÉ½±°)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹ÉÉ…¹•µ•¹Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹	½à)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹½±Õµ¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹I½Ü)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹MÁ…•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹™¥±±5…áM¥é”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹™¥±±5…á!•¥¡Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹™¥±±5…á]¥‘Ñ )¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹¡•¥¡Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹¡•¥¡Ñ%¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹]¥¹‘½İ%¹Í•ÑÌ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹¹…Ù¥…Ñ¥½¹	…ÉÌ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹¹…Ù¥…Ñ¥½¹	…ÉÍA…‘‘¥¹œ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹ÍÑ…ÑÕÍ	…ÉÌ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹İ¥¹‘½İ%¹Í•ÑÍ	½ÑÑ½µ!•¥¡Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹İ¥¹‘½İ%¹Í•ÑÍQ½Á!•¥¡Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹Á…‘‘¥¹œ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹Í¥é”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹ÍÑ…ÑÕÍ	…ÉÍA…‘‘¥¹œ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹İ¥‘Ñ¡%¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹É•µ•µ‰•ÉMÉ½±±MÑ…Ñ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹Í¡…Á”¹I½Õ¹‘•‘½É¹•ÉM¡…Á”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹Ñ•áĞ¹-•å‰½…É‘Ñ¥½¹Ì)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹Ñ•áĞ¹-•å‰½…É‘=ÁÑ¥½¹Ì)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹Ù•ÉÑ¥…±MÉ½±°)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹%½¹Ì)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹‘)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹‘‘Q½!½µ•MÉ••¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹ÉÑ¥±”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹	½½­µ…É¬)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹±½Í”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹½İ¹±½…)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹Õ±±ÍÉ••¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹•Í­Ñ½Á]¥¹‘½İÌ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹áÑ•¹Í¥½¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹!¥ÍÑ½Éä)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹!½µ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹M•ÕÉ¥Ñä)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹Y¥Í¥‰¥±¥Ñå=™˜)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹5½É•!½É¥è)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹I•™É•Í )¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹M•…É )¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹M•ÑÑ¥¹Ì)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹M¡…É”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹MÑ…È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹MÑ…É	½É‘•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹QÉ…¹Í±…Ñ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹Y¥‘•½1¥‰É…Éä)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹±•ÉÑ¥…±½œ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹áÁ•É¥µ•¹Ñ…±5…Ñ•É¥…°ÍÁ¤)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹!½É¥é½¹Ñ…±¥Ù¥‘•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹%½¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹5…Ñ•É¥…±Q¡•µ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹5½‘…±	½ÑÑ½µM¡••Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹=ÕÑ±¥¹•‘Q•áÑ¥•±)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ‡]4ÒÚ$z{-®éÜj×tines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -270,179 +111,7 @@ fun IlyroApp() {
             primaryContainer = Color(0xFF263A70),
             onPrimaryContainer = Color(0xFFF4F4F5),
             secondary = Color(0xFFB9C5E6),
-            onSecondary = Color(0xFF0B1326),
-            secondaryContainer = Color(0xFF1B2947),
-            onSecondaryContainer = Color(0xFFF2F5FF),
-            tertiary = Color(0xFFB9C5E6),
-            onTertiary = Color(0xFF0B1326),
-            tertiaryContainer = Color(0xFF223253),
-            onTertiaryContainer = Color(0xFFF2F5FF),
-            background = Color(0xFF071225),
-            onBackground = Color(0xFFF4F4F5),
-            surface = Color(0xFF101B33),
-            onSurface = Color(0xFFF4F4F5),
-            surfaceVariant = Color(0xFF1B2947),
-            onSurfaceVariant = Color(0xFFAAB7D4),
-            outline = Color(0xFF657CA9),
-            outlineVariant = Color(0xFF334466),
-            error = Color(0xFFFFB4AB),
-            onError = Color(0xFF690005),
-            errorContainer = Color(0xFF93000A),
-            onErrorContainer = Color(0xFFFFDAD6),
-            inverseSurface = Color(0xFFE3E2E6),
-            inverseOnSurface = Color(0xFF303034),
-            inversePrimary = accentColor,
-            scrim = Color.Black,
-            surfaceTint = Color.Transparent
-        )
-    } else {
-        lightColorScheme(
-            primary = accentColor,
-            onPrimary = accentOnColor,
-            primaryContainer = Color(0xFFE8EBF0),
-            onPrimaryContainer = Color(0xFF15171A),
-            secondary = Color(0xFF555B63),
-            onSecondary = Color.White,
-            secondaryContainer = Color(0xFFE7E9ED),
-            onSecondaryContainer = Color(0xFF1B1D20),
-            tertiary = Color(0xFF5B6068),
-            onTertiary = Color.White,
-            tertiaryContainer = Color(0xFFE9EBEF),
-            onTertiaryContainer = Color(0xFF1B1D20),
-            background = Color(0xFFF7F8FA),
-            onBackground = Color(0xFF15171A),
-            surface = Color.White,
-            onSurface = Color(0xFF15171A),
-            surfaceVariant = Color(0xFFF0F2F5),
-            onSurfaceVariant = Color(0xFF62676F),
-            outline = Color(0xFF8B9097),
-            outlineVariant = Color(0xFFD8DBE0),
-            error = Color(0xFFBA1A1A),
-            onError = Color.White,
-            errorContainer = Color(0xFFFFDAD6),
-            onErrorContainer = Color(0xFF410002),
-            inverseSurface = Color(0xFF303034),
-            inverseOnSurface = Color(0xFFF2F0F4),
-            inversePrimary = accentColor,
-            scrim = Color.Black,
-            surfaceTint = Color.Transparent
-        )
-    }
-
-    SideEffect {
-        context.findActivity()?.let { activity ->
-            WindowCompat.getInsetsController(activity.window, activity.window.decorView).apply {
-                isAppearanceLightStatusBars = !darkTheme
-                isAppearanceLightNavigationBars = !darkTheme
-            }
-        }
-    }
-
-    val updateSettings: (BrowserSettings) -> Unit = { updated ->
-        val iconChanged = settings.appIcon != updated.appIcon
-        val themeChanged = settings.theme != updated.theme
-        if (themeChanged) {
-            // Keep Gecko's own SYSTEM mode intact. This avoids resolving the Android theme twice
-            // during a cold start and lets Gecko track system appearance directly.
-            BrowserEngine.applyPreferredColorScheme(updated.theme)
-        }
-        settings = updated
-        BrowserSettingsStore.save(prefs, updated)
-        if (iconChanged) {
-            prefs.edit()
-                .putString("settings_app_icon", updated.appIcon.name)
-                .commit()
-        }
-    }
-
-    // First install: initialize and preallocate Gecko while onboarding is visible so the first
-    // real navigation does not also have to start the runtime/content process.
-    LaunchedEffect(onboardingComplete) {
-        if (!onboardingComplete) {
-            BrowserEngine.prewarm(context, settings)
-        }
-    }
-
-    MaterialTheme(colorScheme = colors) {
-        Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = if (onboardingComplete) Color.Transparent else MaterialTheme.colorScheme.background,
-            contentColor = MaterialTheme.colorScheme.onBackground
-        ) {
-            CompositionLocalProvider(
-                LocalIlyroLanguage provides resolveAppLanguage(settings.language),
-                LocalAppIcon provides settings.appIcon,
-                LocalIlyroUiDensity provides settings.uiDensity
-            ) {
-                if (onboardingComplete) {
-                    BrowserScreen(
-                        settings = settings,
-                        darkTheme = darkTheme,
-                        onSettingsChange = updateSettings
-                    )
-                } else {
-                    OnboardingScreen(
-                        settings = settings,
-                        onSettingsChange = updateSettings,
-                        onFinish = { _ ->
-                            // Guarantee that the runtime is fully configured with the selected
-                            // theme before BrowserScreen opens its first GeckoSession.
-                            BrowserEngine.prewarm(context, settings)
-                            prefs.edit()
-                                .putBoolean(PREF_ONBOARDING_COMPLETE, true)
-                                .remove(PREF_PENDING_ONBOARDING_EXTENSIONS)
-                                .apply()
-                            onboardingComplete = true
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun BrowserScreen(
-    settings: BrowserSettings,
-    darkTheme: Boolean,
-    onSettingsChange: (BrowserSettings) -> Unit
-) {
-    val context = LocalContext.current
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val focusManager = LocalFocusManager.current
-    val browserScope = rememberCoroutineScope()
-    val showTabletTabStrip = configuration.smallestScreenWidthDp >= 600
-    val runtime = remember {
-        BrowserEngine.prepareForSettings(settings)
-        BrowserEngine.getRuntime(context, settings.theme, settings.preferredSiteLanguages)
-    }
-    SideEffect {
-        BrowserEngine.applyPreferredColorScheme(settings.theme)
-    }
-
-    // Do not restore/open web sessions until bundled extensions have reached their requested
-    // startup state. This prevents a previously-enabled Dark Reader from touching pages for a
-    // moment before the saved "off" setting is applied, and guarantees the media detector is
-    // attached to the final WebExtension instance before YouTube starts loading.
-    if (!BrowserEngine.startupExtensionsReady) {
-        // Keep this placeholder transparent: GeckoView is Activity-owned and the project
-        // contract forbids an opaque BrowserScreen root from covering it.
-        Box(modifier = Modifier.fillMaxSize())
-        return
-    }
-    val prefs = remember { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
-    val downloadController = remember(runtime) { DownloadController(context, prefs, runtime) }
-    val downloads = remember { mutableStateListOf<DownloadUiItem>() }
-    fun isDownloadActive(item: DownloadUiItem): Boolean = when (item.status) {
-        android.app.DownloadManager.STATUS_PENDING,
-        android.app.DownloadManager.STATUS_RUNNING,
-        android.app.DownloadManager.STATUS_PAUSED -> true
-        else -> false
-    }
-
-    val overlayState = remember { BrowserOverlayState() }
-    var showDownloads by remember(overlayState) { overlayState.flag(BrowserOverlay.DOWNLOADS) }
+         YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Ô€€½¹M•½¹‘…Éä€ô½±½È ÁáÁÄÌÈØ¤°(€€€€€€€€€€€Í•½¹‘…Éå½¹Ñ…¥¹•È€ô½±½È ÁáÅÈäĞÜ¤°(€€€€€€€€€€€½¹M•½¹‘…Éå½¹Ñ…¥¹•È€ô½±½È ÁáÉÕ¤°(€€€€€€€€€€€Ñ•ÉÑ¥…Éä€ô½±½È ÁáåÕØ¤°(€€€€€€€€€€€½¹Q•ÉÑ¥…Éä€ô½±½È ÁáÁÄÌÈØ¤°(€€€€€€€€€€€Ñ•ÉÑ¥…Éå½¹Ñ…¥¹•È€ô½±½È ÁáÈÈÌÈÔÌ¤°(€€€€€€€€€€€½¹Q•ÉÑ¥…Éå½¹Ñ…¥¹•È€ô½±½È ÁáÉÕ¤°(€€€€€€€€€€€‰…­É½Õ¹€ô½±½È ÁáÀÜÄÈÈÔ¤°(€€€€€€€€€€€½¹	…­É½Õ¹€ô½±½È ÁáÑÑÔ¤°(€€€€€€€€€€€ÍÕÉ™…”€ô½±½È ÁáÄÀÅÌÌ¤°(€€€€€€€€€€€½¹MÕÉ™…”€ô½±½È ÁáÑÑÔ¤°(€€€€€€€€€€€ÍÕÉ™…•Y…É¥…¹Ğ€ô½±½È ÁáÅÈäĞÜ¤°(€€€€€€€€€€€½¹MÕÉ™…•Y…É¥…¹Ğ€ô½±½È ÁáİĞ¤°(€€€€€€€€€€€½ÕÑ±¥¹”€ô½±½È ÁáØÔİä¤°(€€€€€€€€€€€½ÕÑ±¥¹•Y…É¥…¹Ğ€ô½±½È ÁáÌÌĞĞØØ¤°(€€€€€€€€€€€•ÉÉ½È€ô½±½È ÁáÑ¤°(€€€€€€€€€€€½¹ÉÉ½È€ô½±½È ÁáØäÀÀÀÔ¤°(€€€€€€€€€€€•ÉÉ½É½¹Ñ…¥¹•È€ô½±½È ÁáäÌÀÀÁ¤°(€€€€€€€€€€€½¹ÉÉ½É½¹Ñ…¥¹•È€ô½±½È ÁáØ¤°(€€€€€€€€€€€¥¹Ù•ÉÍ•MÕÉ™…”€ô½±½È ÁáÍÉØ¤°(€€€€€€€€€€€¥¹Ù•ÉÍ•=¹MÕÉ™…”€ô½±½È ÁáÌÀÌÀÌĞ¤°(€€€€€€€€€€€¥¹Ù•ÉÍ•AÉ¥µ…Éä€ô…•¹Ñ½±½È°(€€€€€€€€€€€ÍÉ¥´€ô½±½È¹	±…¬°(€€€€€€€€€€€ÍÕÉ™…•Q¥¹Ğ€ô½±½È¹QÉ…¹ÍÁ…É•¹Ğ(€€€€€€€€¤(€€€ô•±Í”ì(€€€€€€€±¥¡Ñ½±½ÉM¡•µ” (€€€€€€€€€€€ÁÉ¥µ…Éä€ô…•¹Ñ½±½È°(€€€€€€€€€€€½¹AÉ¥µ…Éä€ô…•¹Ñ=¹½±½È°(€€€€€€€€€€€ÁÉ¥µ…Éå½¹Ñ…¥¹•È€ô½±½È Ááá	À¤°(€€€€€€€€€€€½¹AÉ¥µ…Éå½¹Ñ…¥¹•È€ô½±½È ÁáÄÔÄÜÅ¤°(€€€€€€€€€€€Í•½¹‘…Éä€ô½±½È ÁáÔÔÕØÌ¤°(€€€€€€€€€€€½¹M•½¹‘…Éä€ô½±½È¹]¡¥Ñ”°(€€€€€€€€€€€Í•½¹‘…Éå½¹Ñ…¥¹•È€ô½±½È Ááİå¤°(€€€€€€€€€€€½¹M•½¹‘…Éå½¹Ñ…¥¹•È€ô½±½È ÁáÅÅÈÀ¤°(€€€€€€€€€€€Ñ•ÉÑ¥…Éä€ô½±½È ÁáÕØÀØà¤°(€€€€€€€€€€€½¹Q•ÉÑ¥…Éä€ô½±½È¹]¡¥Ñ”°(€€€€€€€€€€€Ñ•ÉÑ¥…Éå½¹Ñ…¥¹•È€ô½±½È Ááå	¤°(€€€€€€€€€€€½¹Q•ÉÑ¥…Éå½¹Ñ…¥¹•È€ô½±½È ÁáÅÅÈÀ¤°(€€€€€€€€€€€‰…­É½Õ¹€ô½±½È Ááİá¤°(€€€€€€€€€€€½¹	…­É½Õ¹€ô½±½È ÁáÄÔÄÜÅ¤°(€€€€€€€€€€€ÍÕÉ™…”€ô½±½È¹]¡¥Ñ”°(€€€€€€€€€€€½¹MÕÉ™…”€ô½±½È ÁáÄÔÄÜÅ¤°(€€€€€€€€€€€ÍÕÉ™…•Y…É¥…¹Ğ€ô½±½È ÁáÁÉÔ¤°(€€€€€€€€€€€½¹MÕÉ™…•Y…É¥…¹Ğ€ô½±½È ÁáØÈØÜÙ¤°(€€€€€€€€€€€½ÕÑ±¥¹”€ô½±½È ÁááäÀäÜ¤°(€€€€€€€€€€€½ÕÑ±¥¹•Y…É¥…¹Ğ€ô½±½È Ááá	À¤°(€€€€€€€€€€€•ÉÉ½È€ô½±½È Áá	ÅÅ¤°(€€€€€€€€€€€½¹ÉÉ½È€ô½±½È¹]¡¥Ñ”°(€€€€€€€€€€€•ÉÉ½É½¹Ñ…¥¹•È€ô½±½È ÁáØ¤°(€€€€€€€€€€€½¹ÉÉ½É½¹Ñ…¥¹•È€ô½±½È ÁáĞÄÀÀÀÈ¤°(€€€€€€€€€€€¥¹Ù•ÉÍ•MÕÉ™…”€ô½±½È ÁáÌÀÌÀÌĞ¤°(€€€€€€€€€€€¥¹Ù•ÉÍ•=¹MÕÉ™…”€ô½±½È ÁáÉÁĞ¤°(€€€€€€€€€€€¥¹Ù•ÉÍ•AÉ¥µ…Éä€ô…•¹Ñ½±½È°(€€€€€€€€€€€ÍÉ¥´€ô½±½È¹	±…¬°(€€€€€€€€€€€ÍÕÉ™…•Q¥¹Ğ€ô½±½È¹QÉ…¹ÍÁ…É•¹Ğ(€€€€€€€€¤(€€€ô((€€€M¥‘•™™•Ğì(€€€€€€€½¹Ñ•áĞ¹™¥¹‘Ñ¥Ù¥Ñä ¤ü¹±•Ğì…Ñ¥Ù¥Ñä€´ø(€€€€€€€€€€€]¥¹‘½İ½µÁ…Ğ¹•Ñ%¹Í•ÑÍ½¹ÑÉ½±±•È¡…Ñ¥Ù¥Ñä¹İ¥¹‘½Ü°…Ñ¥Ù¥Ñä¹İ¥¹‘½Ü¹‘•½ÉY¥•Ü¤¹…ÁÁ±äì(€€€€€€€€€€€€€€€¥ÍÁÁ•…É…¹•1¥¡ÑMÑ…ÑÕÍ	…ÉÌ€ô€…‘…É­Q¡•µ”(€€€€€€€€€€€€€€€¥ÍÁÁ•…É…¹•1¥¡Ñ9…Ù¥…Ñ¥½¹	…ÉÌ€ô€…‘…É­Q¡•µ”(€€€€€€€€€€€ô(€€€€€€€ô(€€€ô((€€€Ù…°ÕÁ‘…Ñ•M•ÑÑ¥¹Ìè€¡	É½İÍ•ÉM•ÑÑ¥¹Ì¤€´øU¹¥Ğ€ôìÕÁ‘…Ñ•€´ø(€€€€€€€Ù…°¥½¹¡…¹•€ôÍ•ÑÑ¥¹Ì¹…ÁÁ%½¸€„ôÕÁ‘…Ñ•¹…ÁÁ%½¸(€€€€€€€Ù…°Ñ¡•µ•¡…¹•€ôÍ•ÑÑ¥¹Ì¹Ñ¡•µ”€„ôÕÁ‘…Ñ•¹Ñ¡•µ”(€€€€€€€¥˜€¡Ñ¡•µ•¡…¹•¤ì(€€€€€€€€€€€€¼¼-••À•­¼Ì½İ¸MeMQ4µ½‘”¥¹Ñ…Ğ¸Q¡¥Ì…Ù½¥‘ÌÉ•Í½±Ù¥¹œÑ¡”¹‘É½¥Ñ¡•µ”Ñİ¥”(€€€€€€€€€€€€¼¼‘ÕÉ¥¹œ„½±ÍÑ…ÉĞ…¹±•ÑÌ•­¼ÑÉ…¬ÍåÍÑ•´…ÁÁ•…É…¹”‘¥É•Ñ±ä¸(€€€€€€€€€€€	É½İÍ•É¹¥¹”¹…ÁÁ±åAÉ•™•ÉÉ•‘½±½ÉM¡•µ”¡ÕÁ‘…Ñ•¹Ñ¡•µ”¤(€€€€€€€ô(€€€€€€€Í•ÑÑ¥¹Ì€ôÕÁ‘…Ñ•(€€€€€€€	É½İÍ•ÉM•ÑÑ¥¹ÍMÑ½É”¹Í…Ù”¡ÁÉ•™Ì°ÕÁ‘…Ñ•¤(€€€€€€€¥˜€¡¥½¹¡…¹•¤ì(€€€€€€€€€€€ÁÉ•™Ì¹•‘¥Ğ ¤(€€€€€€€€€€€€€€€€¹ÁÕÑMÑÉ¥¹œ ‰Í•ÑÑ¥¹Í}…ÁÁ}¥½¸ˆ°ÕÁ‘…Ñ•¹…ÁÁ%½¸¹¹…µ”¤(€€€€€€€€€€€€€€€€¹½µµ¥Ğ ¤(€€€€€€€ô(€€€ô((€€€€¼¼¥ÉÍĞ¥¹ÍÑ…±°è¥¹¥Ñ¥…±¥é”…¹ÁÉ•…±±½…Ñ”•­¼İ¡¥±”½¹‰½…É‘¥¹œ¥ÌÙ¥Í¥‰±”Í¼Ñ¡”™¥ÉÍĞ(€€€€¼¼É•…°¹…Ù¥…Ñ¥½¸‘½•Ì¹½Ğ…±Í¼¡…Ù”Ñ¼ÍÑ…ÉĞÑ¡”ÉÕ¹Ñ¥µ”½½¹Ñ•¹ĞÁÉ½•ÍÌ¸(€€€1…Õ¹¡•‘™™•Ğ¡½¹‰½…É‘¥¹½µÁ±•Ñ”¤ì(€€€€€€€¥˜€ …½¹‰½…É‘¥¹½µÁ±•Ñ”¤ì(€€€€€€€€€€€	É½İÍ•É¹¥¹”¹ÁÉ•İ…É´¡½¹Ñ•áĞ°Í•ÑÑ¥¹Ì¤(€€€€€€€ô(€€€ô((€€€5…Ñ•É¥…±Q¡•µ”¡½±½ÉM¡•µ”€ô½±½ÉÌ¤ì(€€€€€€€MÕÉ™…” (€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹™¥±±5…áM¥é” ¤°(€€€€€€€€€€€½±½È€ô¥˜€¡½¹‰½…É‘¥¹½µÁ±•Ñ”¤½±½È¹QÉ…¹ÍÁ…É•¹Ğ•±Í”5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹‰…­É½Õ¹°(€€€€€€€€€€€½¹Ñ•¹Ñ½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½¹	…­É½Õ¹(€€€€€€€€¤ì(€€€€€€€€€€€½µÁ½Í¥Ñ¥½¹1½…±AÉ½Ù¥‘•È (€€€€€€€€€€€€€€€1½…±%±åÉ½1…¹Õ…”ÁÉ½Ù¥‘•ÌÉ•Í½±Ù•ÁÁ1…¹Õ…”¡Í•ÑÑ¥¹Ì¹±…¹Õ…”¤°(€€€€€€€€€€€€€€€1½…±ÁÁ%½¸ÁÉ½Ù¥‘•ÌÍ•ÑÑ¥¹Ì¹…ÁÁ%½¸°(€€€€€€€€€€€€€€€1½…±%±åÉ½U¥•¹Í¥ÑäÁÉ½Ù¥‘•ÌÍ•ÑÑ¥¹Ì¹Õ¥•¹Í¥Ñä(€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€¥˜€¡½¹‰½…É‘¥¹½µÁ±•Ñ”¤ì(€€€€€€€€€€€€€€€€€€€	É½İÍ•ÉMÉ••¸ (€€€€€€€€€€€€€€€€€€€€€€€Í•ÑÑ¥¹Ì€ôÍ•ÑÑ¥¹Ì°(€€€€€€€€€€€€€€€€€€€€€€€‘…É­Q¡•µ”€ôƒ]4ÒÚ$z{-®éÜj×ADS) }
     var topNotice by remember { mutableStateOf<BrowserTopNotice?>(null) }
     var renderedTopNotice by remember { mutableStateOf<BrowserTopNotice?>(null) }
     var pendingClosedTab by remember { mutableStateOf<BrowserTab?>(null) }
@@ -565,171 +234,7 @@ private fun BrowserScreen(
 
     DisposableEffect(Unit) {
         onDispose {
-            NativeBrowserHostCoordinator.clearInputExclusion()
-        }
-    }
-    val currentSettings by rememberUpdatedState(settings)
-    val onDownloadResponse: (WebResponse, String?, Boolean) -> Unit = { response, referrer, isPrivate ->
-        ensureDownloadNotificationPermission(context)
-        val record = downloadController.enqueue(
-            response = response,
-            allowMetered = currentSettings.downloadsOverMetered,
-            referrer = referrer,
-            isPrivate = isPrivate
-        )
-        refreshDownloads()
-        if (record != null) {
-            markDownloadsActive()
-            pushTopNotice(
-                kind = BrowserTopNoticeKind.DOWNLOAD,
-                title = tr(currentSettings.language, "Download started", "Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ° Ğ½Ğ°Ñ‡Ğ°Ğ»Ğ°ÑÑŒ"),
-                message = record.fileName,
-                actionLabel = tr(currentSettings.language, "View download", "ĞŸĞ¾ĞºĞ°Ğ·Ğ°Ñ‚ÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºÑƒ")
-            )
-        } else {
-            Toast.makeText(
-                context,
-                tr(currentSettings.language, "Couldn't start download", "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºÑƒ"),
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-    val onDownloadNavigation: (String, String?, Boolean, GeckoSessionSettings) -> Unit =
-        { url, referrer, isPrivate, sourceSettings ->
-            ensureDownloadNotificationPermission(context)
-            val started = downloadController.enqueueNavigationWithSession(
-                url = url,
-                sourceSettings = sourceSettings,
-                allowMetered = currentSettings.downloadsOverMetered,
-                referrer = referrer,
-                isPrivate = isPrivate,
-                onRecordsChanged = refreshDownloads
-            )
-            refreshDownloads()
-            if (started) {
-                markDownloadsActive()
-                val fileLabel = runCatching {
-                    Uri.decode(Uri.parse(url).lastPathSegment.orEmpty())
-                }.getOrDefault("").takeIf { it.isNotBlank() }
-                    ?: tr(currentSettings.language, "Preparing fileâ€¦", "ĞŸĞ¾Ğ´Ğ³Ğ¾Ñ‚Ğ°Ğ²Ğ»Ğ¸Ğ²Ğ°ĞµĞ¼ Ñ„Ğ°Ğ¹Ğ»â€¦")
-                pushTopNotice(
-                    kind = BrowserTopNoticeKind.DOWNLOAD,
-                    title = tr(currentSettings.language, "Download started", "Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ° Ğ½Ğ°Ñ‡Ğ°Ğ»Ğ°ÑÑŒ"),
-                    message = fileLabel,
-                    actionLabel = tr(currentSettings.language, "Open", "ĞÑ‚ĞºÑ€Ñ‹Ñ‚ÑŒ")
-                )
-            } else {
-                Toast.makeText(
-                    context,
-                    tr(currentSettings.language, "Couldn't start download", "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºÑƒ"),
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-    val legacyUrl = remember { prefs.getString(PREF_LAST_URL, HOME_URL) ?: HOME_URL }
-    val restoredSession = remember {
-        if (settings.restoreTabs) {
-            TabSessionStore.restore(prefs, legacyUrl)
-        } else {
-            RestoredTabSession(urls = listOf(HOME_URL), states = listOf(null), metadata = listOf(TabSessionMetadata()), activeIndex = 0)
-        }
-    }
-    val desiredWebColorScheme = if (darkTheme) "dark" else "light"
-    val forceFreshRestoredWebContent = remember {
-        // SessionState can contain a document created under the previous color scheme.
-        // Reopen its URL once when the scheme changes; subsequent launches keep fast restores.
-        prefs.getString(PREF_RESTORED_WEB_COLOR_SCHEME, null) != desiredWebColorScheme
-    }
-    LaunchedEffect(desiredWebColorScheme) {
-        prefs.edit().putString(PREF_RESTORED_WEB_COLOR_SCHEME, desiredWebColorScheme).apply()
-    }
-
-    val restoredBookmarks = remember { BookmarkStore.restore(prefs) }
-    val restoredHistory = remember { HistoryStore.restore(prefs) }
-
-    DisposableEffect(downloadController) {
-        ExtensionHostBridge.initialize(runtime)
-        ExtensionHostBridge.setDownloadHandler { _, request ->
-            ensureDownloadNotificationPermission(context)
-            val result = downloadController.enqueueExtensionDownload(
-                request = request,
-                allowMetered = currentSettings.downloadsOverMetered,
-                onRecordsChanged = refreshDownloads
-            )
-            markDownloadsActive()
-            val requestedName = request.filename
-                ?.substringAfterLast('/')
-                ?.substringAfterLast('\\')
-                ?.takeIf { it.isNotBlank() }
-                ?: tr(currentSettings.language, "Preparing fileâ€¦", "ĞŸĞ¾Ğ´Ğ³Ğ¾Ñ‚Ğ°Ğ²Ğ»Ğ¸Ğ²Ğ°ĞµĞ¼ Ñ„Ğ°Ğ¹Ğ»â€¦")
-            pushTopNotice(
-                kind = BrowserTopNoticeKind.DOWNLOAD,
-                title = tr(currentSettings.language, "Download started", "Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ° Ğ½Ğ°Ñ‡Ğ°Ğ»Ğ°ÑÑŒ"),
-                message = requestedName,
-                actionLabel = tr(currentSettings.language, "Open", "ĞÑ‚ĞºÑ€Ñ‹Ñ‚ÑŒ")
-            )
-            result
-        }
-        onDispose {
-            ExtensionHostBridge.setDownloadHandler(null)
-            ExtensionHostBridge.closePopup()
-        }
-    }
-
-    LaunchedEffect(settings.adBlockingEnabled) {
-        BrowserEngine.setAdBlockingEnabled(settings.adBlockingEnabled)
-    }
-
-    LaunchedEffect(
-        settings.preferredSiteLanguages,
-        settings.textScale,
-        settings.httpsOnly,
-        settings.thirdPartyCookieIsolation,
-        settings.globalPrivacyControl,
-        settings.theme,
-        darkTheme
-    ) {
-        BrowserEngine.applyRuntimeSettings(settings)
-    }
-
-    LaunchedEffect(Unit) {
-        prefs.edit().remove(PREF_PENDING_ONBOARDING_EXTENSIONS).apply()
-        ProtectionBridge.removeUnsupportedUserExtensions()
-    }
-
-    var pendingNewTabRequest by remember { mutableStateOf<PendingNewTabRequest?>(null) }
-    val handleNewTabRequest: (BrowserTab, String, GeckoResult<GeckoSession>) -> Unit =
-        { sourceTab, uri, result ->
-            pendingNewTabRequest?.let { previous ->
-                runCatching { previous.result.complete(null) }
-            }
-            pendingNewTabRequest = PendingNewTabRequest(sourceTab.id, uri, result)
-        }
-    var linkContextMenu by remember { mutableStateOf<LinkContextMenuRequest?>(null) }
-    val handleLinkContextMenu: (BrowserTab, GeckoSession.ContentDelegate.ContextElement) -> Unit =
-        { sourceTab, element ->
-            element.linkUri?.takeIf { it.isNotBlank() }?.let { linkUrl ->
-                linkContextMenu = LinkContextMenuRequest(
-                    sourceTabId = sourceTab.id,
-                    url = linkUrl,
-                    title = element.linkText?.takeIf { it.isNotBlank() }
-                        ?: element.title?.takeIf { it.isNotBlank() }
-                )
-            }
-        }
-
-    val tabs = remember(runtime) {
-        mutableStateListOf<BrowserTab>().apply {
-            restoredSession.urls.forEachIndexed { index, url ->
-                add(
-                    BrowserTab(
-                        runtime = runtime,
-                        initialUrl = url,
-                        initialPinned = restoredSession.metadata.getOrNull(index)?.pinned == true,
-                        initialGroup = restoredSession.metadata.getOrNull(index)?.group,
-                        settings = settings,
-                        desktopModeForUrl = { target -> SiteDesktopModeStore.effective(prefs, target, currentSettings.desktopMode) },
-                        onDownload = onDownloadResponse,
+            NativeBrowserHostCoYªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Õ½É‘¥¹…Ñ½È¹±•…É%¹ÁÕÑá±ÕÍ¥½¸ ¤(€€€€€€€ô(€€€ô(€€€Ù…°ÕÉÉ•¹ÑM•ÑÑ¥¹Ì‰äÉ•µ•µ‰•ÉUÁ‘…Ñ•‘MÑ…Ñ”¡Í•ÑÑ¥¹Ì¤(€€€Ù…°½¹½İ¹±½…‘I•ÍÁ½¹Í”è€¡]•‰I•ÍÁ½¹Í”°MÑÉ¥¹œü°	½½±•…¸¤€´øU¹¥Ğ€ôìÉ•ÍÁ½¹Í”°É•™•ÉÉ•È°¥ÍAÉ¥Ù…Ñ”€´ø(€€€€€€€•¹ÍÕÉ•½İ¹±½…‘9½Ñ¥™¥…Ñ¥½¹A•Éµ¥ÍÍ¥½¸¡½¹Ñ•áĞ¤(€€€€€€€Ù…°É•½É€ô‘½İ¹±½…‘½¹ÑÉ½±±•È¹•¹ÅÕ•Õ” (€€€€€€€€€€€É•ÍÁ½¹Í”€ôÉ•ÍÁ½¹Í”°(€€€€€€€€€€€…±±½İ5•Ñ•É•€ôÕÉÉ•¹ÑM•ÑÑ¥¹Ì¹‘½İ¹±½…‘Í=Ù•É5•Ñ•É•°(€€€€€€€€€€€É•™•ÉÉ•È€ôÉ•™•ÉÉ•È°(€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ô¥ÍAÉ¥Ù…Ñ”(€€€€€€€€¤(€€€€€€€É•™É•Í¡½İ¹±½…‘Ì ¤(€€€€€€€¥˜€¡É•½É€„ô¹Õ±°¤ì(€€€€€€€€€€€µ…É­½İ¹±½…‘ÍÑ¥Ù” ¤(€€€€€€€€€€€ÁÕÍ¡Q½Á9½Ñ¥” (€€€€€€€€€€€€€€€­¥¹€ô	É½İÍ•ÉQ½Á9½Ñ¥•-¥¹¹=]91=°(€€€€€€€€€€€€€€€Ñ¥Ñ±”€ôÑÈ¡ÕÉÉ•¹ÑM•ÑÑ¥¹Ì¹±…¹Õ…”°€‰½İ¹±½…ÍÑ…ÉÑ•ˆ°€‹B_BÃBÏFFBßBëBÀƒB÷BÃFBÃBïBÃFF0ˆ¤°(€€€€€€€€€€€€€€€µ•ÍÍ…”€ôÉ•½É¹™¥±•9…µ”°(€€€€€€€€€€€€€€€…Ñ¥½¹1…‰•°€ôÑÈ¡ÕÉÉ•¹ÑM•ÑÑ¥¹Ì¹±…¹Õ…”°€‰Y¥•Ü‘½İ¹±½…ˆ°€‹BBûBëBÃBßBÃFF0ƒBßBÃBÏFFBßBëFˆ¤(€€€€€€€€€€€€¤(€€€€€€€ô•±Í”ì(€€€€€€€€€€€Q½…ÍĞ¹µ…­•Q•áĞ (€€€€€€€€€€€€€€€½¹Ñ•áĞ°(€€€€€€€€€€€€€€€ÑÈ¡ÕÉÉ•¹ÑM•ÑÑ¥¹Ì¹±…¹Õ…”°€‰½Õ±‘¸ĞÍÑ…ÉĞ‘½İ¹±½…ˆ°€‹BwBÔƒFBÓBÃBïBûFF0ƒB÷BÃFBÃFF0ƒBßBÃBÏFFBßBëFˆ¤°(€€€€€€€€€€€€€€€Q½…ÍĞ¹19Q!}M!=IP(€€€€€€€€€€€€¤¹Í¡½Ü ¤(€€€€€€€ô(€€€ô(€€€Ù…°½¹½İ¹±½…‘9…Ù¥…Ñ¥½¸è€¡MÑÉ¥¹œ°MÑÉ¥¹œü°	½½±•…¸°•­½M•ÍÍ¥½¹M•ÑÑ¥¹Ì¤€´øU¹¥Ğ€ô(€€€€€€€ìÕÉ°°É•™•ÉÉ•È°¥ÍAÉ¥Ù…Ñ”°Í½ÕÉ•M•ÑÑ¥¹Ì€´ø(€€€€€€€€€€€•¹ÍÕÉ•½İ¹±½…‘9½Ñ¥™¥…Ñ¥½¹A•Éµ¥ÍÍ¥½¸¡½¹Ñ•áĞ¤(€€€€€€€€€€€Ù…°ÍÑ…ÉÑ•€ô‘½İ¹±½…‘½¹ÑÉ½±±•È¹•¹ÅÕ•Õ•9…Ù¥…Ñ¥½¹]¥Ñ¡M•ÍÍ¥½¸ (€€€€€€€€€€€€€€€ÕÉ°€ôÕÉ°°(€€€€€€€€€€€€€€€Í½ÕÉ•M•ÑÑ¥¹Ì€ôÍ½ÕÉ•M•ÑÑ¥¹Ì°(€€€€€€€€€€€€€€€…±±½İ5•Ñ•É•€ôÕÉÉ•¹ÑM•ÑÑ¥¹Ì¹‘½İ¹±½…‘Í=Ù•É5•Ñ•É•°(€€€€€€€€€€€€€€€É•™•ÉÉ•È€ôÉ•™•ÉÉ•È°(€€€€€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ô¥ÍAÉ¥Ù…Ñ”°(€€€€€€€€€€€€€€€½¹I•½É‘Í¡…¹•€ôÉ•™É•Í¡½İ¹±½…‘Ì(€€€€€€€€€€€€¤(€€€€€€€€€€€É•™É•Í¡½İ¹±½…‘Ì ¤(€€€€€€€€€€€¥˜€¡ÍÑ…ÉÑ•¤ì(€€€€€€€€€€€€€€€µ…É­½İ¹±½…‘ÍÑ¥Ù” ¤(€€€€€€€€€€€€€€€Ù…°™¥±•1…‰•°€ôÉÕ¹…Ñ¡¥¹œì(€€€€€€€€€€€€€€€€€€€UÉ¤¹‘•½‘”¡UÉ¤¹Á…ÉÍ”¡ÕÉ°¤¹±…ÍÑA…Ñ¡M•µ•¹Ğ¹½ÉµÁÑä ¤¤(€€€€€€€€€€€€€€€ô¹•Ñ=É•™…Õ±Ğ ˆˆ¤¹Ñ…­•%˜ì¥Ğ¹¥Í9½Ñ	±…¹¬ ¤ô(€€€€€€€€€€€€€€€€€€€€üèÑÈ¡ÕÉÉ•¹ÑM•ÑÑ¥¹Ì¹±…¹Õ…”°€‰AÉ•Á…É¥¹œ™¥±—Š˜ˆ°€‹BBûBÓBÏBûFBÃBËBïBãBËBÃB×BğƒFBÃBçBïŠ˜ˆ¤(€€€€€€€€€€€€€€€ÁÕÍ¡Q½Á9½Ñ¥” (€€€€€€€€€€€€€€€€€€€­¥¹€ô	É½İÍ•ÉQ½Á9½Ñ¥•-¥¹¹=]91=°(€€€€€€€€€€€€€€€€€€€Ñ¥Ñ±”€ôÑÈ¡ÕÉÉ•¹ÑM•ÑÑ¥¹Ì¹±…¹Õ…”°€‰½İ¹±½…ÍÑ…ÉÑ•ˆ°€‹B_BÃBÏFFBßBëBÀƒB÷BÃFBÃBïBÃFF0ˆ¤°(€€€€€€€€€€€€€€€€€€€µ•ÍÍ…”€ô™¥±•1…‰•°°(€€€€€€€€€€€€€€€€€€€…Ñ¥½¹1…‰•°€ôÑÈ¡ÕÉÉ•¹ÑM•ÑÑ¥¹Ì¹±…¹Õ…”°€‰=Á•¸ˆ°€‹B{FBëFF/FF0ˆ¤(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€Q½…ÍĞ¹µ…­•Q•áĞ (€€€€€€€€€€€€€€€€€€€½¹Ñ•áĞ°(€€€€€€€€€€€€€€€€€€€ÑÈ¡ÕÉÉ•¹ÑM•ÑÑ¥¹Ì¹±…¹Õ…”°€‰½Õ±‘¸ĞÍÑ…ÉĞ‘½İ¹±½…ˆ°€‹BwBÔƒFBÓBÃBïBûFF0ƒB÷BÃFBÃFF0ƒBßBÃBÏFFBßBëFˆ¤°(€€€€€€€€€€€€€€€€€€€Q½…ÍĞ¹19Q!}M!=IP(€€€€€€€€€€€€€€€€¤¹Í¡½Ü ¤(€€€€€€€€€€€ô(€€€€€€€ô(€€€Ù…°±•…åUÉ°€ôÉ•µ•µ‰•ÈìÁÉ•™Ì¹•ÑMÑÉ¥¹œ¡AI}1MQ}UI0°!=5}UI0¤€üè!=5}UI0ô(€€€Ù…°É•ÍÑ½É•‘M•ÍÍ¥½¸€ôÉ•µ•µ‰•Èì(€€€€€€€¥˜€¡Í•ÑÑ¥¹Ì¹É•ÍÑ½É•Q…‰Ì¤ì(€€€€€€€€€€€Q…‰M•ÍÍ¥½¹MÑ½É”¹É•ÍÑ½É”¡ÁÉ•™Ì°±•…åUÉ°¤(€€€€€€€ô•±Í”ì(€€€€€€€€€€€I•ÍÑ½É•‘Q…‰M•ÍÍ¥½¸¡ÕÉ±Ì€ô±¥ÍÑ=˜¡!=5}UI0¤°ÍÑ…Ñ•Ì€ô±¥ÍÑ=˜¡¹Õ±°¤°µ•Ñ…‘…Ñ„€ô±¥ÍÑ=˜¡Q…‰M•ÍÍ¥½¹5•Ñ…‘…Ñ„ ¤¤°…Ñ¥Ù•%¹‘•à€ô€À¤(€€€€€€€ô(€€€ô(€€€Ù…°‘•Í¥É•‘]•‰½±½ÉM¡•µ”€ô¥˜€¡‘…É­Q¡•µ”¤€‰‘…É¬ˆ•±Í”€‰±¥¡Ğˆ(€€€Ù…°™½É•É•Í¡I•ÍÑ½É•‘]•‰½¹Ñ•¹Ğ€ôÉ•µ•µ‰•Èì(€€€€€€€€¼¼M•ÍÍ¥½¹MÑ…Ñ”…¸½¹Ñ…¥¸„‘½Õµ•¹ĞÉ•…Ñ•Õ¹‘•ÈÑ¡”ÁÉ•Ù¥½ÕÌ½±½ÈÍ¡•µ”¸(€€€€€€€€¼¼I•½Á•¸¥ÑÌUI0½¹”İ¡•¸Ñ¡”Í¡•µ”¡…¹•ÌìÍÕ‰Í•ÅÕ•¹Ğ±…Õ¹¡•Ì­••À™…ÍĞÉ•ÍÑ½É•Ì¸(€€€€€€€ÁÉ•™Ì¹•ÑMÑÉ¥¹œ¡AI}IMQ=I}]	}=1=I}M!5°¹Õ±°¤€„ô‘•Í¥É•‘]•‰½±½ÉM¡•µ”(€€€ô(€€€1…Õ¹¡•‘™™•Ğ¡‘•Í¥É•‘]•‰½±½ÉM¡•µ”¤ì(€€€€€€€ÁÉ•™Ì¹•‘¥Ğ ¤¹ÁÕÑMÑÉ¥¹œ¡AI}IMQ=I}]	}=1=I}M!5°‘•Í¥É•‘]•‰½±½ÉM¡•µ”¤¹…ÁÁ±ä ¤(€€€ô((€€€Ù…°É•ÍÑ½É•‘	½½­µ…É­Ì€ôÉ•µ•µ‰•Èì	½½­µ…É­MÑ½É”¹É•ÍÑ½É”¡ÁÉ•™Ì¤ô(€€€Ù…°É•ÍÑ½É•‘!¥ÍÑ½Éä€ôÉ•µ•µ‰•Èì!¥ÍÑ½ÉåMÑ½É”¹É•ÍÑ½É”¡ÁÉ•™Ì¤ô((€€€¥ÍÁ½Í…‰±•™™•Ğ¡‘½İ¹±½…‘½¹ÑÉ½±±•È¤ì(€€€€€€€áÑ•¹Í¥½¹!½ÍÑ	É¥‘”¹¥¹¥Ñ¥…±¥é”¡ÉÕ¹Ñ¥µ”¤(€€€€€€€áÑ•¹Í¥½¹!½ÍÑ	É¥‘”¹Í•Ñ½İ¹±½…‘!…¹‘±•Èì|°É•ÅÕ•ÍĞ€´ø(€€€€€€€€€€€•¹ÍÕÉ•½İ¹±½…‘9½Ñ¥™¥…Ñ¥½¹A•Éµ¥ÍÍ¥½¸¡½¹Ñ•áĞ¤(€€€€€€€€€€€Ù…°É•ÍÕ±Ğ€ô‘½İ¹±½…‘½¹ÑÉ½±±•È¹•¹ÅÕ•Õ•áÑ•¹Í¥½¹½İ¹±½… (€€€€€€€€€€€€€€€É•ÅÕ•ÍĞ€ôÉ•ÅÕ•ÍĞ°(€€€€€€€€€€€€€€€…±±½İ5•Ñ•É•€ôÕÉÉ•¹ÑM•ÑÑ¥¹Ì¹‘½İ¹±½…‘Í=Ù•É5•Ñ•É•°(€€€€€€€€€€€€€€€½¹I•½É‘Í¡…¹•€ôÉ•™É•Í¡½İ¹±½…‘Ì(€€€€€€€€€€€€¤(€€€€€€€€€€€µ…É­½İ¹±½…‘ÍÑ¥Ù” ¤(€€€€€€€€€€€Ù…°É•ÅÕ•ÍÑ•‘9…µ”€ôÉ•ÅÕ•ÍĞ¹™¥±•¹…µ”(€€€€€€€€€€€€€€€€ü¹ÍÕ‰ÍÑÉ¥¹™Ñ•É1…ÍĞ œ¼œ¤(€€€€€€€€€€€€€€€€ü¹ÍÕ‰ÍÑÉ¥¹™Ñ•É1…ÍĞ qpœ¤(ƒ]4ÒÚ$z{-®éÜj×onDownloadResponse,
                         onDownloadNavigation = onDownloadNavigation,
                         onNewTabRequest = handleNewTabRequest,
                         onLinkContextMenu = handleLinkContextMenu,
@@ -823,170 +328,7 @@ private fun BrowserScreen(
 
     // Many sites only evaluate prefers-color-scheme while creating the document. Update Gecko
     // first, then reload each already-open web session exactly once. There is no arbitrary delay:
-    // the runtime preference has already been set by updateSettings for manual theme changes.
-    LaunchedEffect(settings.theme, darkTheme) {
-        val browserThemeChanged = lastAppliedBrowserTheme != settings.theme
-        val resolvedAppearanceChanged = lastAppliedDarkTheme != darkTheme
-        if (!browserThemeChanged && !resolvedAppearanceChanged) return@LaunchedEffect
-        lastAppliedBrowserTheme = settings.theme
-        lastAppliedDarkTheme = darkTheme
-        BrowserEngine.applyPreferredColorScheme(settings.theme)
-
-        val activity = context.findActivity()
-        val inPictureInPicture = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            activity?.isInPictureInPictureMode == true
-
-        tabs.forEach { tab ->
-            val canReloadForTheme =
-                tab.session.isOpen() &&
-                    tab.url != HOME_URL &&
-                    tab.readerArticle == null &&
-                    !tab.isFullScreen &&
-                    !(inPictureInPicture && tab.id == activeTab.id)
-
-            if (canReloadForTheme) {
-                tab.session.reload()
-            }
-        }
-    }
-
-    LaunchedEffect(textScaleReloadRevision) {
-        if (textScaleReloadRevision > 0) {
-            delay(280L)
-            if (activeTab.url != HOME_URL) {
-                activeTab.session.reload()
-            }
-        }
-    }
-
-    LaunchedEffect(activeTab.id, isHome, readerModeActive, pageTransitionColor) {
-        if (!isHome && !readerModeActive) {
-            runCatching { activeTab.session.compositorController.setClearColor(pageTransitionColor) }
-            NativeBrowserHostCoordinator.render(activeTab.session)
-            currentGeckoView = NativeBrowserHostCoordinator.geckoView()
-            currentGeckoView?.let(::requestHighFrameRateTree)
-        } else {
-            NativeBrowserHostCoordinator.hideAndRelease()
-            currentGeckoView = null
-        }
-    }
-    val effectivePageUrl = activeTab.url
-    val activeHost = siteHost(effectivePageUrl)
-    val activeSiteDesktopMode = siteDesktopRevision.let {
-        SiteDesktopModeStore.effective(prefs, effectivePageUrl, settings.desktopMode)
-    }
-    val isBookmarked = !isHome && bookmarks.any { it.url == effectivePageUrl }
-    val restorableSnapshot by remember {
-        derivedStateOf {
-            val restorableTabs = tabs.filterNot { it.isPrivate }
-            RestorableTabSnapshot(
-                ids = restorableTabs.map { it.id },
-                urls = restorableTabs.map { it.url },
-                states = restorableTabs.map { it.serializedSessionState },
-                metadata = restorableTabs.map { TabSessionMetadata(it.isPinned, it.groupName) }
-            )
-        }
-    }
-    val restorableTabIds = restorableSnapshot.ids
-    val restorableTabUrls = restorableSnapshot.urls
-    val restorableTabStates = restorableSnapshot.states
-    val restorableTabMetadata = restorableSnapshot.metadata
-    val blockedBadge = ProtectionBridge.blockedBadge(activeTab.session)
-    val extensionReady = ProtectionBridge.extensionReady
-    val extensionPopupSession = ExtensionHostBridge.popupSession
-    val chromeHiddenByOverlay = false
-    val mediaRevision = MediaDetectorBridge.revision
-    val detectedMedia = remember(activeTab.session, mediaRevision) {
-        MediaDetectorBridge.itemsFor(activeTab.session)
-    }
-    val mediaEnabledForPage = !isHome && !MediaDetectorBridge.isExcludedUrl(activeTab.url)
-    val latestDetectedMedia = remember(detectedMedia) {
-        MediaDetectorBridge.selectPrimaryCandidate(detectedMedia)
-    }
-    val detectedVideoCount = if (
-        mediaEnabledForPage &&
-        latestDetectedMedia != null &&
-        latestDetectedMedia.kind != DetectedMediaKind.AUDIO
-    ) {
-        1
-    } else {
-        0
-    }
-    var resolvedMedia by remember(activeTab.id) { mutableStateOf<List<DetectedMedia>>(emptyList()) }
-    var resolvingMediaQualities by remember(activeTab.id) { mutableStateOf(false) }
-    var mediaResolveRequest by remember { mutableIntStateOf(0) }
-    val activeSiteProtection = settings.adBlockingEnabled &&
-        !isHome && activeHost.isNotBlank() &&
-        ProtectionBridge.siteEnabled("https://$activeHost/")
-
-    LaunchedEffect(showMedia, activeTab.id, mediaRevision) {
-        if (!showMedia || !mediaEnabledForPage) {
-            resolvingMediaQualities = false
-            return@LaunchedEffect
-        }
-        val candidate = MediaDetectorBridge.selectPrimaryCandidate(detectedMedia)
-        val requestId = mediaResolveRequest + 1
-        mediaResolveRequest = requestId
-        val tabId = activeTab.id
-        resolvedMedia = listOfNotNull(candidate)
-        resolvingMediaQualities = candidate?.kind == DetectedMediaKind.HLS
-        if (candidate == null) return@LaunchedEffect
-
-        downloadController.resolveMediaQualities(
-            media = listOf(candidate),
-            isPrivate = activeTab.isPrivate
-        ) { resolved ->
-            if (mediaResolveRequest == requestId && activeTabId == tabId && showMedia) {
-                resolvedMedia = listOfNotNull(
-                    MediaDetectorBridge.selectPrimaryCandidate(resolved)
-                )
-                resolvingMediaQualities = false
-            }
-        }
-    }
-
-    LaunchedEffect(activeTab.id, activeTab.pageStartSequence, pageTransitionColor) {
-        runCatching { activeTab.session.compositorController.setClearColor(pageTransitionColor) }
-    }
-
-    LaunchedEffect(activeTab.id, isFullScreen) {
-        if (isFullScreen) {
-            pushTopNotice(
-                kind = BrowserTopNoticeKind.FULLSCREEN,
-                title = tr(settings.language, "Full screen", "ĞŸĞ¾Ğ»Ğ½Ğ¾ÑĞºÑ€Ğ°Ğ½Ğ½Ñ‹Ğ¹ Ñ€ĞµĞ¶Ğ¸Ğ¼"),
-                message = tr(settings.language, "Press Back to exit", "ĞĞ°Ğ¶Ğ¼Ğ¸Ñ‚Ğµ Â«ĞĞ°Ğ·Ğ°Ğ´Â», Ñ‡Ñ‚Ğ¾Ğ±Ñ‹ Ğ²Ñ‹Ğ¹Ñ‚Ğ¸")
-            )
-        } else if (topNotice?.kind == BrowserTopNoticeKind.FULLSCREEN) {
-            // Start the existing slide/fade exit immediately instead of waiting for the timer.
-            topNotice = null
-        }
-    }
-
-    LaunchedEffect(isFullScreen, darkTheme) {
-        context.findActivity()?.let { activity ->
-            val controller = WindowCompat.getInsetsController(
-                activity.window,
-                activity.window.decorView
-            )
-            val isPhone = activity.resources.configuration.smallestScreenWidthDp < 600
-
-            if (isFullScreen) {
-                activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
-                controller.systemBarsBehavior =
-                    WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                controller.hide(WindowInsetsCompat.Type.systemBars())
-
-                activity.window.decorView.requestLayout()
-                currentGeckoView?.let { view ->
-                    view.requestLayout()
-                    view.invalidate()
-                    delay(180L)
-                    if (activeTab.isFullScreen && currentGeckoView === view) {
-                        activity.window.decorView.requestLayout()
-                        view.requestLayout()
-                        ViewCompat.requestApplyInsets(activity.window.decorView)
-                        ViewCompat.requestApplyInsets(view)
-                        view.setVerticalClipping(0)
+    // the runtime preference has already been set byYªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬ÔÕÁ‘…Ñ•M•ÑÑ¥¹Ì™½Èµ…¹Õ…°Ñ¡•µ”¡…¹•Ì¸(€€€1…Õ¹¡•‘™™•Ğ¡Í•ÑÑ¥¹Ì¹Ñ¡•µ”°‘…É­Q¡•µ”¤ì(€€€€€€€Ù…°‰É½İÍ•ÉQ¡•µ•¡…¹•€ô±…ÍÑÁÁ±¥•‘	É½İÍ•ÉQ¡•µ”€„ôÍ•ÑÑ¥¹Ì¹Ñ¡•µ”(€€€€€€€Ù…°É•Í½±Ù•‘ÁÁ•…É…¹•¡…¹•€ô±…ÍÑÁÁ±¥•‘…É­Q¡•µ”€„ô‘…É­Q¡•µ”(€€€€€€€¥˜€ …‰É½İÍ•ÉQ¡•µ•¡…¹•€˜˜€…É•Í½±Ù•‘ÁÁ•…É…¹•¡…¹•¤É•ÑÕÉ¹1…Õ¹¡•‘™™•Ğ(€€€€€€€±…ÍÑÁÁ±¥•‘	É½İÍ•ÉQ¡•µ”€ôÍ•ÑÑ¥¹Ì¹Ñ¡•µ”(€€€€€€€±…ÍÑÁÁ±¥•‘…É­Q¡•µ”€ô‘…É­Q¡•µ”(€€€€€€€	É½İÍ•É¹¥¹”¹…ÁÁ±åAÉ•™•ÉÉ•‘½±½ÉM¡•µ”¡Í•ÑÑ¥¹Ì¹Ñ¡•µ”¤((€€€€€€€Ù…°…Ñ¥Ù¥Ñä€ô½¹Ñ•áĞ¹™¥¹‘Ñ¥Ù¥Ñä ¤(€€€€€€€Ù…°¥¹A¥ÑÕÉ•%¹A¥ÑÕÉ”€ô	Õ¥±¹YIM%=8¹M-}%9P€øô	Õ¥±¹YIM%=9}=L¹<€˜˜(€€€€€€€€€€€…Ñ¥Ù¥Ñäü¹¥Í%¹A¥ÑÕÉ•%¹A¥ÑÕÉ•5½‘”€ôôÑÉÕ”((€€€€€€€Ñ…‰Ì¹™½É… ìÑ…ˆ€´ø(€€€€€€€€€€€Ù…°…¹I•±½…‘½ÉQ¡•µ”€ô(€€€€€€€€€€€€€€€Ñ…ˆ¹Í•ÍÍ¥½¸¹¥Í=Á•¸ ¤€˜˜(€€€€€€€€€€€€€€€€€€€Ñ…ˆ¹ÕÉ°€„ô!=5}UI0€˜˜(€€€€€€€€€€€€€€€€€€€Ñ…ˆ¹É•…‘•ÉÉÑ¥±”€ôô¹Õ±°€˜˜(€€€€€€€€€€€€€€€€€€€€…Ñ…ˆ¹¥ÍÕ±±MÉ••¸€˜˜(€€€€€€€€€€€€€€€€€€€€„¡¥¹A¥ÑÕÉ•%¹A¥ÑÕÉ”€˜˜Ñ…ˆ¹¥€ôô…Ñ¥Ù•Q…ˆ¹¥¤((€€€€€€€€€€€¥˜€¡…¹I•±½…‘½ÉQ¡•µ”¤ì(€€€€€€€€€€€€€€€Ñ…ˆ¹Í•ÍÍ¥½¸¹É•±½… ¤(€€€€€€€€€€€ô(€€€€€€€ô(€€€ô((€€€1…Õ¹¡•‘™™•Ğ¡Ñ•áÑM…±•I•±½…‘I•Ù¥Í¥½¸¤ì(€€€€€€€¥˜€¡Ñ•áÑM…±•I•±½…‘I•Ù¥Í¥½¸€ø€À¤ì(€€€€€€€€€€€‘•±…ä ÈàÁ0¤(€€€€€€€€€€€¥˜€¡…Ñ¥Ù•Q…ˆ¹ÕÉ°€„ô!=5}UI0¤ì(€€€€€€€€€€€€€€€…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¹É•±½… ¤(€€€€€€€€€€€ô(€€€€€€€ô(€€€ô((€€€1…Õ¹¡•‘™™•Ğ¡…Ñ¥Ù•Q…ˆ¹¥°¥Í!½µ”°É•…‘•É5½‘•Ñ¥Ù”°Á…•QÉ…¹Í¥Ñ¥½¹½±½È¤ì(€€€€€€€¥˜€ …¥Í!½µ”€˜˜€…É•…‘•É5½‘•Ñ¥Ù”¤ì(€€€€€€€€€€€ÉÕ¹…Ñ¡¥¹œì…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¹½µÁ½Í¥Ñ½É½¹ÑÉ½±±•È¹Í•Ñ±•…É½±½È¡Á…•QÉ…¹Í¥Ñ¥½¹½±½È¤ô(€€€€€€€€€€€9…Ñ¥Ù•	É½İÍ•É!½ÍÑ½½É‘¥¹…Ñ½È¹É•¹‘•È¡…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¤(€€€€€€€€€€€ÕÉÉ•¹Ñ•­½Y¥•Ü€ô9…Ñ¥Ù•	É½İÍ•É!½ÍÑ½½É‘¥¹…Ñ½È¹•­½Y¥•Ü ¤(€€€€€€€€€€€ÕÉÉ•¹Ñ•­½Y¥•Üü¹±•Ğ èéÉ•ÅÕ•ÍÑ!¥¡É…µ•I…Ñ•QÉ•”¤(€€€€€€€ô•±Í”ì(€€€€€€€€€€€9…Ñ¥Ù•	É½İÍ•É!½ÍÑ½½É‘¥¹…Ñ½È¹¡¥‘•¹‘I•±•…Í” ¤(€€€€€€€€€€€ÕÉÉ•¹Ñ•­½Y¥•Ü€ô¹Õ±°(€€€€€€€ô(€€€ô(€€€Ù…°•™™•Ñ¥Ù•A…•UÉ°€ô…Ñ¥Ù•Q…ˆ¹ÕÉ°(€€€Ù…°…Ñ¥Ù•!½ÍĞ€ôÍ¥Ñ•!½ÍĞ¡•™™•Ñ¥Ù•A…•UÉ°¤(€€€Ù…°…Ñ¥Ù•M¥Ñ••Í­Ñ½Á5½‘”€ôÍ¥Ñ••Í­Ñ½ÁI•Ù¥Í¥½¸¹±•Ğì(€€€€€€€M¥Ñ••Í­Ñ½Á5½‘•MÑ½É”¹•™™•Ñ¥Ù”¡ÁÉ•™Ì°•™™•Ñ¥Ù•A…•UÉ°°Í•ÑÑ¥¹Ì¹‘•Í­Ñ½Á5½‘”¤(€€€ô(€€€Ù…°¥Í	½½­µ…É­•€ô€…¥Í!½µ”€˜˜‰½½­µ…É­Ì¹…¹äì¥Ğ¹ÕÉ°€ôô•™™•Ñ¥Ù•A…•UÉ°ô(€€€Ù…°É•ÍÑ½É…‰±•M¹…ÁÍ¡½Ğ‰äÉ•µ•µ‰•Èì(€€€€€€€‘•É¥Ù•‘MÑ…Ñ•=˜ì(€€€€€€€€€€€Ù…°É•ÍÑ½É…‰±•Q…‰Ì€ôÑ…‰Ì¹™¥±Ñ•É9½Ğì¥Ğ¹¥ÍAÉ¥Ù…Ñ”ô(€€€€€€€€€€€I•ÍÑ½É…‰±•Q…‰M¹…ÁÍ¡½Ğ (€€€€€€€€€€€€€€€¥‘Ì€ôÉ•ÍÑ½É…‰±•Q…‰Ì¹µ…Àì¥Ğ¹¥ô°(€€€€€€€€€€€€€€€ÕÉ±Ì€ôÉ•ÍÑ½É…‰±•Q…‰Ì¹µ…Àì¥Ğ¹ÕÉ°ô°(€€€€€€€€€€€€€€€ÍÑ…Ñ•Ì€ôÉ•ÍÑ½É…‰±•Q…‰Ì¹µ…Àì¥Ğ¹Í•É¥…±¥é•‘M•ÍÍ¥½¹MÑ…Ñ”ô°(€€€€€€€€€€€€€€€µ•Ñ…‘…Ñ„€ôÉ•ÍÑ½É…‰±•Q…‰Ì¹µ…ÀìQ…‰M•ÍÍ¥½¹5•Ñ…‘…Ñ„¡¥Ğ¹¥ÍA¥¹¹•°¥Ğ¹É½ÕÁ9…µ”¤ô(€€€€€€€€€€€€¤(€€€€€€€ô(€€€ô(€€€Ù…°É•ÍÑ½É…‰±•Q…‰%‘Ì€ôÉ•ÍÑ½É…‰±•M¹…ÁÍ¡½Ğ¹¥‘Ì(€€€Ù…°É•ÍÑ½É…‰±•Q…‰UÉ±Ì€ôÉ•ÍÑ½É…‰±•M¹…ÁÍ¡½Ğ¹ÕÉ±Ì(€€€Ù…°É•ÍÑ½É…‰±•Q…‰MÑ…Ñ•Ì€ôÉ•ÍÑ½É…‰±•M¹…ÁÍ¡½Ğ¹ÍÑ…Ñ•Ì(€€€Ù…°É•ÍÑ½É…‰±•Q…‰5•Ñ…‘…Ñ„€ôÉ•ÍÑ½É…‰±•M¹…ÁÍ¡½Ğ¹µ•Ñ…‘…Ñ„(€€€Ù…°‰±½­•‘	…‘”€ôAÉ½Ñ•Ñ¥½¹	É¥‘”¹‰±½­•‘	…‘”¡…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¤(€€€Ù…°•áÑ•¹Í¥½¹I•…‘ä€ôAÉ½Ñ•Ñ¥½¹	É¥‘”¹•áÑ•¹Í¥½¹I•…‘ä(€€€Ù…°•áÑ•¹Í¥½¹A½ÁÕÁM•ÍÍ¥½¸€ôáÑ•¹Í¥½¹!½ÍÑ	É¥‘”¹Á½ÁÕÁM•ÍÍ¥½¸(€€€Ù…°¡É½µ•!¥‘‘•¹	å=Ù•É±…ä€ô™…±Í”(€€€Ù…°µ•‘¥…I•Ù¥Í¥½¸€ô5•‘¥…•Ñ•Ñ½É	É¥‘”¹É•Ù¥Í¥½¸(€€€Ù…°‘•Ñ•Ñ•‘5•‘¥„€ôÉ•µ•µ‰•È¡…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸°µ•‘¥…I•Ù¥Í¥½¸¤ì(€€€€€€€5•‘¥…•Ñ•Ñ½É	É¥‘”¹¥Ñ•µÍ½È¡…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¤(€€€ô(€€€Ù…°µ•‘¥…¹…‰±•‘½ÉA…”€ô€…¥Í!½µ”€˜˜€…5•‘¥…•Ñ•Ñ½É	É¥‘”¹¥Íá±Õ‘•‘UÉ°¡…Ñ¥Ù•Q…ˆ¹ÕÉ°¤(€€€Ù…°±…Ñ•ÍÑ•Ñ•Ñ•‘5•‘¥„€ôÉ•µ•µ‰•È¡‘•Ñ•Ñ•‘5•‘¥„¤ì(€€€€€€€5•‘¥…•Ñ•Ñ½É	É¥‘”¹Í•±•ÑAÉ¥µ…Éå…¹‘¥‘…Ñ”¡‘•Ñ•Ñ•‘5•‘¥„¤(€€€ô(€€€Ù…°‘•Ñ•Ñ•‘Y¥‘•½½Õ¹Ğ€ô¥˜€ (€€€€€€€µ•‘¥…¹…‰±•‘½ÉA…”€˜˜(€€€€€€€±…Ñ•ÍÑ•Ñ•Ñ•‘5•‘¥„€„ô¹Õ±°€˜˜(€€€€€€€±…Ñ•ÍÑ•Ñ•Ñ•‘5•‘¥„¹­¥¹€„ô•Ñ•Ñ•‘5•‘¥…-¥¹¹U%<(€€€€¤ì(€€€€€€€€Ä(€€€ô•±Í”ì(€€€€€€€€À(€€€ô(€€€Ù…ÈÉ•Í½±Ù•‘5•‘¥„‰äÉ•µ•µ‰•È¡…Ñ¥Ù•Q…ˆ¹¥¤ìµÕÑ…‰±•MÑ…Ñ•=˜ñ1¥ÍĞñ•Ñ•Ñ•‘5•‘¥„øø¡•µÁÑå1¥ÍĞ ¤¤ô(€€€Ù…ÈÉ•Í½±Ù¥¹5•‘¥…EÕ…±¥Ñ¥•Ì‰äÉ•µ•µ‰•È¡…Ñ¥Ù•Q…ˆ¹¥¤ìµÕÑ…‰±•MÑ…Ñ•=˜¡™…±Í”¤ô(€€€Ù…Èµ•‘¥…I•Í½±Ù•I•ÅÕ•ÍĞ‰äÉ•µ•µ‰•ÈìµÕÑ…‰±•%¹ÑMÑ…Ñ•=˜ À¤ô(€€€Ù…°…Ñ¥Ù•M¥Ñ•AÉ½Ñ•Ñ¥½¸€ôÍ•ÑÑ¥¹Ì¹…‘	±½­¥¹¹…‰±•€˜˜(€€€€€€€€…¥Í!½µ”€˜˜…Ñ¥Ù•!½ÍĞ¹¥Í9½Ñ	±…¹¬ ¤€˜˜(€€€€€€€AÉ½Ñ•Ñ¥½¹	É¥‘”¹Í¥Ñ•¹…‰±• ‰¡ÑÑÁÌè¼¼‘…Ñ¥Ù•!½ÍĞ¼ˆ¤((€€€¥ÍÁ½Í…‰±•™™•Ğ¡Í¡½İ5•‘¥„°…Ñ¥Ù•Q…ˆ¹¥°µ•‘¥…I•Ù¥Í¥½¸°µ•‘¥…¹…‰±•‘½ÉA…”¤ì(€€€€€€€¥˜€ …Í¡½İ5•‘¥„ñğ€…µ•‘¥…¹…‰±•‘½ÉA…”¤ì(€€€€€€€€€€€É•Í½±Ù¥¹5•‘¥…EÕ…±¥Ñ¥•Ì€ô™…±Í”(€€€€€€€€€€€½¹¥ÍÁ½Í”ìô(€€€€€€€ô•±Í”ì(€€€€€€€€€€€Ù…°…¹‘¥‘…Ñ”€ô5•‘¥…•Ñ•Ñ½É	É¥‘”¹Í•±•ÑAÉ¥µ…Éå…¹‘¥‘…Ñ”¡‘•Ñ•Ñ•‘5•‘¥„¤(€€€€€€€€€€€Ù…°É•ÅÕ•ÍÑ%€ôµ•‘¥…I•Í½±Ù•I•ÅÕ•ÍĞ€¬€Ä+]4ÒÚ$z{-®éÜj×.setVerticalClipping(0)
                         view.invalidate()
                     }
                 }
@@ -1084,207 +426,7 @@ private fun BrowserScreen(
     fun trimTabPreviews() {
         tabs.asSequence()
             .filter { it.preview != null }
-            .sortedByDescending { it.previewRecency }
-            .drop(MAX_TAB_PREVIEWS)
-            .forEach { stale ->
-                stale.preview = null
-                stale.previewRecency = 0
-            }
-    }
-
-    DisposableEffect(activeTabId) {
-        val unbindMemoryTrim = BrowserMemoryCoordinator.bind {
-            // Keep the current preview for a smooth return to the tab overview, but drop every
-            // background thumbnail first. At 640x480 this can still release several MiB at once.
-            tabs.forEach { candidate ->
-                if (candidate.id != activeTabId) {
-                    candidate.preview = null
-                    candidate.previewRecency = 0
-                }
-            }
-        }
-        onDispose { unbindMemoryTrim() }
-    }
-
-    fun captureActivePreview() {
-        val previewTab = activeTab
-        if (previewTab.url == HOME_URL) return
-        val geckoView = currentGeckoView ?: return
-
-        geckoView.capturePixels().accept(
-            { bitmap ->
-                if (bitmap != null) {
-                    browserScope.launch {
-                        val scaled = withContext(Dispatchers.Default) {
-                            downscaleTabPreview(bitmap)
-                        }
-                        if (scaled !== bitmap) {
-                            // capturePixels() gives us a fresh bitmap; once a smaller copy exists,
-                            // releasing the full-size source avoids a large transient allocation.
-                            runCatching { bitmap.recycle() }
-                        }
-                        if (tabs.none { it.id == previewTab.id } || previewTab.url == HOME_URL) {
-                            runCatching { scaled.recycle() }
-                            return@launch
-                        }
-                        previewRecencyCounter += 1
-                        previewTab.previewRecency = previewRecencyCounter
-                        previewTab.preview = scaled
-                        trimTabPreviews()
-                    }
-                }
-            },
-            { _ -> }
-        )
-    }
-
-    // Capture only when the user is about to need a preview (opening the tab overview or
-    // switching away). This avoids a full GPU readback after every page load.
-
-    fun selectTab(tab: BrowserTab) {
-        if (tab.id != activeTabId) captureActivePreview()
-        focusManager.clearFocus()
-        addressFocused = false
-        currentGeckoView = null
-        // Keep Gecko's web color scheme current before a lazy/restored session is opened.
-        // This lets prefers-color-scheme be correct for the document from its first render.
-        BrowserEngine.applyPreferredColorScheme(settings.theme)
-        tab.openIfNeeded()
-        applyActiveState(tab.id)
-        activeTabId = tab.id
-        addressText = if (tab.url == HOME_URL) "" else tab.url
-        showTabs = false
-        showFindInPage = false
-        showTranslation = false
-    }
-
-    fun createTab(
-        isPrivate: Boolean = false,
-        initialUrl: String = HOME_URL,
-        select: Boolean = true,
-        initialGroup: String? = null
-    ) {
-        BrowserEngine.applyPreferredColorScheme(settings.theme)
-        val tab = BrowserTab(
-            runtime = runtime,
-            initialUrl = initialUrl,
-            isPrivate = isPrivate,
-            initialGroup = initialGroup,
-            settings = settings,
-            desktopModeForUrl = { target -> SiteDesktopModeStore.effective(prefs, target, currentSettings.desktopMode) },
-            onDownload = onDownloadResponse,
-            onDownloadNavigation = onDownloadNavigation,
-            onNewTabRequest = handleNewTabRequest,
-            onLinkContextMenu = handleLinkContextMenu
-        )
-        tabs.add(tab)
-        if (select) {
-            selectTab(tab)
-            addressText = if (initialUrl == HOME_URL) "" else initialUrl
-        }
-    }
-
-    fun clearPendingClosedTabState() {
-        pendingClosedTab = null
-        pendingClosedIndex = -1
-        pendingClosedWasActive = false
-        pendingClosedReplacementId = null
-        pendingClosedClearPrivateData = false
-        pendingClosedToken = 0L
-    }
-
-    fun finalizePendingClosedTab() {
-        val pending = pendingClosedTab ?: return
-        val clearPrivateData = pendingClosedClearPrivateData
-        clearPendingClosedTabState()
-        pending.close(clearPrivateData)
-    }
-
-    fun clearPendingClosedAllState() {
-        pendingClosedAllTabs = emptyList()
-        pendingClosedAllActiveId = null
-        pendingClosedAllReplacementId = null
-        pendingClosedAllClearPrivateData = false
-        pendingClosedAllToken = 0L
-    }
-
-    fun finalizePendingClosedAllTabs() {
-        val pending = pendingClosedAllTabs
-        if (pending.isEmpty()) return
-        val clearPrivateData = pendingClosedAllClearPrivateData
-        clearPendingClosedAllState()
-        pending.forEach { it.close(clearPrivateData) }
-    }
-
-    fun undoClosedTab() {
-        val closedTab = pendingClosedTab ?: return
-        val restoreIndex = pendingClosedIndex
-        val restoreAsActive = pendingClosedWasActive
-        val replacementId = pendingClosedReplacementId
-
-        val disposableReplacement = replacementId
-            ?.let { id -> tabs.firstOrNull { it.id == id } }
-            ?.takeIf { replacement ->
-                tabs.size == 1 && replacement.url == HOME_URL
-            }
-
-        if (disposableReplacement != null) {
-            tabs.remove(disposableReplacement)
-            disposableReplacement.close(false)
-        }
-
-        val safeIndex = restoreIndex.coerceIn(0, tabs.size)
-        tabs.add(safeIndex, closedTab)
-
-        // A LazyGrid can keep a dismissed card composition alive for a short time. Give the
-        // restored tab a new presentation generation so its swipe/removal state is recreated
-        // instead of immediately dismissing the same tab again.
-        lastRestoredTabId = closedTab.id
-        tabRestoreGeneration += 1L
-        clearPendingClosedTabState()
-
-        if (restoreAsActive || tabs.size == 1) {
-            activeTabId = closedTab.id
-            applyActiveState(closedTab.id)
-            addressText = if (closedTab.url == HOME_URL) "" else closedTab.url
-        } else {
-            applyActiveState(activeTabId)
-        }
-
-        topNotice = null
-    }
-
-    fun undoClosedAllTabs() {
-        val closedTabs = pendingClosedAllTabs
-        if (closedTabs.isEmpty()) return
-
-        val restoreActiveId = pendingClosedAllActiveId
-        val replacementId = pendingClosedAllReplacementId
-        val disposableReplacement = replacementId
-            ?.let { id -> tabs.firstOrNull { it.id == id } }
-            ?.takeIf { replacement ->
-                tabs.size == 1 && replacement.url == HOME_URL
-            }
-
-        if (disposableReplacement != null) {
-            tabs.remove(disposableReplacement)
-            disposableReplacement.close(false)
-        }
-
-        tabs.addAll(closedTabs)
-        clearPendingClosedAllState()
-
-        val restoredActive = closedTabs.firstOrNull { it.id == restoreActiveId }
-            ?: closedTabs.firstOrNull()
-        if (restoredActive != null) {
-            activeTabId = restoredActive.id
-            applyActiveState(restoredActive.id)
-            addressText = if (restoredActive.url == HOME_URL) "" else restoredActive.url
-        }
-
-        // Recreate any tab-card composition that could still hold a stale close animation.
-        lastRestoredTabId = restoredActive?.id
-        tabRestoreGeneration += 1L
+            .sortedByDescending { it.previYªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Õ•İI••¹äô(€€€€€€€€€€€€¹‘É½À¡5a}Q	}AIY%]L¤(€€€€€€€€€€€€¹™½É… ìÍÑ…±”€´ø(€€€€€€€€€€€€€€€ÍÑ…±”¹ÁÉ•Ù¥•Ü€ô¹Õ±°(€€€€€€€€€€€€€€€ÍÑ…±”¹ÁÉ•Ù¥•İI••¹ä€ô€À(€€€€€€€€€€€ô(€€€ô((€€€¥ÍÁ½Í…‰±•™™•Ğ¡…Ñ¥Ù•Q…‰%¤ì(€€€€€€€Ù…°Õ¹‰¥¹‘5•µ½ÉåQÉ¥´€ô	É½İÍ•É5•µ½Éå½½É‘¥¹…Ñ½È¹‰¥¹ì(€€€€€€€€€€€€¼¼-••ÀÑ¡”ÕÉÉ•¹ĞÁÉ•Ù¥•Ü™½È„Íµ½½Ñ É•ÑÕÉ¸Ñ¼Ñ¡”Ñ…ˆ½Ù•ÉÙ¥•Ü°‰ÕĞ‘É½À•Ù•Éä(€€€€€€€€€€€€¼¼‰…­É½Õ¹Ñ¡Õµ‰¹…¥°™¥ÉÍĞ¸Ğ€ØĞÁàĞàÀÑ¡¥Ì…¸ÍÑ¥±°É•±•…Í”Í•Ù•É…°5¥…Ğ½¹”¸(€€€€€€€€€€€Ñ…‰Ì¹™½É… ì…¹‘¥‘…Ñ”€´ø(€€€€€€€€€€€€€€€¥˜€¡…¹‘¥‘…Ñ”¹¥€„ô…Ñ¥Ù•Q…‰%¤ì(€€€€€€€€€€€€€€€€€€€…¹‘¥‘…Ñ”¹ÁÉ•Ù¥•Ü€ô¹Õ±°(€€€€€€€€€€€€€€€€€€€…¹‘¥‘…Ñ”¹ÁÉ•Ù¥•İI••¹ä€ô€À(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô(€€€€€€€ô(€€€€€€€½¹¥ÍÁ½Í”ìÕ¹‰¥¹‘5•µ½ÉåQÉ¥´ ¤ô(€€€ô((€€€™Õ¸…ÁÑÕÉ•Ñ¥Ù•AÉ•Ù¥•Ü ¤ì(€€€€€€€Ù…°ÁÉ•Ù¥•İQ…ˆ€ô…Ñ¥Ù•Q…ˆ(€€€€€€€¥˜€¡ÁÉ•Ù¥•İQ…ˆ¹ÕÉ°€ôô!=5}UI0¤É•ÑÕÉ¸(€€€€€€€Ù…°•­½Y¥•Ü€ôÕÉÉ•¹Ñ•­½Y¥•Ü€üèÉ•ÑÕÉ¸((€€€€€€€•­½Y¥•Ü¹…ÁÑÕÉ•A¥á•±Ì ¤¹…•ÁĞ (€€€€€€€€€€€ì‰¥Ñµ…À€´ø(€€€€€€€€€€€€€€€¥˜€¡‰¥Ñµ…À€„ô¹Õ±°¤ì(€€€€€€€€€€€€€€€€€€€‰É½İÍ•ÉM½Á”¹±…Õ¹ ì(€€€€€€€€€€€€€€€€€€€€€€€Ù…°Í…±•€ôİ¥Ñ¡½¹Ñ•áĞ¡¥ÍÁ…Ñ¡•ÉÌ¹•™…Õ±Ğ¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€‘½İ¹Í…±•Q…‰AÉ•Ù¥•Ü¡‰¥Ñµ…À¤(€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡Í…±•€„ôô‰¥Ñµ…À¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¼¼…ÁÑÕÉ•A¥á•±Ì ¤¥Ù•ÌÕÌ„™É•Í ‰¥Ñµ…Àì½¹”„Íµ…±±•È½Áä•á¥ÍÑÌ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¼¼É•±•…Í¥¹œÑ¡”™Õ±°µÍ¥é”Í½ÕÉ”…Ù½¥‘Ì„±…É”ÑÉ…¹Í¥•¹Ğ…±±½…Ñ¥½¸¸(€€€€€€€€€€€€€€€€€€€€€€€€€€€ÉÕ¹…Ñ¡¥¹œì‰¥Ñµ…À¹É•å±” ¤ô(€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡Ñ…‰Ì¹¹½¹”ì¥Ğ¹¥€ôôÁÉ•Ù¥•İQ…ˆ¹¥ôñğÁÉ•Ù¥•İQ…ˆ¹ÕÉ°€ôô!=5}UI0¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€ÉÕ¹…Ñ¡¥¹œìÍ…±•¹É•å±” ¤ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€É•ÑÕÉ¹±…Õ¹ (€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€ÁÉ•Ù¥•İI••¹å½Õ¹Ñ•È€¬ô€Ä(€€€€€€€€€€€€€€€€€€€€€€€ÁÉ•Ù¥•İQ…ˆ¹ÁÉ•Ù¥•İI••¹ä€ôÁÉ•Ù¥•İI••¹å½Õ¹Ñ•È(€€€€€€€€€€€€€€€€€€€€€€€ÁÉ•Ù¥•İQ…ˆ¹ÁÉ•Ù¥•Ü€ôÍ…±•(€€€€€€€€€€€€€€€€€€€€€€€ÑÉ¥µQ…‰AÉ•Ù¥•İÌ ¤(€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô°(€€€€€€€€€€€ì|€´øô(€€€€€€€€¤(€€€ô((€€€€¼¼…ÁÑÕÉ”½¹±äİ¡•¸Ñ¡”ÕÍ•È¥Ì…‰½ÕĞÑ¼¹••„ÁÉ•Ù¥•Ü€¡½Á•¹¥¹œÑ¡”Ñ…ˆ½Ù•ÉÙ¥•Ü½È(€€€€¼¼Íİ¥Ñ¡¥¹œ…İ…ä¤¸Q¡¥Ì…Ù½¥‘Ì„™Õ±°ATÉ•…‘‰…¬…™Ñ•È•Ù•ÉäÁ…”±½…¸((€€€™Õ¸Í•±•ÑQ…ˆ¡Ñ…ˆè	É½İÍ•ÉQ…ˆ¤ì(€€€€€€€¥˜€¡Ñ…ˆ¹¥€„ô…Ñ¥Ù•Q…‰%¤…ÁÑÕÉ•Ñ¥Ù•AÉ•Ù¥•Ü ¤(€€€€€€€™½ÕÍ5…¹…•È¹±•…É½ÕÌ ¤(€€€€€€€…‘‘É•ÍÍ½ÕÍ•€ô™…±Í”(€€€€€€€ÕÉÉ•¹Ñ•­½Y¥•Ü€ô¹Õ±°(€€€€€€€€¼¼-••À•­¼Ìİ•ˆ½±½ÈÍ¡•µ”ÕÉÉ•¹Ğ‰•™½É”„±…éä½É•ÍÑ½É•Í•ÍÍ¥½¸¥Ì½Á•¹•¸(€€€€€€€€¼¼Q¡¥Ì±•ÑÌÁÉ•™•ÉÌµ½±½ÈµÍ¡•µ”‰”½ÉÉ•Ğ™½ÈÑ¡”‘½Õµ•¹Ğ™É½´¥ÑÌ™¥ÉÍĞÉ•¹‘•È¸(€€€€€€€	É½İÍ•É¹¥¹”¹…ÁÁ±åAÉ•™•ÉÉ•‘½±½ÉM¡•µ”¡Í•ÑÑ¥¹Ì¹Ñ¡•µ”¤(€€€€€€€Ñ…ˆ¹½Á•¹%™9••‘• ¤(€€€€€€€…ÁÁ±åÑ¥Ù•MÑ…Ñ”¡Ñ…ˆ¹¥¤(€€€€€€€…Ñ¥Ù•Q…‰%€ôÑ…ˆ¹¥(€€€€€€€…‘‘É•ÍÍQ•áĞ€ô¥˜€¡Ñ…ˆ¹ÕÉ°€ôô!=5}UI0¤€ˆˆ•±Í”Ñ…ˆ¹ÕÉ°(€€€€€€€Í¡½İQ…‰Ì€ô™…±Í”(€€€€€€€Í¡½İ¥¹‘%¹A…”€ô™…±Í”(€€€€€€€Í¡½İQÉ…¹Í±…Ñ¥½¸€ô™…±Í”(€€€ô((€€€™Õ¸É•…Ñ•Q…ˆ (€€€€€€€¥ÍAÉ¥Ù…Ñ”è	½½±•…¸€ô™…±Í”°(€€€€€€€¥¹¥Ñ¥…±UÉ°èMÑÉ¥¹œ€ô!=5}UI0°(€€€€€€€Í•±•Ğè	½½±•…¸€ôÑÉÕ”°(€€€€€€€¥¹¥Ñ¥…±É½ÕÀèMÑÉ¥¹œü€ô¹Õ±°(€€€€¤ì(€€€€€€€	É½İÍ•É¹¥¹”¹…ÁÁ±åAÉ•™•ÉÉ•‘½±½ÉM¡•µ”¡Í•ÑÑ¥¹Ì¹Ñ¡•µ”¤(€€€€€€€Ù…°Ñ…ˆ€ô	É½İÍ•ÉQ…ˆ (€€€€€€€€€€€ÉÕ¹Ñ¥µ”€ôÉÕ¹Ñ¥µ”°(€€€€€€€€€€€¥¹¥Ñ¥…±UÉ°€ô¥¹¥Ñ¥…±UÉ°°(€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ô¥ÍAÉ¥Ù…Ñ”°(€€€€€€€€€€€¥¹¥Ñ¥…±É½ÕÀ€ô¥¹¥Ñ¥…±É½ÕÀ°(€€€€€€€€€€€Í•ÑÑ¥¹Ì€ôÍ•ÑÑ¥¹Ì°(€€€€€€€€€€€‘•Í­Ñ½Á5½‘•½ÉUÉ°€ôìÑ…É•Ğ€´øM¥Ñ••Í­Ñ½Á5½‘•MÑ½É”¹•™™•Ñ¥Ù”¡ÁÉ•™Ì°Ñ…É•Ğ°ÕÉÉ•¹ÑM•ÑÑ¥¹Ì¹‘•Í­Ñ½Á5½‘”¤ô°(€€€€€€€€€€€½¹½İ¹±½…€ô½¹½İ¹±½…‘I•ÍÁ½¹Í”°(€€€€€€€€€€€½¹½İ¹±½…‘9…Ù¥…Ñ¥½¸€ô½¹½İ¹±½…‘9…Ù¥…Ñ¥½¸°(€€€€€€€€€€€½¹9•İQ…‰I•ÅÕ•ÍĞ€ô¡…¹‘±•9•İQ…‰I•ÅÕ•ÍĞ°(€€€€€€€€€€€½¹1¥¹­½¹Ñ•áÑ5•¹Ô€ô¡…¹‘±•1¥¹­½¹Ñ•áÑ5•¹Ô(€€€€€€€€¤(€€€€€€€Ñ…‰Ì¹…‘¡Ñ…ˆ¤(€€€€€€€¥˜€¡Í•±•Ğ¤ì(€€€€€€€€€€€Í•±•ÑQ…ˆ¡Ñ…ˆ¤(€€€€€€€€€€€…‘‘É•ÍÍQ•áĞ€ô¥˜€¡¥¹¥Ñ¥…±UÉ°€ôô!=5}UI0¤€ˆˆ•±Í”¥¹¥Ñ¥…±UÉ°(€€€€€€€ô(€€€ô((€€€™Õ¸±•…ÉA•¹‘¥¹±½Í•‘Q…‰MÑ…Ñ” ¤ì(€€€€€€€Á•¹‘¥¹±½Í•‘Q…ˆ€ô¹Õ±°(€€€€€€€Á•¹‘¥¹±½Í•‘%¹‘•à€ô€´Ä(€€€€€€€Á•¹‘¥¹±½Í•‘]…ÍÑ¥Ù”€ô™…±Í”(€€€€€€€Á•¹‘¥¹±½Í•‘I•Á±…•µ•¹Ñ%€ô¹Õ±°(€€€€€€€Á•¹‘¥¹±½Í•‘±•…ÉAÉ¥Ù…Ñ•…Ñ„€ô™…±Í”(€€€€€€€Á•¹‘¥¹±½Í•‘Q½­•¸€ô€Á0(€€€ô((€€€™Õ¸™¥¹…±¥é•A•¹‘¥¹±½Í•‘Q…ˆ ¤ì(€€€€€€€Ù…°Á•¹‘¥¹œ€ôÁ•¹‘¥¹±½Í•‘Q…ˆ€üèÉ•ÑÕÉ¸(€€€€€€€Ù…°±•…ÉAÉ¥Ù…Ñ•…Ñ„€ôÁ•¹‘¥¹±½Í•‘±•…ÉAÉ¥Ù…Ñ•…Ñ„(€€€€€€€±•…ÉA•¹‘¥¹±½Í•‘Q…‰MÑ…Ñ” ¤(€€€€€€€Á•¹‘¥¹œ¹±½Í”¡±•…ÉAÉ¥Ù…Ñ•…Ñ„¤(€€€ô((€€€™Õ¸±•…ÉA•¹‘¥¹±½Í•‘±±MÑ…Ñ” ¤ì(€€€€€€€Á•¹‘¥¹±½Í•‘±±Q…‰Ì€ô•µÁÑå1¥ÍĞ ¤(€€€€€€€Á•¹‘¥¹±½Í•‘±±Ñ¥Ù•']4ÒÚ$z{-®éÜj×eGeneration += 1L
         topNotice = null
     }
 
@@ -1409,216 +551,7 @@ private fun BrowserScreen(
             message = tr(
                 settings.language,
                 "${closedTabs.size} tabs closed",
-                "Ğ—Ğ°ĞºÑ€Ñ‹Ñ‚Ğ¾ Ğ²ĞºĞ»Ğ°Ğ´Ğ¾Ğº: ${closedTabs.size}"
-            ),
-            actionLabel = tr(settings.language, "Undo", "ĞÑ‚Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ")
-        )
-
-        browserScope.launch {
-            delay(4_200L)
-            if (pendingClosedAllToken == closeToken && pendingClosedAllTabs === closedTabs) {
-                finalizePendingClosedAllTabs()
-            }
-        }
-    }
-
-    fun navigateInput(input: String) {
-        val target = normalizeAddress(input, settings.searchEngine)
-        addressText = if (target == HOME_URL) "" else target
-        BrowserEngine.applyPreferredColorScheme(settings.theme)
-        runCatching { activeTab.session.compositorController.setClearColor(pageTransitionColor) }
-        NativeBrowserHostCoordinator.coverUntilFirstPaint(activeTab.session)
-        activeTab.session.loadUri(target)
-        focusManager.clearFocus()
-        showFindInPage = false
-        showTranslation = false
-    }
-
-    fun openHome() {
-        addressText = ""
-        activeTab.preview = null
-        activeTab.previewRecency = 0
-        activeTab.session.loadUri(HOME_URL)
-        focusManager.clearFocus()
-        showFindInPage = false
-        showTranslation = false
-    }
-
-    fun refreshSitePermissions() {
-        if (isHome || activeHost.isBlank()) {
-            sitePermissions = emptyList()
-            return
-        }
-        runtime.storageController
-            .getPermissions(effectivePageUrl, activeTab.storageContextId, activeTab.isPrivate)
-            .accept(
-                { permissions -> sitePermissions = permissions?.toList().orEmpty() },
-                { _ -> sitePermissions = emptyList() }
-            )
-    }
-
-    fun openProtectionPanel() {
-        sitePermissions = emptyList()
-        if (!isHome && activeHost.isNotBlank()) {
-            refreshSitePermissions()
-        }
-        showProtection = true
-    }
-
-    fun toggleBookmark() {
-        if (activeTab.url == HOME_URL) return
-        val bookmarkUrl = activeTab.url
-
-        val existingIndex = bookmarks.indexOfFirst { it.url == bookmarkUrl }
-        if (existingIndex >= 0) {
-            bookmarks.removeAt(existingIndex)
-        } else {
-            bookmarks.add(
-                0,
-                BookmarkItem(
-                    url = bookmarkUrl,
-                    title = activeTab.title.ifBlank { hostLabel(bookmarkUrl) }
-                )
-            )
-        }
-        BookmarkStore.save(prefs, bookmarks)
-    }
-
-    fun openBookmark(bookmark: BookmarkItem) {
-        showBookmarks = false
-        addressText = bookmark.url
-        BrowserEngine.applyPreferredColorScheme(settings.theme)
-        runCatching { activeTab.session.compositorController.setClearColor(pageTransitionColor) }
-        NativeBrowserHostCoordinator.coverUntilFirstPaint(activeTab.session)
-        activeTab.session.loadUri(bookmark.url)
-        focusManager.clearFocus()
-    }
-
-    fun removeBookmark(bookmark: BookmarkItem) {
-        bookmarks.removeAll { it.url == bookmark.url }
-        BookmarkStore.save(prefs, bookmarks)
-    }
-
-    fun editBookmark(bookmark: BookmarkItem, title: String, folder: String?) {
-        val index = bookmarks.indexOfFirst { it.url == bookmark.url }
-        if (index < 0) return
-        bookmarks[index] = bookmark.copy(
-            title = title.trim().ifBlank { bookmark.url },
-            folder = folder?.trim()?.takeIf { it.isNotBlank() }
-        )
-        BookmarkStore.save(prefs, bookmarks)
-    }
-
-    fun openHistoryEntry(entry: HistoryItem) {
-        showHistory = false
-        addressText = entry.url
-        BrowserEngine.applyPreferredColorScheme(settings.theme)
-        runCatching { activeTab.session.compositorController.setClearColor(pageTransitionColor) }
-        NativeBrowserHostCoordinator.coverUntilFirstPaint(activeTab.session)
-        activeTab.session.loadUri(entry.url)
-        focusManager.clearFocus()
-    }
-
-    fun removeHistoryEntry(entry: HistoryItem) {
-        history.remove(entry)
-        HistoryStore.save(prefs, history)
-    }
-
-    val externalNavigationHandler by rememberUpdatedState<(String) -> Unit> { target ->
-        createTab(isPrivate = false, initialUrl = target)
-    }
-
-    DisposableEffect(Unit) {
-        // Apply the selected browser theme before the initial/restored tab is opened.
-        BrowserEngine.applyPreferredColorScheme(settings.theme)
-        applyActiveState(activeTabId)
-        val unbindExternalNavigation = ExternalNavigationCoordinator.bind { target ->
-            externalNavigationHandler(target)
-        }
-
-        onDispose {
-            unbindExternalNavigation()
-            tabs.forEach { it.close(currentSettings.clearPrivateDataOnExit) }
-        }
-    }
-
-    LaunchedEffect(activeTab.id, activeTab.url, addressFocused) {
-        if (!addressFocused) {
-            addressText = if (activeTab.url == HOME_URL) "" else activeTab.url
-        }
-        if (!activeTab.isPrivate) {
-            prefs.edit().putString(PREF_LAST_URL, activeTab.url).apply()
-        }
-    }
-
-    LaunchedEffect(activeTab.id, readerModeActive) {
-        if (readerModeActive) {
-            fun dismissReaderOmnibox() {
-                focusManager.clearFocus(force = true)
-                addressFocused = false
-                context.findActivity()?.let { activity ->
-                    activity.currentFocus?.clearFocus()
-                    WindowInsetsControllerCompat(
-                        activity.window,
-                        activity.window.decorView
-                    ).hide(WindowInsetsCompat.Type.ime())
-                    (context.getSystemService(Context.INPUT_METHOD_SERVICE) as?
-                        android.view.inputmethod.InputMethodManager)
-                        ?.hideSoftInputFromWindow(
-                            activity.window.decorView.windowToken,
-                            0
-                        )
-                }
-            }
-
-            dismissReaderOmnibox()
-            delay(64L)
-            dismissReaderOmnibox()
-            delay(160L)
-            dismissReaderOmnibox()
-        }
-    }
-
-    LaunchedEffect(restorableTabUrls, restorableTabStates, restorableTabMetadata, activeTabId) {
-        delay(250L)
-        val activeIndex = restorableTabIds.indexOf(activeTabId)
-            .coerceAtLeast(0)
-        TabSessionStore.save(
-            prefs = prefs,
-            urls = restorableTabUrls.ifEmpty { listOf(HOME_URL) },
-            states = restorableTabStates.ifEmpty { listOf(null) },
-            metadata = restorableTabMetadata.ifEmpty { listOf(TabSessionMetadata()) },
-            activeIndex = activeIndex
-        )
-    }
-
-    LaunchedEffect(settings.desktopMode, siteDesktopRevision) {
-        tabs.forEach { tab ->
-            val desired = SiteDesktopModeStore.effective(prefs, tab.url, settings.desktopMode)
-            if (tab.isDesktopModeEnabled() != desired) {
-                tab.applyDesktopMode(desired, reload = true)
-            }
-        }
-    }
-
-    LaunchedEffect(activeTab.id, activeTab.loadSequence) {
-        if (
-            settings.historyEnabled &&
-            !activeTab.isPrivate &&
-            activeTab.loadSequence > 0 &&
-            activeTab.url != HOME_URL
-        ) {
-            history.add(
-                0,
-                HistoryItem(
-                    url = activeTab.url,
-                    title = activeTab.title.ifBlank { hostLabel(activeTab.url) },
-                    visitedAt = System.currentTimeMillis()
-                )
-            )
-            while (history.size > 1000) {
-                history.removeAt(history.lastIndex)
-            }
+                "Ğ—Ğ°ĞºÑ€Ñ‹Ñ‚Ğ¾ Ğ²ĞºĞ»Ğ°Ğ´Ğ¾Ğº: ${closedTabsYªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Ô¹Í¥é•ôˆ(€€€€€€€€€€€€¤°(€€€€€€€€€€€…Ñ¥½¹1…‰•°€ôÑÈ¡Í•ÑÑ¥¹Ì¹±…¹Õ…”°€‰U¹‘¼ˆ°€‹B{FBóB×B÷BãFF0ˆ¤(€€€€€€€€¤((€€€€€€€‰É½İÍ•ÉM½Á”¹±…Õ¹ ì(€€€€€€€€€€€‘•±…ä Ñ|ÈÀÁ0¤(€€€€€€€€€€€¥˜€¡Á•¹‘¥¹±½Í•‘±±Q½­•¸€ôô±½Í•Q½­•¸€˜˜Á•¹‘¥¹±½Í•‘±±Q…‰Ì€ôôô±½Í•‘Q…‰Ì¤ì(€€€€€€€€€€€€€€€™¥¹…±¥é•A•¹‘¥¹±½Í•‘±±Q…‰Ì ¤(€€€€€€€€€€€ô(€€€€€€€ô(€€€ô((€€€™Õ¸¹…Ù¥…Ñ•%¹ÁÕĞ¡¥¹ÁÕĞèMÑÉ¥¹œ¤ì(€€€€€€€Ù…°Ñ…É•Ğ€ô¹½Éµ…±¥é•‘‘É•ÍÌ¡¥¹ÁÕĞ°Í•ÑÑ¥¹Ì¹Í•…É¡¹¥¹”¤(€€€€€€€…‘‘É•ÍÍQ•áĞ€ô¥˜€¡Ñ…É•Ğ€ôô!=5}UI0¤€ˆˆ•±Í”Ñ…É•Ğ(€€€€€€€	É½İÍ•É¹¥¹”¹…ÁÁ±åAÉ•™•ÉÉ•‘½±½ÉM¡•µ”¡Í•ÑÑ¥¹Ì¹Ñ¡•µ”¤(€€€€€€€ÉÕ¹…Ñ¡¥¹œì…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¹½µÁ½Í¥Ñ½É½¹ÑÉ½±±•È¹Í•Ñ±•…É½±½È¡Á…•QÉ…¹Í¥Ñ¥½¹½±½È¤ô(€€€€€€€9…Ñ¥Ù•	É½İÍ•É!½ÍÑ½½É‘¥¹…Ñ½È¹½Ù•ÉU¹Ñ¥±¥ÉÍÑA…¥¹Ğ¡…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¤(€€€€€€€…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¹±½…‘UÉ¤¡Ñ…É•Ğ¤(€€€€€€€™½ÕÍ5…¹…•È¹±•…É½ÕÌ ¤(€€€€€€€Í¡½İ¥¹‘%¹A…”€ô™…±Í”(€€€€€€€Í¡½İQÉ…¹Í±…Ñ¥½¸€ô™…±Í”(€€€ô((€€€™Õ¸½Á•¹!½µ” ¤ì(€€€€€€€…‘‘É•ÍÍQ•áĞ€ô€ˆˆ(€€€€€€€…Ñ¥Ù•Q…ˆ¹ÁÉ•Ù¥•Ü€ô¹Õ±°(€€€€€€€…Ñ¥Ù•Q…ˆ¹ÁÉ•Ù¥•İI••¹ä€ô€À(€€€€€€€…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¹±½…‘UÉ¤¡!=5}UI0¤(€€€€€€€™½ÕÍ5…¹…•È¹±•…É½ÕÌ ¤(€€€€€€€Í¡½İ¥¹‘%¹A…”€ô™…±Í”(€€€€€€€Í¡½İQÉ…¹Í±…Ñ¥½¸€ô™…±Í”(€€€ô((€€€™Õ¸É•™É•Í¡M¥Ñ•A•Éµ¥ÍÍ¥½¹Ì ¤ì(€€€€€€€¥˜€¡¥Í!½µ”ñğ…Ñ¥Ù•!½ÍĞ¹¥Í	±…¹¬ ¤¤ì(€€€€€€€€€€€Í¥Ñ•A•Éµ¥ÍÍ¥½¹Ì€ô•µÁÑå1¥ÍĞ ¤(€€€€€€€€€€€É•ÑÕÉ¸(€€€€€€€ô(€€€€€€€ÉÕ¹Ñ¥µ”¹ÍÑ½É…•½¹ÑÉ½±±•È(€€€€€€€€€€€€¹•ÑA•Éµ¥ÍÍ¥½¹Ì¡•™™•Ñ¥Ù•A…•UÉ°°…Ñ¥Ù•Q…ˆ¹ÍÑ½É…•½¹Ñ•áÑ%°…Ñ¥Ù•Q…ˆ¹¥ÍAÉ¥Ù…Ñ”¤(€€€€€€€€€€€€¹…•ÁĞ (€€€€€€€€€€€€€€€ìÁ•Éµ¥ÍÍ¥½¹Ì€´øÍ¥Ñ•A•Éµ¥ÍÍ¥½¹Ì€ôÁ•Éµ¥ÍÍ¥½¹Ìü¹Ñ½1¥ÍĞ ¤¹½ÉµÁÑä ¤ô°(€€€€€€€€€€€€€€€ì|€´øÍ¥Ñ•A•Éµ¥ÍÍ¥½¹Ì€ô•µÁÑå1¥ÍĞ ¤ô(€€€€€€€€€€€€¤(€€€ô((€€€™Õ¸½Á•¹AÉ½Ñ•Ñ¥½¹A…¹•° ¤ì(€€€€€€€Í¥Ñ•A•Éµ¥ÍÍ¥½¹Ì€ô•µÁÑå1¥ÍĞ ¤(€€€€€€€¥˜€ …¥Í!½µ”€˜˜…Ñ¥Ù•!½ÍĞ¹¥Í9½Ñ	±…¹¬ ¤¤ì(€€€€€€€€€€€É•™É•Í¡M¥Ñ•A•Éµ¥ÍÍ¥½¹Ì ¤(€€€€€€€ô(€€€€€€€Í¡½İAÉ½Ñ•Ñ¥½¸€ôÑÉÕ”(€€€ô((€€€™Õ¸Ñ½±•	½½­µ…É¬ ¤ì(€€€€€€€¥˜€¡…Ñ¥Ù•Q…ˆ¹ÕÉ°€ôô!=5}UI0¤É•ÑÕÉ¸(€€€€€€€Ù…°‰½½­µ…É­UÉ°€ô…Ñ¥Ù•Q…ˆ¹ÕÉ°((€€€€€€€Ù…°•á¥ÍÑ¥¹%¹‘•à€ô‰½½­µ…É­Ì¹¥¹‘•á=™¥ÉÍĞì¥Ğ¹ÕÉ°€ôô‰½½­µ…É­UÉ°ô(€€€€€€€¥˜€¡•á¥ÍÑ¥¹%¹‘•à€øô€À¤ì(€€€€€€€€€€€‰½½­µ…É­Ì¹É•µ½Ù•Ğ¡•á¥ÍÑ¥¹%¹‘•à¤(€€€€€€€ô•±Í”ì(€€€€€€€€€€€‰½½­µ…É­Ì¹…‘ (€€€€€€€€€€€€€€€€À°(€€€€€€€€€€€€€€€	½½­µ…É­%Ñ•´ (€€€€€€€€€€€€€€€€€€€ÕÉ°€ô‰½½­µ…É­UÉ°°(€€€€€€€€€€€€€€€€€€€Ñ¥Ñ±”€ô…Ñ¥Ù•Q…ˆ¹Ñ¥Ñ±”¹¥™	±…¹¬ì¡½ÍÑ1…‰•°¡‰½½­µ…É­UÉ°¤ô(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€¤(€€€€€€€ô(€€€€€€€	½½­µ…É­MÑ½É”¹Í…Ù”¡ÁÉ•™Ì°‰½½­µ…É­Ì¤(€€€ô((€€€™Õ¸½Á•¹	½½­µ…É¬¡‰½½­µ…É¬è	½½­µ…É­%Ñ•´¤ì(€€€€€€€Í¡½İ	½½­µ…É­Ì€ô™…±Í”(€€€€€€€…‘‘É•ÍÍQ•áĞ€ô‰½½­µ…É¬¹ÕÉ°(€€€€€€€	É½İÍ•É¹¥¹”¹…ÁÁ±åAÉ•™•ÉÉ•‘½±½ÉM¡•µ”¡Í•ÑÑ¥¹Ì¹Ñ¡•µ”¤(€€€€€€€ÉÕ¹…Ñ¡¥¹œì…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¹½µÁ½Í¥Ñ½É½¹ÑÉ½±±•È¹Í•Ñ±•…É½±½È¡Á…•QÉ…¹Í¥Ñ¥½¹½±½È¤ô(€€€€€€€9…Ñ¥Ù•	É½İÍ•É!½ÍÑ½½É‘¥¹…Ñ½È¹½Ù•ÉU¹Ñ¥±¥ÉÍÑA…¥¹Ğ¡…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¤(€€€€€€€…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¹±½…‘UÉ¤¡‰½½­µ…É¬¹ÕÉ°¤(€€€€€€€™½ÕÍ5…¹…•È¹±•…É½ÕÌ ¤(€€€ô((€€€™Õ¸É•µ½Ù•	½½­µ…É¬¡‰½½­µ…É¬è	½½­µ…É­%Ñ•´¤ì(€€€€€€€‰½½­µ…É­Ì¹É•µ½Ù•±°ì¥Ğ¹ÕÉ°€ôô‰½½­µ…É¬¹ÕÉ°ô(€€€€€€€	½½­µ…É­MÑ½É”¹Í…Ù”¡ÁÉ•™Ì°‰½½­µ…É­Ì¤(€€€ô((€€€™Õ¸•‘¥Ñ	½½­µ…É¬¡‰½½­µ…É¬è	½½­µ…É­%Ñ•´°Ñ¥Ñ±”èMÑÉ¥¹œ°™½±‘•ÈèMÑÉ¥¹œü¤ì(€€€€€€€Ù…°¥¹‘•à€ô‰½½­µ…É­Ì¹¥¹‘•á=™¥ÉÍĞì¥Ğ¹ÕÉ°€ôô‰½½­µ…É¬¹ÕÉ°ô(€€€€€€€¥˜€¡¥¹‘•à€ğ€À¤É•ÑÕÉ¸(€€€€€€€‰½½­µ…É­Ím¥¹‘•át€ô‰½½­µ…É¬¹½Áä (€€€€€€€€€€€Ñ¥Ñ±”€ôÑ¥Ñ±”¹ÑÉ¥´ ¤¹¥™	±…¹¬ì‰½½­µ…É¬¹ÕÉ°ô°(€€€€€€€€€€€™½±‘•È€ô™½±‘•Èü¹ÑÉ¥´ ¤ü¹Ñ…­•%˜ì¥Ğ¹¥Í9½Ñ	±…¹¬ ¤ô(€€€€€€€€¤(€€€€€€€	½½­µ…É­MÑ½É”¹Í…Ù”¡ÁÉ•™Ì°‰½½­µ…É­Ì¤(€€€ô((€€€™Õ¸½Á•¹!¥ÍÑ½Éå¹ÑÉä¡•¹ÑÉäè!¥ÍÑ½Éå%Ñ•´¤ì(€€€€€€€Í¡½İ!¥ÍÑ½Éä€ô™…±Í”(€€€€€€€…‘‘É•ÍÍQ•áĞ€ô•¹ÑÉä¹ÕÉ°(€€€€€€€	É½İÍ•É¹¥¹”¹…ÁÁ±åAÉ•™•ÉÉ•‘½±½ÉM¡•µ”¡Í•ÑÑ¥¹Ì¹Ñ¡•µ”¤(€€€€€€€ÉÕ¹…Ñ¡¥¹œì…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¹½µÁ½Í¥Ñ½É½¹ÑÉ½±±•È¹Í•Ñ±•…É½±½È¡Á…•QÉ…¹Í¥Ñ¥½¹½±½È¤ô(€€€€€€€9…Ñ¥Ù•	É½İÍ•É!½ÍÑ½½É‘¥¹…Ñ½È¹½Ù•ÉU¹Ñ¥±¥ÉÍÑA…¥¹Ğ¡…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¤(€€€€€€€…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¹±½…‘UÉ¤¡•¹ÑÉä¹ÕÉ°¤(€€€€€€€™½ÕÍ5…¹…•È¹±•…É½ÕÌ ¤(€€€ô((€€€™Õ¸É•µ½Ù•!¥ÍÑ½Éå¹ÑÉä¡•¹ÑÉäè!¥ÍÑ½Éå%Ñ•´¤ì(€€€€€€€¡¥ÍÑ½Éä¹É•µ½Ù”¡•¹ÑÉä¤(€€€€€€€!¥ÍÑ½ÉåMÑ½É”¹Í…Ù”¡ÁÉ•™Ì°¡¥ÍÑ½Éä¤(€€€ô((€€€Ù…°•áÑ•É¹…±9…Ù¥…Ñ¥½¹!…¹‘±•È‰äÉ•µ•µ‰•ÉUÁ‘…Ñ•‘MÑ…Ñ”ğ¡MÑÉ¥¹œ¤€´øU¹¥ĞøìÑ…É•Ğ€´ø(€€€€€€€É•…Ñ•Q…ˆ¡¥ÍAÉ¥Ù…Ñ”€ô™…±Í”°¥¹¥Ñ¥…±UÉ°€ôÑ…É•Ğ¤(€€€ô((€€€¥ÍÁ½Í…‰±•™™•Ğ¡U¹¥Ğ¤ì(€€€€€€€€¼¼ÁÁ±äÑ¡”Í•±•Ñ•‰É½İÍ•ÈÑ¡•µ”‰•™½É”Ñ¡”¥¹¥Ñ¥…°½É•ÍÑ½É•Ñ…ˆ¥Ì½Á•¹•¸(€€€€€€€	É½İÍ•É¹¥¹”¹…ÁÁ±åAÉ•™•ÉÉ•‘½±½ÉM¡•µ”¡Í•ÑÑ¥¹Ì¹Ñ¡•µ”¤(€€€€€€€…ÁÁ±åÑ¥Ù•MÑ…Ñ”¡…Ñ¥Ù•Q…‰%¤(€€€€€€€Ù…°Õ¹‰¥¹‘áÑ•É¹…±9…Ù¥…Ñ¥½¸€ôáÑ•É¹…±9…Ù¥…Ñ¥½¹½½É‘¥¹…Ñ½È¹‰¥¹ìÑ…É•Ğ€´ø(€€€€€€€€€€€•áÑ•É¹…±9…Ù¥…Ñ¥½¹!…¹‘±•È¡Ñ…É•Ğ¤(€€€€€€€ô((€€€€€€€½¹¥ÍÁ½Í”ì(€€€€ƒ]4ÒÚ$z{-®éÜj×            }
             HistoryStore.saveAsync(prefs, history)
         }
     }
@@ -1730,151 +663,7 @@ private fun BrowserScreen(
 
                 if (!isFullScreen && !chromeHiddenByOverlay && settings.toolbarPosition == ToolbarPosition.TOP) {
                     BrowserBottomBar(
-                        address = addressText,
-                        onAddressChange = { addressText = it },
-                        onAddressFocusChanged = { addressFocused = it },
-                        onNavigate = { input -> navigateInput(input) },
-                        searchEngine = settings.searchEngine,
-                        history = if (activeTab.isPrivate) emptyList() else history,
-                        canGoBack = activeTab.canGoBack,
-                        canGoForward = activeTab.canGoForward,
-                        onBack = {
-                            if (readerModeActive) activeTab.exitReaderMode()
-                            else activeTab.session.goBack()
-                        },
-                        onForward = { activeTab.session.goForward() },
-                        onTabs = { captureActivePreview(); showTabs = true },
-                        onMenu = { showMenu = true },
-                        tabCount = tabs.size,
-                        isPrivate = activeTab.isPrivate,
-                        darkTheme = darkTheme,
-                        mediaCount = detectedVideoCount,
-                        onMedia = {
-                            focusManager.clearFocus()
-                            showMedia = true
-                        },
-                        homeMode = isHome,
-                        position = settings.toolbarPosition,
-                        toolbarActions = settings.toolbarActions,
-                        uiDensity = settings.uiDensity
-                    )
-                }
-
-                if (!isFullScreen && settings.toolbarPosition == ToolbarPosition.TOP) {
-                    BrowserPageLoadingLine(
-                        loading = activeTab.isLoading,
-                        progress = activeTab.loadProgress,
-                        isPrivate = activeTab.isPrivate
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .onGloballyPositioned { coordinates ->
-                            val bounds = coordinates.boundsInWindow()
-                            NativeBrowserHostCoordinator.setBounds(
-                                bounds.left.toInt(),
-                                bounds.top.toInt(),
-                                bounds.right.toInt(),
-                                bounds.bottom.toInt()
-                            )
-                        }
-                        .then(
-                            if (!isFullScreen && settings.toolbarPosition == ToolbarPosition.TOP) {
-                                Modifier.navigationBarsPadding()
-                            } else {
-                                Modifier
-                            }
-                        )
-                ) {
-                    if (isHome) {
-                        IlyroHomePage(
-                            settings = settings,
-                            searchEngine = settings.searchEngine,
-                            history = if (activeTab.isPrivate) emptyList() else history,
-                            isPrivate = activeTab.isPrivate,
-                            onSearchEngineChange = { engine ->
-                                onSettingsChange(settings.copy(searchEngine = engine))
-                            },
-                            onNavigate = { navigateInput(it) }
-                        )
-                    } else if (readerModeActive) {
-                        ReaderModeView(
-                            article = activeTab.readerArticle!!,
-                            language = settings.language,
-                            darkTheme = darkTheme,
-                            onExit = { activeTab.exitReaderMode() }
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.fillMaxSize())
-                    }
-
-                    if (!isHome && activeTab.pullDistance > 0f) {
-                        val indicatorOffset = (8 + 30 * activeTab.pullDistance.coerceIn(0f, 1f)).dp
-                        Surface(
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = indicatorOffset)
-                                .size(42.dp),
-                            shape = RoundedCornerShape(21.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            shadowElevation = 7.dp
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Rounded.Refresh,
-                                    contentDescription = tr("Pull to refresh", "ĞŸĞ¾Ñ‚ÑĞ½Ğ¸Ñ‚Ğµ Ğ´Ğ»Ñ Ğ¾Ğ±Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ¸Ñ"),
-                                    modifier = Modifier.size(22.dp),
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    }
-
-                    val displayedNotice = renderedTopNotice ?: topNotice
-                    val noticeAtBottom = displayedNotice?.kind == BrowserTopNoticeKind.TAB_CLOSED
-                    androidx.compose.animation.AnimatedVisibility(
-                        visible = topNotice != null,
-                        enter = if (noticeAtBottom) {
-                            slideInVertically(initialOffsetY = { it }) + fadeIn()
-                        } else {
-                            slideInVertically(initialOffsetY = { -it }) + fadeIn()
-                        },
-                        exit = if (noticeAtBottom) {
-                            slideOutVertically(targetOffsetY = { it }) + fadeOut()
-                        } else {
-                            slideOutVertically(targetOffsetY = { -it }) + fadeOut()
-                        },
-                        modifier = Modifier
-                            .align(
-                                if (noticeAtBottom) Alignment.BottomCenter else Alignment.TopCenter
-                            )
-                            .padding(horizontal = 12.dp)
-                            .padding(
-                                top = if (noticeAtBottom) 0.dp else 10.dp,
-                                bottom = if (noticeAtBottom) 12.dp else 0.dp
-                            )
-                            .onGloballyPositioned { coordinates ->
-                                val bounds = coordinates.boundsInWindow()
-                                NativeBrowserHostCoordinator.setInputExclusion(
-                                    bounds.left.toInt(),
-                                    bounds.top.toInt(),
-                                    bounds.right.toInt(),
-                                    bounds.bottom.toInt()
-                                )
-                            }
-                    ) {
-                        val notice = displayedNotice
-                        if (notice != null) {
-                            val runNoticeAction: () -> Unit = {
-                                when (notice.kind) {
-                                    BrowserTopNoticeKind.DOWNLOAD -> {
-                                        refreshDownloads()
-                                        showDownloads = true
-                                    }
-                                    BrowserTopNoticeKind.TAB_CLOSED -> undoPendingClosedTabs()
+                        address = YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Õ…‘‘É•ÍÍQ•áĞ°(€€€€€€€€€€€€€€€€€€€€€€€½¹‘‘É•ÍÍ¡…¹”€ôì…‘‘É•ÍÍQ•áĞ€ô¥Ğô°(€€€€€€€€€€€€€€€€€€€€€€€½¹‘‘É•ÍÍ½ÕÍ¡…¹•€ôì…‘‘É•ÍÍ½ÕÍ•€ô¥Ğô°(€€€€€€€€€€€€€€€€€€€€€€€½¹9…Ù¥…Ñ”€ôì¥¹ÁÕĞ€´ø¹…Ù¥…Ñ•%¹ÁÕĞ¡¥¹ÁÕĞ¤ô°(€€€€€€€€€€€€€€€€€€€€€€€Í•…É¡¹¥¹”€ôÍ•ÑÑ¥¹Ì¹Í•…É¡¹¥¹”°(€€€€€€€€€€€€€€€€€€€€€€€¡¥ÍÑ½Éä€ô¥˜€¡…Ñ¥Ù•Q…ˆ¹¥ÍAÉ¥Ù…Ñ”¤•µÁÑå1¥ÍĞ ¤•±Í”¡¥ÍÑ½Éä°(€€€€€€€€€€€€€€€€€€€€€€€…¹½	…¬€ô…Ñ¥Ù•Q…ˆ¹…¹½	…¬°(€€€€€€€€€€€€€€€€€€€€€€€…¹½½Éİ…É€ô…Ñ¥Ù•Q…ˆ¹…¹½½Éİ…É°(€€€€€€€€€€€€€€€€€€€€€€€½¹	…¬€ôì(€€€€€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡É•…‘•É5½‘•Ñ¥Ù”¤…Ñ¥Ù•Q…ˆ¹•á¥ÑI•…‘•É5½‘” ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€•±Í”…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¹½	…¬ ¤(€€€€€€€€€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€€€€€€€€€€€€€½¹½Éİ…É€ôì…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¹½½Éİ…É ¤ô°(€€€€€€€€€€€€€€€€€€€€€€€½¹Q…‰Ì€ôì…ÁÑÕÉ•Ñ¥Ù•AÉ•Ù¥•Ü ¤ìÍ¡½İQ…‰Ì€ôÑÉÕ”ô°(€€€€€€€€€€€€€€€€€€€€€€€½¹5•¹Ô€ôìÍ¡½İ5•¹Ô€ôÑÉÕ”ô°(€€€€€€€€€€€€€€€€€€€€€€€Ñ…‰½Õ¹Ğ€ôÑ…‰Ì¹Í¥é”°(€€€€€€€€€€€€€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ô…Ñ¥Ù•Q…ˆ¹¥ÍAÉ¥Ù…Ñ”°(€€€€€€€€€€€€€€€€€€€€€€€‘…É­Q¡•µ”€ô‘…É­Q¡•µ”°(€€€€€€€€€€€€€€€€€€€€€€€µ•‘¥…½Õ¹Ğ€ô‘•Ñ•Ñ•‘Y¥‘•½½Õ¹Ğ°(€€€€€€€€€€€€€€€€€€€€€€€½¹5•‘¥„€ôì(€€€€€€€€€€€€€€€€€€€€€€€€€€€™½ÕÍ5…¹…•È¹±•…É½ÕÌ ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¡½İ5•‘¥„€ôÑÉÕ”(€€€€€€€€€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€€€€€€€€€€€€€¡½µ•5½‘”€ô¥Í!½µ”°(€€€€€€€€€€€€€€€€€€€€€€€Á½Í¥Ñ¥½¸€ôÍ•ÑÑ¥¹Ì¹Ñ½½±‰…ÉA½Í¥Ñ¥½¸°(€€€€€€€€€€€€€€€€€€€€€€€Ñ½½±‰…ÉÑ¥½¹Ì€ôÍ•ÑÑ¥¹Ì¹Ñ½½±‰…ÉÑ¥½¹Ì°(€€€€€€€€€€€€€€€€€€€€€€€Õ¥•¹Í¥Ñä€ôÍ•ÑÑ¥¹Ì¹Õ¥•¹Í¥Ñä(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€ô((€€€€€€€€€€€€€€€¥˜€ …¥ÍÕ±±MÉ••¸€˜˜Í•ÑÑ¥¹Ì¹Ñ½½±‰…ÉA½Í¥Ñ¥½¸€ôôQ½½±‰…ÉA½Í¥Ñ¥½¸¹Q=@¤ì(€€€€€€€€€€€€€€€€€€€	É½İÍ•ÉA…•1½…‘¥¹1¥¹” (€€€€€€€€€€€€€€€€€€€€€€€±½…‘¥¹œ€ô…Ñ¥Ù•Q…ˆ¹¥Í1½…‘¥¹œ°(€€€€€€€€€€€€€€€€€€€€€€€ÁÉ½É•ÍÌ€ô…Ñ¥Ù•Q…ˆ¹±½…‘AÉ½É•ÍÌ°(€€€€€€€€€€€€€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ô…Ñ¥Ù•Q…ˆ¹¥ÍAÉ¥Ù…Ñ”(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€ô((€€€€€€€€€€€€€€€	½à (€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€€€€€¹™¥±±5…á]¥‘Ñ  ¤(€€€€€€€€€€€€€€€€€€€€€€€€¹İ•¥¡Ğ Å˜¤(€€€€€€€€€€€€€€€€€€€€€€€€¹½¹±½‰…±±åA½Í¥Ñ¥½¹•ì½½É‘¥¹…Ñ•Ì€´ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù…°‰½Õ¹‘Ì€ô½½É‘¥¹…Ñ•Ì¹‰½Õ¹‘Í%¹]¥¹‘½Ü ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€9…Ñ¥Ù•	É½İÍ•É!½ÍÑ½½É‘¥¹…Ñ½È¹Í•Ñ	½Õ¹‘Ì (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰½Õ¹‘Ì¹±•™Ğ¹Ñ½%¹Ğ ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰½Õ¹‘Ì¹Ñ½À¹Ñ½%¹Ğ ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰½Õ¹‘Ì¹É¥¡Ğ¹Ñ½%¹Ğ ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰½Õ¹‘Ì¹‰½ÑÑ½´¹Ñ½%¹Ğ ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€¹Ñ¡•¸ (€€€€€€€€€€€€€€€€€€€€€€€€€€€¥˜€ …¥ÍÕ±±MÉ••¸€˜˜Í•ÑÑ¥¹Ì¹Ñ½½±‰…ÉA½Í¥Ñ¥½¸€ôôQ½½±‰…ÉA½Í¥Ñ¥½¸¹Q=@¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€5½‘¥™¥•È¹¹…Ù¥…Ñ¥½¹	…ÉÍA…‘‘¥¹œ ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€¥˜€¡¥Í!½µ”¤ì(€€€€€€€€€€€€€€€€€€€€€€€%±åÉ½!½µ•A…” (€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•ÑÑ¥¹Ì€ôÍ•ÑÑ¥¹Ì°(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•…É¡¹¥¹”€ôÍ•ÑÑ¥¹Ì¹Í•…É¡¹¥¹”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€¡¥ÍÑ½Éä€ô¥˜€¡…Ñ¥Ù•Q…ˆ¹¥ÍAÉ¥Ù…Ñ”¤•µÁÑå1¥ÍĞ ¤•±Í”¡¥ÍÑ½Éä°(€€€€€€€€€€€€€€€€€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ô…Ñ¥Ù•Q…ˆ¹¥ÍAÉ¥Ù…Ñ”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹M•…É¡¹¥¹•¡…¹”€ôì•¹¥¹”€´ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹M•ÑÑ¥¹Í¡…¹”¡Í•ÑÑ¥¹Ì¹½Áä¡Í•…É¡¹¥¹”€ô•¹¥¹”¤¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹9…Ù¥…Ñ”€ôì¹…Ù¥…Ñ•%¹ÁÕĞ¡¥Ğ¤ô(€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€ô•±Í”¥˜€¡É•…‘•É5½‘•Ñ¥Ù”¤ì(€€€€€€€€€€€€€€€€€€€€€€€I•…‘•É5½‘•Y¥•Ü (€€€€€€€€€€€€€€€€€€€€€€€€€€€…ÉÑ¥±”€ô…Ñ¥Ù•Q…ˆ¹É•…‘•ÉÉÑ¥±”„„°(€€€€€€€€€€€€€€€€€€€€€€€€€€€±…¹Õ…”€ôÍ•ÑÑ¥¹Ì¹±…¹Õ…”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€‘…É­Q¡•µ”€ô‘…É­Q¡•µ”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹á¥Ğ€ôì…Ñ¥Ù•Q…ˆ¹•á¥ÑI•…‘•É5½‘” ¤ô(€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€€€€€MÁ…•È¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹™¥±±5…áM¥é” ¤¤(€€€€€€€€€€€€€€€€€€€ô((€€€€€€€€€€€€€€€€€€€¥˜€ …¥Í!½µ”€˜˜…Ñ¥Ù•Q…ˆ¹ÁÕ±±¥ÍÑ…¹”€ø€Á˜¤ì(€€€€€€€€€€€€€€€€€€€€€€€Ù…°¥¹‘¥…Ñ½É=™™Í•Ğ€ô€ à€¬€ÌÀ€¨…Ñ¥Ù•Q…ˆ¹ÁÕ±±¥ÍÑ…¹”¹½•É•%¸ Á˜°€Å˜¤¤¹‘À(€€€€€€€€€€€€€€€€€€€€€€€MÕÉ™…” (€€€€€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹…±¥¸¡±¥¹µ•¹Ğ¹Q½Á•¹Ñ•È¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹Á…‘‘¥¹œ¡Ñ½À€ô¥¹‘¥…Ñ½É=™™Í•Ğ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹Í¥é” ĞÈ¹‘À¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¡…Á”€ôI½Õ¹‘•‘½É¹•ÉM¡…Á” ÈÄ¹‘À¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÍÕÉ™…”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¡…‘½İ±•Û]4ÒÚ$z{-®éÜj×ClosedTabs()
                                     BrowserTopNoticeKind.FULLSCREEN -> Unit
                                 }
                                 topNotice = null
@@ -1966,181 +755,7 @@ private fun BrowserScreen(
             },
             onCopy = {
                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Link", request.url))
-                linkContextMenu = null
-                Toast.makeText(context, linkCopiedMessage, Toast.LENGTH_SHORT).show()
-            },
-            onShare = {
-                val shareIntent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                    type = "text/plain"
-                    putExtra(android.content.Intent.EXTRA_TEXT, request.url)
-                }
-                runCatching {
-                    context.startActivity(
-                        android.content.Intent.createChooser(
-                            shareIntent,
-                            shareLinkTitle
-                        )
-                    )
-                }
-                linkContextMenu = null
-            }
-        )
-    }
-
-    if (showFindInPage && !isHome) {
-        FindInPageDialog(
-            session = activeTab.session,
-            onDismiss = { showFindInPage = false }
-        )
-    }
-
-    if (showTranslation && !isHome && !readerModeActive) {
-        TranslationDialog(
-            session = activeTab.session,
-            state = activeTab.translationState,
-            pageLanguage = activeTab.pageLanguage,
-            translationReady = activeTab.translationReady,
-            pageLoading = activeTab.isLoading,
-            language = settings.language,
-            onDismiss = { showTranslation = false }
-        )
-    }
-
-    extensionPopupSession?.let { popup ->
-        ExtensionPopupHost(
-            session = popup,
-            title = ExtensionHostBridge.popupTitle,
-            onDismiss = { ExtensionHostBridge.closePopup() }
-        )
-    }
-
-    if (showTabs) {
-        val overviewItems = tabs.map { tab ->
-            TabOverviewItem(
-                id = tab.id,
-                title = if (tab.url == HOME_URL) tr("New tab", "ĞĞ¾Ğ²Ğ°Ñ Ğ²ĞºĞ»Ğ°Ğ´ĞºĞ°") else tab.title.ifBlank { hostLabel(tab.url) },
-                host = if (tab.url == HOME_URL) tr("ILYRO Home", "Ğ“Ğ»Ğ°Ğ²Ğ½Ğ°Ñ ILYRO") else hostLabel(tab.url),
-                isHome = tab.url == HOME_URL,
-                isPrivate = tab.isPrivate,
-                selected = tab.id == activeTabId,
-                isPinned = tab.isPinned,
-                groupName = tab.groupName,
-                preview = tab.preview
-            )
-        }
-
-        TabOverviewSheet(
-            settings = settings,
-            tabs = overviewItems,
-            onDismiss = { showTabs = false },
-            onNewTab = { createTab() },
-            onNewPrivateTab = { createTab(isPrivate = true) },
-            onSelect = { id ->
-                tabs.firstOrNull { it.id == id }?.let { selectTab(it) }
-            },
-            onClose = { id ->
-                tabs.firstOrNull { it.id == id }?.let { closeTab(it) }
-            },
-            onCloseAll = { closeAllTabs() },
-            onDismissNotice = { dismissTopNotice() },
-            tabCloseNotice = topNotice?.takeIf { it.kind == BrowserTopNoticeKind.TAB_CLOSED },
-            onUndoClose = { undoPendingClosedTabs() },
-            restoredTabId = lastRestoredTabId,
-            restoreGeneration = tabRestoreGeneration,
-            onTogglePinned = { id ->
-                tabs.firstOrNull { it.id == id }?.let { it.isPinned = !it.isPinned }
-            },
-            onUpdateGroup = { id, group ->
-                tabs.firstOrNull { it.id == id }?.let { it.groupName = group }
-            }
-        )
-    }
-
-    if (showBookmarks) {
-        BookmarksSheet(
-            settings = settings,
-            bookmarks = bookmarks,
-            onDismiss = { showBookmarks = false },
-            onOpen = { bookmark -> openBookmark(bookmark) },
-            onRemove = { bookmark -> removeBookmark(bookmark) },
-            onEdit = { bookmark, title, folder ->
-                editBookmark(bookmark, title, folder)
-            },
-            onClearAll = {
-                bookmarks.clear()
-                BookmarkStore.save(prefs, bookmarks)
-            }
-        )
-    }
-
-    if (showHistory) {
-        HistorySheet(
-            settings = settings,
-            history = history,
-            onDismiss = { showHistory = false },
-            onOpen = { entry -> openHistoryEntry(entry) },
-            onRemove = { entry -> removeHistoryEntry(entry) },
-            onClearAll = {
-                history.clear()
-                HistoryStore.save(prefs, history)
-            }
-        )
-    }
-
-    if (showMedia && mediaEnabledForPage) {
-        val mediaDownloadStartedTitle = tr("Download started", "Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ° Ğ½Ğ°Ñ‡Ğ°Ğ»Ğ°ÑÑŒ")
-        val mediaFileLabel = tr("Media file", "ĞœĞµĞ´Ğ¸Ğ°Ñ„Ğ°Ğ¹Ğ»")
-        val mediaOpenLabel = tr("View download", "ĞŸĞ¾ĞºĞ°Ğ·Ğ°Ñ‚ÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºÑƒ")
-        val mediaDownloadFailedMessage = tr("Couldn't start media download", "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ½Ğ°Ñ‡Ğ°Ñ‚ÑŒ Ğ·Ğ°Ğ³Ñ€ÑƒĞ·ĞºÑƒ Ğ¼ĞµĞ´Ğ¸Ğ°")
-        MediaSheet(
-            media = if (resolvedMedia.isNotEmpty() || detectedMedia.isEmpty()) {
-                resolvedMedia
-            } else {
-                listOfNotNull(MediaDetectorBridge.selectPrimaryCandidate(detectedMedia))
-            },
-            resolvingQualities = resolvingMediaQualities,
-            onDismiss = { showMedia = false },
-            onDownload = { item ->
-                if (!item.canDownload) return@MediaSheet
-                ensureDownloadNotificationPermission(context)
-                val started = when (item.kind) {
-                    DetectedMediaKind.HLS -> downloadController.enqueueHlsDownload(
-                        url = item.url,
-                        suggestedTitle = activeTab.title.takeIf { it.isNotBlank() } ?: item.title,
-                        referrer = item.pageUrl ?: activeTab.url,
-                        isPrivate = activeTab.isPrivate,
-                        onRecordsChanged = refreshDownloads,
-                        onError = { message ->
-                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                        }
-                    )
-                    DetectedMediaKind.VIDEO -> {
-                        downloadController.enqueueNavigationWithSession(
-                            url = item.url,
-                            sourceSettings = activeTab.session.settings,
-                            suggestedName = activeTab.title.takeIf { it.isNotBlank() } ?: item.title,
-                            allowMetered = currentSettings.downloadsOverMetered,
-                            referrer = item.pageUrl ?: activeTab.url,
-                            isPrivate = activeTab.isPrivate,
-                            onRecordsChanged = refreshDownloads
-                        )
-                    }
-                    DetectedMediaKind.AUDIO ->
-                        downloadController.enqueueNavigationWithSession(
-                            url = item.url,
-                            sourceSettings = activeTab.session.settings,
-                            suggestedName = activeTab.title.takeIf { it.isNotBlank() } ?: item.title,
-                            allowMetered = currentSettings.downloadsOverMetered,
-                            referrer = item.pageUrl ?: activeTab.url,
-                            isPrivate = activeTab.isPrivate,
-                            onRecordsChanged = refreshDownloads
-                        )
-                    DetectedMediaKind.DASH -> false
-                }
-                refreshDownloads()
-                if (started) {
-                    markDownloadsActive()
+                clipboard.setPrimaryClip(android.content.ClipData.newPlaYªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Õ¥¹Q•áĞ ‰1¥¹¬ˆ°É•ÅÕ•ÍĞ¹ÕÉ°¤¤(€€€€€€€€€€€€€€€±¥¹­½¹Ñ•áÑ5•¹Ô€ô¹Õ±°(€€€€€€€€€€€€€€€Q½…ÍĞ¹µ…­•Q•áĞ¡½¹Ñ•áĞ°±¥¹­½Á¥•‘5•ÍÍ…”°Q½…ÍĞ¹19Q!}M!=IP¤¹Í¡½Ü ¤(€€€€€€€€€€€ô°(€€€€€€€€€€€½¹M¡…É”€ôì(€€€€€€€€€€€€€€€Ù…°Í¡…É•%¹Ñ•¹Ğ€ô…¹‘É½¥¹½¹Ñ•¹Ğ¹%¹Ñ•¹Ğ¡…¹‘É½¥¹½¹Ñ•¹Ğ¹%¹Ñ•¹Ğ¹Q%=9}M9¤¹…ÁÁ±äì(€€€€€€€€€€€€€€€€€€€ÑåÁ”€ô€‰Ñ•áĞ½Á±…¥¸ˆ(€€€€€€€€€€€€€€€€€€€ÁÕÑáÑÉ„¡…¹‘É½¥¹½¹Ñ•¹Ğ¹%¹Ñ•¹Ğ¹aQI}QaP°É•ÅÕ•ÍĞ¹ÕÉ°¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€ÉÕ¹…Ñ¡¥¹œì(€€€€€€€€€€€€€€€€€€€½¹Ñ•áĞ¹ÍÑ…ÉÑÑ¥Ù¥Ñä (€€€€€€€€€€€€€€€€€€€€€€€…¹‘É½¥¹½¹Ñ•¹Ğ¹%¹Ñ•¹Ğ¹É•…Ñ•¡½½Í•È (€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¡…É•%¹Ñ•¹Ğ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¡…É•1¥¹­Q¥Ñ±”(€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€±¥¹­½¹Ñ•áÑ5•¹Ô€ô¹Õ±°(€€€€€€€€€€€ô(€€€€€€€€¤(€€€ô((€€€¥˜€¡Í¡½İ¥¹‘%¹A…”€˜˜€…¥Í!½µ”¤ì(€€€€€€€¥¹‘%¹A…•¥…±½œ (€€€€€€€€€€€Í•ÍÍ¥½¸€ô…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸°(€€€€€€€€€€€½¹¥Íµ¥ÍÌ€ôìÍ¡½İ¥¹‘%¹A…”€ô™…±Í”ô(€€€€€€€€¤(€€€ô((€€€¥˜€¡Í¡½İQÉ…¹Í±…Ñ¥½¸€˜˜€…¥Í!½µ”€˜˜€…É•…‘•É5½‘•Ñ¥Ù”¤ì(€€€€€€€QÉ…¹Í±…Ñ¥½¹¥…±½œ (€€€€€€€€€€€Í•ÍÍ¥½¸€ô…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸°(€€€€€€€€€€€ÍÑ…Ñ”€ô…Ñ¥Ù•Q…ˆ¹ÑÉ…¹Í±…Ñ¥½¹MÑ…Ñ”°(€€€€€€€€€€€Á…•1…¹Õ…”€ô…Ñ¥Ù•Q…ˆ¹Á…•1…¹Õ…”°(€€€€€€€€€€€ÑÉ…¹Í±…Ñ¥½¹I•…‘ä€ô…Ñ¥Ù•Q…ˆ¹ÑÉ…¹Í±…Ñ¥½¹I•…‘ä°(€€€€€€€€€€€Á…•1½…‘¥¹œ€ô…Ñ¥Ù•Q…ˆ¹¥Í1½…‘¥¹œ°(€€€€€€€€€€€±…¹Õ…”€ôÍ•ÑÑ¥¹Ì¹±…¹Õ…”°(€€€€€€€€€€€½¹¥Íµ¥ÍÌ€ôìÍ¡½İQÉ…¹Í±…Ñ¥½¸€ô™…±Í”ô(€€€€€€€€¤(€€€ô((€€€•áÑ•¹Í¥½¹A½ÁÕÁM•ÍÍ¥½¸ü¹±•ĞìÁ½ÁÕÀ€´ø(€€€€€€€áÑ•¹Í¥½¹A½ÁÕÁ!½ÍĞ (€€€€€€€€€€€Í•ÍÍ¥½¸€ôÁ½ÁÕÀ°(€€€€€€€€€€€Ñ¥Ñ±”€ôáÑ•¹Í¥½¹!½ÍÑ	É¥‘”¹Á½ÁÕÁQ¥Ñ±”°(€€€€€€€€€€€½¹¥Íµ¥ÍÌ€ôìáÑ•¹Í¥½¹!½ÍÑ	É¥‘”¹±½Í•A½ÁÕÀ ¤ô(€€€€€€€€¤(€€€ô((€€€¥˜€¡Í¡½İQ…‰Ì¤ì(€€€€€€€Ù…°½Ù•ÉÙ¥•İ%Ñ•µÌ€ôÑ…‰Ì¹µ…ÀìÑ…ˆ€´ø(€€€€€€€€€€€Q…‰=Ù•ÉÙ¥•İ%Ñ•´ (€€€€€€€€€€€€€€€¥€ôÑ…ˆ¹¥°(€€€€€€€€€€€€€€€Ñ¥Ñ±”€ô¥˜€¡Ñ…ˆ¹ÕÉ°€ôô!=5}UI0¤ÑÈ ‰9•ÜÑ…ˆˆ°€‹BwBûBËBÃF<ƒBËBëBïBÃBÓBëBÀˆ¤•±Í”Ñ…ˆ¹Ñ¥Ñ±”¹¥™	±…¹¬ì¡½ÍÑ1…‰•°¡Ñ…ˆ¹ÕÉ°¤ô°(€€€€€€€€€€€€€€€¡½ÍĞ€ô¥˜€¡Ñ…ˆ¹ÕÉ°€ôô!=5}UI0¤ÑÈ ‰%1eI<!½µ”ˆ°€‹BOBïBÃBËB÷BÃF<%1eI<ˆ¤•±Í”¡½ÍÑ1…‰•°¡Ñ…ˆ¹ÕÉ°¤°(€€€€€€€€€€€€€€€¥Í!½µ”€ôÑ…ˆ¹ÕÉ°€ôô!=5}UI0°(€€€€€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ôÑ…ˆ¹¥ÍAÉ¥Ù…Ñ”°(€€€€€€€€€€€€€€€Í•±•Ñ•€ôÑ…ˆ¹¥€ôô…Ñ¥Ù•Q…‰%°(€€€€€€€€€€€€€€€¥ÍA¥¹¹•€ôÑ…ˆ¹¥ÍA¥¹¹•°(€€€€€€€€€€€€€€€É½ÕÁ9…µ”€ôÑ…ˆ¹É½ÕÁ9…µ”°(€€€€€€€€€€€€€€€ÁÉ•Ù¥•Ü€ôÑ…ˆ¹ÁÉ•Ù¥•Ü(€€€€€€€€€€€€¤(€€€€€€€ô((€€€€€€€Q…‰=Ù•ÉÙ¥•İM¡••Ğ (€€€€€€€€€€€Í•ÑÑ¥¹Ì€ôÍ•ÑÑ¥¹Ì°(€€€€€€€€€€€Ñ…‰Ì€ô½Ù•ÉÙ¥•İ%Ñ•µÌ°(€€€€€€€€€€€½¹¥Íµ¥ÍÌ€ôìÍ¡½İQ…‰Ì€ô™…±Í”ô°(€€€€€€€€€€€½¹9•İQ…ˆ€ôìÉ•…Ñ•Q…ˆ ¤ô°(€€€€€€€€€€€½¹9•İAÉ¥Ù…Ñ•Q…ˆ€ôìÉ•…Ñ•Q…ˆ¡¥ÍAÉ¥Ù…Ñ”€ôÑÉÕ”¤ô°(€€€€€€€€€€€½¹M•±•Ğ€ôì¥€´ø(€€€€€€€€€€€€€€€Ñ…‰Ì¹™¥ÉÍÑ=É9Õ±°ì¥Ğ¹¥€ôô¥ôü¹±•ĞìÍ•±•ÑQ…ˆ¡¥Ğ¤ô(€€€€€€€€€€€ô°(€€€€€€€€€€€½¹±½Í”€ôì¥€´ø(€€€€€€€€€€€€€€€Ñ…‰Ì¹™¥ÉÍÑ=É9Õ±°ì¥Ğ¹¥€ôô¥ôü¹±•Ğì±½Í•Q…ˆ¡¥Ğ¤ô(€€€€€€€€€€€ô°(€€€€€€€€€€€½¹±½Í•±°€ôì±½Í•±±Q…‰Ì ¤ô°(€€€€€€€€€€€½¹¥Íµ¥ÍÍ9½Ñ¥”€ôì‘¥Íµ¥ÍÍQ½Á9½Ñ¥” ¤ô°(€€€€€€€€€€€Ñ…‰±½Í•9½Ñ¥”€ôÑ½Á9½Ñ¥”ü¹Ñ…­•%˜ì¥Ğ¹­¥¹€ôô	É½İÍ•ÉQ½Á9½Ñ¥•-¥¹¹Q	}1=Mô°(€€€€€€€€€€€½¹U¹‘½±½Í”€ôìÕ¹‘½A•¹‘¥¹±½Í•‘Q…‰Ì ¤ô°(€€€€€€€€€€€É•ÍÑ½É•‘Q…‰%€ô±…ÍÑI•ÍÑ½É•‘Q…‰%°(€€€€€€€€€€€É•ÍÑ½É••¹•É…Ñ¥½¸€ôÑ…‰I•ÍÑ½É••¹•É…Ñ¥½¸°(€€€€€€€€€€€½¹Q½±•A¥¹¹•€ôì¥€´ø(€€€€€€€€€€€€€€€Ñ…‰Ì¹™¥ÉÍÑ=É9Õ±°ì¥Ğ¹¥€ôô¥ôü¹±•Ğì¥Ğ¹¥ÍA¥¹¹•€ô€…¥Ğ¹¥ÍA¥¹¹•ô(€€€€€€€€€€€ô°(€€€€€€€€€€€½¹UÁ‘…Ñ•É½ÕÀ€ôì¥°É½ÕÀ€´ø(€€€€€€€€€€€€€€€Ñ…‰Ì¹™¥ÉÍÑ=É9Õ±°ì¥Ğ¹¥€ôô¥ôü¹±•Ğì¥Ğ¹É½ÕÁ9…µ”€ôÉ½ÕÀô(€€€€€€€€€€€ô(€€€€€€€€¤(€€€ô((€€€¥˜€¡Í¡½İ	½½­µ…É­Ì¤ì(€€€€€€€	½½­µ…É­ÍM¡••Ğ (€€€€€€€€€€€Í•ÑÑ¥¹Ì€ôÍ•ÑÑ¥¹Ì°(€€€€€€€€€€€‰½½­µ…É­Ì€ô‰½½­µ…É­Ì°(€€€€€€€€€€€½¹¥Íµ¥ÍÌ€ôìÍ¡½İ	½½­µ…É­Ì€ô™…±Í”ô°(€€€€€€€€€€€½¹=Á•¸€ôì‰½½­µ…É¬€´ø½Á•¹	½½­µ…É¬¡‰½½­µ…É¬¤ô°(€€€€€€€€€€€½¹I•µ½Ù”€ôì‰½½­µ…É¬€´øÉ•µ½Ù•	½½­µ…É¬¡‰½½­µ…É¬¤ô°(€€€€€€€€€€€½¹‘¥Ğ€ôì‰½½­µ…É¬°Ñ¥Ñ±”°™½±‘•È€´ø(€€€€€€€€€€€€€€€•‘¥Ñ	½½­µ…É¬¡‰½½­µ…É¬°Ñ¥Ñ±”°™½±‘•È¤(€€€€€€€€€€€ô°(€€€€€€€€€€€½¹±•…É±°€ôì(€€€€€€€€€€€€€€€‰½½­µ…É­Ì¹±•…È ¤(€€€€€€€€€€€€€€€	½½­µ…É­MÑ½É”¹Í…Ù”¡ÁÉ•™Ì°‰½½­µ…É­Ì¤(€€€€€€€€€€€ô(€€€€€€€€¤(€€€ô((€€€¥˜€¡Í¡½İ!¥ÍÑ½Éä¤ì(€€€€€€€!¥ÍÑ½ÉåM¡••Ğ (€€€€€€€€€€€Í•ÑÑ¥¹Ì€ôÍ•ÑÑ¥¹Ì°(€€€€€€€€€€€¡¥ÍÑ½Éä€ô¡¥ÍÑ½Éä°(€€€€€€€€€€€½¹¥Íµ¥ÍÌ€ôìÍ¡½İ!¥ÍÑ½Éä€ô™…±Í”ô°(€€€€€€€€€€€½¹=Á•¸€ôì•¹ÑÉä€´ø½Á•¹!¥ÍÑ½Éå¹ÑÉä¡•¹ÑÉä¤ô°(€€€€€€€€€€€½¹I•µ½Ù”€ôì•¹ÑÉä€´øÉ•µ½Ù•!¥ÍÑ½Éå¹ÑÉä¡•¹ÑÉä¤ô°(€€€€€€€€€€€½¹±•…É±°€ôì(€€€€€€€€€€€€€€€¡¥ÍÑ½Éä¹±•…È ¤(€€€€€€€€€€€€€€€!¥ÍÑ½ÉåMÑ½É”¹Í…Ù”¡ÁÉ•™Ì°¡¥ÍÑ½Éä¤(€€€€€€€€€€€ô(€€€€€€€€¤(€€€ô((€€€¥˜€¡Í¡½İ5•‘¥„€˜˜µ•‘¥…¹…‰±•‘½ÉA…”¤ì(€€€€€€€Ù…°µ•‘¥…½İ¹±½…‘MÑ…ÉÑ•‘Q¥Ñ±”€ôÑÈ ‰½İ¹±½…ÍÑ…ÉÑ•ˆ°€‹B_BÃBÏG]4ÒÚ$z{-®éÜj×                markDownloadsActive()
                     pushTopNotice(
                         kind = BrowserTopNoticeKind.DOWNLOAD,
                         title = mediaDownloadStartedTitle,
@@ -2233,179 +848,7 @@ private fun BrowserScreen(
                     Toast.LENGTH_SHORT
                 ).show()
             },
-            onResume = { item ->
-                val resumed = downloadController.resume(item)
-                refreshDownloads()
-                if (resumed) markDownloadsActive()
-                Toast.makeText(
-                    context,
-                    if (resumed) downloadResumedMessage else downloadCannotResumeMessage,
-                    Toast.LENGTH_SHORT
-                ).show()
-            },
-            onCancel = { item ->
-                downloadController.cancel(item)
-                refreshDownloads()
-                Toast.makeText(
-                    context,
-                    tr(currentSettings.language, "Download stopped", "Ğ—Ğ°Ğ³Ñ€ÑƒĞ·ĞºĞ° Ğ¾ÑÑ‚Ğ°Ğ½Ğ¾Ğ²Ğ»ĞµĞ½Ğ°"),
-                    Toast.LENGTH_SHORT
-                ).show()
-            },
-            onRemove = { item ->
-                downloadController.remove(item)
-                refreshDownloads()
-            },
-            onRename = { item, name ->
-                val renamed = downloadController.rename(item, name)
-                refreshDownloads()
-                Toast.makeText(
-                    context,
-                    if (renamed) {
-                        tr(currentSettings.language, "File renamed", "Ğ¤Ğ°Ğ¹Ğ» Ğ¿ĞµÑ€ĞµĞ¸Ğ¼ĞµĞ½Ğ¾Ğ²Ğ°Ğ½")
-                    } else {
-                        tr(currentSettings.language, "Couldn't rename file", "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¿ĞµÑ€ĞµĞ¸Ğ¼ĞµĞ½Ğ¾Ğ²Ğ°Ñ‚ÑŒ Ñ„Ğ°Ğ¹Ğ»")
-                    },
-                    Toast.LENGTH_SHORT
-                ).show()
-            },
-            onShare = { item ->
-                if (!downloadController.share(item)) {
-                    Toast.makeText(
-                        context,
-                        tr(currentSettings.language, "Couldn't share file", "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¿Ğ¾Ğ´ĞµĞ»Ğ¸Ñ‚ÑŒÑÑ Ñ„Ğ°Ğ¹Ğ»Ğ¾Ğ¼"),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            },
-            onMove = { item ->
-                pendingMoveDownload = item
-                moveDownloadLauncher.launch(item.record.fileName)
-            }
-        )
-    }
-
-    if (showProtection) {
-        ProtectionSheet(
-            host = activeHost,
-            globalEnabled = settings.adBlockingEnabled,
-            extensionReady = extensionReady,
-            blockedBadge = blockedBadge,
-            permissions = sitePermissions,
-            isPrivate = activeTab.isPrivate,
-            onDismiss = { showProtection = false },
-            onGlobalEnabledChange = { enabled ->
-                onSettingsChange(settings.copy(adBlockingEnabled = enabled))
-            },
-            onUpdateFilters = {
-                if (!ProtectionBridge.updateFilterLists()) {
-                    Toast.makeText(
-                        context,
-                        tr(settings.language, "uBlock Origin is not ready", "uBlock Origin ĞµÑ‰Ñ‘ Ğ½Ğµ Ğ³Ğ¾Ñ‚Ğ¾Ğ²"),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            },
-            onOpenUBlockSettings = {
-                val target = ProtectionBridge.dashboardUrl()
-                if (target.isNullOrBlank()) {
-                    Toast.makeText(
-                        context,
-                        tr(settings.language, "uBlock settings are not ready", "ĞĞ°ÑÑ‚Ñ€Ğ¾Ğ¹ĞºĞ¸ uBlock ĞµÑ‰Ñ‘ Ğ½Ğµ Ğ³Ğ¾Ñ‚Ğ¾Ğ²Ñ‹"),
-                        Toast.LENGTH_SHORT
-                    ).show()
-                } else {
-                    showProtection = false
-                    createTab(isPrivate = false, initialUrl = target, select = true)
-                }
-            },
-            onOpenSiteControls = {
-                if (!ProtectionBridge.openSiteControls(activeTab.session)) {
-                    Toast.makeText(context, "uBlock Origin is still starting", Toast.LENGTH_SHORT).show()
-                }
-            },
-            onPermissionChange = { permission, value ->
-                runtime.storageController.setPermission(permission, value)
-                refreshSitePermissions()
-            },
-            onResetPermissions = {
-                sitePermissions.forEach { permission ->
-                    runtime.storageController.setPermission(
-                        permission,
-                        GeckoSession.PermissionDelegate.ContentPermission.VALUE_PROMPT
-                    )
-                }
-                refreshSitePermissions()
-            },
-            onClearSiteData = {
-                if (activeTab.isPrivate) {
-                    activeTab.clearPrivateStorage()
-                    sitePermissions = emptyList()
-                    activeTab.session.reload()
-                    Toast.makeText(context, tr(settings.language, "Private site data cleared", "Ğ”Ğ°Ğ½Ğ½Ñ‹Ğµ Ğ¿Ñ€Ğ¸Ğ²Ğ°Ñ‚Ğ½Ğ¾Ğ³Ğ¾ ÑĞ°Ğ¹Ñ‚Ğ° Ğ¾Ñ‡Ğ¸Ñ‰ĞµĞ½Ñ‹"), Toast.LENGTH_SHORT).show()
-                } else {
-                    runtime.storageController
-                        .clearDataFromHost(activeHost, StorageController.ClearFlags.SITE_DATA)
-                        .accept(
-                            {
-                                sitePermissions = emptyList()
-                                activeTab.session.reload()
-                                Toast.makeText(context, tr(settings.language, "Site data cleared", "Ğ”Ğ°Ğ½Ğ½Ñ‹Ğµ ÑĞ°Ğ¹Ñ‚Ğ° Ğ¾Ñ‡Ğ¸Ñ‰ĞµĞ½Ñ‹"), Toast.LENGTH_SHORT).show()
-                            },
-                            {
-                                Toast.makeText(context, tr(settings.language, "Couldn't clear site data", "ĞĞµ ÑƒĞ´Ğ°Ğ»Ğ¾ÑÑŒ Ğ¾Ñ‡Ğ¸ÑÑ‚Ğ¸Ñ‚ÑŒ Ğ´Ğ°Ğ½Ğ½Ñ‹Ğµ ÑĞ°Ğ¹Ñ‚Ğ°"), Toast.LENGTH_SHORT).show()
-                            }
-                        )
-                }
-            }
-        )
-    }
-
-    if (showSettings) {
-        SettingsSheet(
-            settings = settings,
-            versionName = context.packageManager
-                .getPackageInfo(context.packageName, 0)
-                .versionName
-                ?: "0.7.0",
-            onDismiss = { showSettings = false },
-            onSettingsChange = onSettingsChange,
-            onClearHistory = {
-                history.clear()
-                HistoryStore.save(prefs, history)
-                Toast.makeText(context, "History cleared", Toast.LENGTH_SHORT).show()
-            },
-            onClearBookmarks = {
-                bookmarks.clear()
-                BookmarkStore.save(prefs, bookmarks)
-                Toast.makeText(context, "Bookmarks cleared", Toast.LENGTH_SHORT).show()
-            },
-            onClearDownloads = {
-                downloadController.clearAll()
-                refreshDownloads()
-                Toast.makeText(context, "Downloads cleared", Toast.LENGTH_SHORT).show()
-            },
-            onClearSiteData = {
-                runtime.storageController.clearData(StorageController.ClearFlags.ALL)
-                Toast.makeText(context, "Site data clearing started", Toast.LENGTH_SHORT).show()
-            }
-        )
-    }
-
-    pendingNewTabRequest?.let { pending ->
-        val requestedHost = siteHost(pending.uri)
-        val sourceHost = tabs.firstOrNull { it.id == pending.sourceTabId }
-            ?.let { siteHost(it.url) }
-            .orEmpty()
-        AlertDialog(
-            onDismissRequest = {
-                runCatching { pending.result.complete(null) }
-                pendingNewTabRequest = null
-            },
-            title = { Text(tr("Open a new tab?", "ĞÑ‚ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ½Ğ¾Ğ²ÑƒÑ Ğ²ĞºĞ»Ğ°Ğ´ĞºÑƒ?")) },
-            text = {
-                Text(
-                    if (requestedHost.isNotBlank()) {
+       YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Ô€€€€½¹I•ÍÕµ”€ôì¥Ñ•´€´ø(€€€€€€€€€€€€€€€Ù…°É•ÍÕµ•€ô‘½İ¹±½…‘½¹ÑÉ½±±•È¹É•ÍÕµ”¡¥Ñ•´¤(€€€€€€€€€€€€€€€É•™É•Í¡½İ¹±½…‘Ì ¤(€€€€€€€€€€€€€€€¥˜€¡É•ÍÕµ•¤µ…É­½İ¹±½…‘ÍÑ¥Ù” ¤(€€€€€€€€€€€€€€€Q½…ÍĞ¹µ…­•Q•áĞ (€€€€€€€€€€€€€€€€€€€½¹Ñ•áĞ°(€€€€€€€€€€€€€€€€€€€¥˜€¡É•ÍÕµ•¤‘½İ¹±½…‘I•ÍÕµ•‘5•ÍÍ…”•±Í”‘½İ¹±½…‘…¹¹½ÑI•ÍÕµ•5•ÍÍ…”°(€€€€€€€€€€€€€€€€€€€Q½…ÍĞ¹19Q!}M!=IP(€€€€€€€€€€€€€€€€¤¹Í¡½Ü ¤(€€€€€€€€€€€ô°(€€€€€€€€€€€½¹…¹•°€ôì¥Ñ•´€´ø(€€€€€€€€€€€€€€€‘½İ¹±½…‘½¹ÑÉ½±±•È¹…¹•°¡¥Ñ•´¤(€€€€€€€€€€€€€€€É•™É•Í¡½İ¹±½…‘Ì ¤(€€€€€€€€€€€€€€€Q½…ÍĞ¹µ…­•Q•áĞ (€€€€€€€€€€€€€€€€€€€½¹Ñ•áĞ°(€€€€€€€€€€€€€€€€€€€ÑÈ¡ÕÉÉ•¹ÑM•ÑÑ¥¹Ì¹±…¹Õ…”°€‰½İ¹±½…ÍÑ½ÁÁ•ˆ°€‹B_BÃBÏFFBßBëBÀƒBûFFBÃB÷BûBËBïB×B÷BÀˆ¤°(€€€€€€€€€€€€€€€€€€€Q½…ÍĞ¹19Q!}M!=IP(€€€€€€€€€€€€€€€€¤¹Í¡½Ü ¤(€€€€€€€€€€€ô°(€€€€€€€€€€€½¹I•µ½Ù”€ôì¥Ñ•´€´ø(€€€€€€€€€€€€€€€‘½İ¹±½…‘½¹ÑÉ½±±•È¹É•µ½Ù”¡¥Ñ•´¤(€€€€€€€€€€€€€€€É•™É•Í¡½İ¹±½…‘Ì ¤(€€€€€€€€€€€ô°(€€€€€€€€€€€½¹I•¹…µ”€ôì¥Ñ•´°¹…µ”€´ø(€€€€€€€€€€€€€€€Ù…°É•¹…µ•€ô‘½İ¹±½…‘½¹ÑÉ½±±•È¹É•¹…µ”¡¥Ñ•´°¹…µ”¤(€€€€€€€€€€€€€€€É•™É•Í¡½İ¹±½…‘Ì ¤(€€€€€€€€€€€€€€€Q½…ÍĞ¹µ…­•Q•áĞ (€€€€€€€€€€€€€€€€€€€½¹Ñ•áĞ°(€€€€€€€€€€€€€€€€€€€¥˜€¡É•¹…µ•¤ì(€€€€€€€€€€€€€€€€€€€€€€€ÑÈ¡ÕÉÉ•¹ÑM•ÑÑ¥¹Ì¹±…¹Õ…”°€‰¥±”É•¹…µ•ˆ°€‹B“BÃBçBìƒBÿB×FB×BãBóB×B÷BûBËBÃBôˆ¤(€€€€€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€€€€€ÑÈ¡ÕÉÉ•¹ÑM•ÑÑ¥¹Ì¹±…¹Õ…”°€‰½Õ±‘¸ĞÉ•¹…µ”™¥±”ˆ°€‹BwBÔƒFBÓBÃBïBûFF0ƒBÿB×FB×BãBóB×B÷BûBËBÃFF0ƒFBÃBçBìˆ¤(€€€€€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€€€€€€€€€Q½…ÍĞ¹19Q!}M!=IP(€€€€€€€€€€€€€€€€¤¹Í¡½Ü ¤(€€€€€€€€€€€ô°(€€€€€€€€€€€½¹M¡…É”€ôì¥Ñ•´€´ø(€€€€€€€€€€€€€€€¥˜€ …‘½İ¹±½…‘½¹ÑÉ½±±•È¹Í¡…É”¡¥Ñ•´¤¤ì(€€€€€€€€€€€€€€€€€€€Q½…ÍĞ¹µ…­•Q•áĞ (€€€€€€€€€€€€€€€€€€€€€€€½¹Ñ•áĞ°(€€€€€€€€€€€€€€€€€€€€€€€ÑÈ¡ÕÉÉ•¹ÑM•ÑÑ¥¹Ì¹±…¹Õ…”°€‰½Õ±‘¸ĞÍ¡…É”™¥±”ˆ°€‹BwBÔƒFBÓBÃBïBûFF0ƒBÿBûBÓB×BïBãFF3FF<ƒFBÃBçBïBûBğˆ¤°(€€€€€€€€€€€€€€€€€€€€€€€Q½…ÍĞ¹19Q!}M!=IP(€€€€€€€€€€€€€€€€€€€€¤¹Í¡½Ü ¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô°(€€€€€€€€€€€½¹5½Ù”€ôì¥Ñ•´€´ø(€€€€€€€€€€€€€€€Á•¹‘¥¹5½Ù•½İ¹±½…€ô¥Ñ•´(€€€€€€€€€€€€€€€µ½Ù•½İ¹±½…‘1…Õ¹¡•È¹±…Õ¹ ¡¥Ñ•´¹É•½É¹™¥±•9…µ”¤(€€€€€€€€€€€ô(€€€€€€€€¤(€€€ô((€€€¥˜€¡Í¡½İAÉ½Ñ•Ñ¥½¸¤ì(€€€€€€€AÉ½Ñ•Ñ¥½¹M¡••Ğ (€€€€€€€€€€€¡½ÍĞ€ô…Ñ¥Ù•!½ÍĞ°(€€€€€€€€€€€±½‰…±¹…‰±•€ôÍ•ÑÑ¥¹Ì¹…‘	±½­¥¹¹…‰±•°(€€€€€€€€€€€•áÑ•¹Í¥½¹I•…‘ä€ô•áÑ•¹Í¥½¹I•…‘ä°(€€€€€€€€€€€‰±½­•‘	…‘”€ô‰±½­•‘	…‘”°(€€€€€€€€€€€Á•Éµ¥ÍÍ¥½¹Ì€ôÍ¥Ñ•A•Éµ¥ÍÍ¥½¹Ì°(€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ô…Ñ¥Ù•Q…ˆ¹¥ÍAÉ¥Ù…Ñ”°(€€€€€€€€€€€½¹¥Íµ¥ÍÌ€ôìÍ¡½İAÉ½Ñ•Ñ¥½¸€ô™…±Í”ô°(€€€€€€€€€€€½¹±½‰…±¹…‰±•‘¡…¹”€ôì•¹…‰±•€´ø(€€€€€€€€€€€€€€€½¹M•ÑÑ¥¹Í¡…¹”¡Í•ÑÑ¥¹Ì¹½Áä¡…‘	±½­¥¹¹…‰±•€ô•¹…‰±•¤¤(€€€€€€€€€€€ô°(€€€€€€€€€€€½¹UÁ‘…Ñ•¥±Ñ•ÉÌ€ôì(€€€€€€€€€€€€€€€¥˜€ …AÉ½Ñ•Ñ¥½¹	É¥‘”¹ÕÁ‘…Ñ•¥±Ñ•É1¥ÍÑÌ ¤¤ì(€€€€€€€€€€€€€€€€€€€Q½…ÍĞ¹µ…­•Q•áĞ (€€€€€€€€€€€€€€€€€€€€€€€½¹Ñ•áĞ°(€€€€€€€€€€€€€€€€€€€€€€€ÑÈ¡Í•ÑÑ¥¹Ì¹±…¹Õ…”°€‰Õ	±½¬=É¥¥¸¥Ì¹½ĞÉ•…‘äˆ°€‰Õ	±½¬=É¥¥¸ƒB×F'FDƒB÷BÔƒBÏBûFBûBÈˆ¤°(€€€€€€€€€€€€€€€€€€€€€€€Q½…ÍĞ¹19Q!}M!=IP(€€€€€€€€€€€€€€€€€€€€¤¹Í¡½Ü ¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô°(€€€€€€€€€€€½¹=Á•¹U	±½­M•ÑÑ¥¹Ì€ôì(€€€€€€€€€€€€€€€Ù…°Ñ…É•Ğ€ôAÉ½Ñ•Ñ¥½¹	É¥‘”¹‘…Í¡‰½…É‘UÉ° ¤(€€€€€€€€€€€€€€€¥˜€¡Ñ…É•Ğ¹¥Í9Õ±±=É	±…¹¬ ¤¤ì(€€€€€€€€€€€€€€€€€€€Q½…ÍĞ¹µ…­•Q•áĞ (€€€€€€€€€€€€€€€€€€€€€€€½¹Ñ•áĞ°(€€€€€€€€€€€€€€€€€€€€€€€ÑÈ¡Í•ÑÑ¥¹Ì¹±…¹Õ…”°€‰Õ	±½¬Í•ÑÑ¥¹Ì…É”¹½ĞÉ•…‘äˆ°€‹BwBÃFFFBûBçBëBàÕ	±½¬ƒB×F'FDƒB÷BÔƒBÏBûFBûBËF,ˆ¤°(€€€€€€€€€€€€€€€€€€€€€€€Q½…ÍĞ¹19Q!}M!=IP(€€€€€€€€€€€€€€€€€€€€¤¹Í¡½Ü ¤(€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€Í¡½İAÉ½Ñ•Ñ¥½¸€ô™…±Í”(€€€€€€€€€€€€€€€€€€€É•…Ñ•Q…ˆ¡¥ÍAÉ¥Ù…Ñ”€ô™…±Í”°¥¹¥Ñ¥…±UÉ°€ôÑ…É•Ğ°Í•±•Ğ€ôÑÉÕ”¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô°(€€€€€€€€€€€½¹=Á•¹M¥Ñ•½¹ÑÉ½±Ì€ôì(€€€€€€€€€€€€€€€¥˜€ …AÉ½Ñ•Ñ¥½¹	É¥‘”¹½Á•¹M¥Ñ•½¹ÑÉ½±Ì¡…Ñ¥Ù•Q…ˆ¹Í•ÍÍ¥½¸¤¤ì(€€€€€€€€€€€€€€€€€€€Q½…ÍĞ¹µ…­•Q•áĞ¡½¹Ñ•áĞ°€‰Õ	±½¬=É¥¥¸¥ÌÍÑ¥±°ÍÑ…ÉÑ¥¹œˆ°Q½…ÍĞ¹19Q!}M!=IP¤¹Í¡½Ü ¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô°(€€€€€€€€€€€½¹A•Éµ¥ÍÍ¥½¹¡…¹”€ôìÁ•Éµ¥ÍÍ¥½¸°Ù…±Õ”€´ø(€€€€€€€€€€€€€€€ÉÕ¹Ñ¥µ”¹ÍÑ½É…•½¹ÑÉ½±±•È¹Í•ÑA•Éµ¥ÍÍ¥½¸¡Á•Éµ¥ÍÍ¥½¸°Ù…±Õ”¤(€€€€€€€€€€€€€€€É•™É•Í¡M¥Ñ•A•Éµ¥ÍÍ¥½¹Ì ¤(€€€€€€€€€€€ô°(€€€€€€€€€€€½¹I•Í•ÑA•Éµ¥ÍÍ¥½¹Ì€ôì(€€€€€€€€€€€€€€€Í¥Ñ•A•Éµ¥ÍÍ¥½¹Ì¹™½É… ìÁ•Éµ¥ÍÍ¥½¸€´ø(€€€€€€€€€€€€€€€€€€€ÉÕ¹Ñ¥µ”¹ÍÑ½É…•½¹ÑÉ½±±•È¹Í•ÑA•Éµ¥ÍÍ¥½¸ (€€€€€€€€€€€€€€€€€€€€€€€Á•Éµ¥ÍÍ¥½¸°(€€€€€€€€€€€€€€€€€€€€€€€•­½M•ÍÍ¥½¸¹A•Éµ¥ÍÍ¥½¹•±•…Ñ”¹½¹Ñ•¹ÑA•Éµ¥ÍÍ¥½¸¹Y1U}AI=5AP(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€É•™É•Í¡M¥Ñ•A•Éµ¥ÍÍ¥½¹Ì ¤(€€€€€€€€€€€ô°(€€€€€€€€€€€½¹±•…ÉM¥Ñ•…Ñ„€ôì(€€€€€€€€€€€€€€€¥˜€¡…Ñ¥Ù•Q…ˆ¹¥ÍAÉ¥Ù…Ñ”¤ì(€€€€€€€€€€€€€€€€€€€…Ñ¥Ù•Q…ˆ¹±•…ÉAÉ¥Ù…Ó]4ÒÚ$z{-®éÜj×t.isNotBlank()) {
                         tr(
                             "${sourceHost.ifBlank { "This site" }} wants to open $requestedHost in a new tab.",
                             "${sourceHost.ifBlank { "Ğ­Ñ‚Ğ¾Ñ‚ ÑĞ°Ğ¹Ñ‚" }} Ñ…Ğ¾Ñ‡ĞµÑ‚ Ğ¾Ñ‚ĞºÑ€Ñ‹Ñ‚ÑŒ $requestedHost Ğ² Ğ½Ğ¾Ğ²Ğ¾Ğ¹ Ğ²ĞºĞ»Ğ°Ğ´ĞºĞµ."
@@ -2502,138 +945,11 @@ private fun BrowserScreen(
                         .fillMaxWidth()
                         .widthIn(max = 480.dp)
                         .heightIn(max = menuMaxHeight)
-                        .navigationBarsPadding()
-                        .padding(horizontal = 8.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .weight(1f, fill = false)
-                            .verticalScroll(menuScrollState)
-                            .padding(horizontal = 4.dp, vertical = 6.dp),
-                        verticalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        QuickMenuPrimaryRow(
-                            icon = if (isBookmarked) Icons.Rounded.Star else Icons.Rounded.StarBorder,
-                            title = if (isBookmarked) {
-                                tr("Remove bookmark", "Ğ£Ğ´Ğ°Ğ»Ğ¸Ñ‚ÑŒ Ğ¸Ğ· Ğ·Ğ°ĞºĞ»Ğ°Ğ´Ğ¾Ğº")
-                            } else {
-                                tr("Add bookmark", "Ğ”Ğ¾Ğ±Ğ°Ğ²Ğ¸Ñ‚ÑŒ Ğ² Ğ·Ğ°ĞºĞ»Ğ°Ğ´ĞºĞ¸")
-                            },
-                            enabled = !isHome,
-                            selected = isBookmarked
-                        ) {
-                            toggleBookmark()
-                            showMenu = false
-                        }
-
-                        QuickMenuPrimaryRow(
-                            icon = Icons.Rounded.Search,
-                            title = tr("Find in page", "ĞĞ°Ğ¹Ñ‚Ğ¸ Ğ½Ğ° ÑÑ‚Ñ€Ğ°Ğ½Ğ¸Ñ†Ğµ"),
-                            enabled = !isHome
-                        ) {
-                            showMenu = false
-                            focusManager.clearFocus()
-                            showTranslation = false
-                            showFindInPage = true
-                        }
-
-                        QuickMenuToggleRow(
-                            icon = Icons.Rounded.DesktopWindows,
-                            title = tr("Desktop site", "Ğ’Ğ¸Ğ´ Ğ´Ğ»Ñ ĞŸĞš"),
-                            checked = activeSiteDesktopMode,
-                            enabled = !isHome && !readerModeActive
-                        ) { enabled ->
-                            SiteDesktopModeStore.setForUrl(prefs, effectivePageUrl, enabled)
-                            siteDesktopRevision += 1
-                            activeTab.applyDesktopMode(enabled, reload = true)
-                        }
-
-                        QuickMenuPrimaryRow(
-                            icon = Icons.Rounded.Security,
-                            title = "ILYRO Shield",
-                            subtitle = if (settings.adBlockingEnabled) {
-                                tr("uBlock Origin Â· protection on", "uBlock Origin Â· Ğ·Ğ°Ñ‰Ğ¸Ñ‚Ğ° Ğ²ĞºĞ»ÑÑ‡ĞµĞ½Ğ°")
-                            } else {
-                                tr("uBlock Origin Â· protection off", "uBlock Origin Â· Ğ·Ğ°Ñ‰Ğ¸Ñ‚Ğ° Ğ²Ñ‹ĞºĞ»ÑÑ‡ĞµĞ½Ğ°")
-                            },
-                            selected = settings.adBlockingEnabled
-                        ) {
-                            showMenu = false
-                            openProtectionPanel()
-                        }
-
-                        QuickMenuPrimaryRow(
-                            icon = Icons.Rounded.MoreHoriz,
-                            title = tr("More", "Ğ‘Ğ¾Ğ»ÑŒÑˆĞµ"),
-                            trailingText = if (menuMoreExpanded) "âˆ’" else "+"
-                        ) {
-                            menuMoreExpanded = !menuMoreExpanded
-                        }
-
-                        AnimatedVisibility(
-                            visible = menuMoreExpanded,
-                            enter = fadeIn(tween(120)),
-                            exit = fadeOut(tween(90))
-                        ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(3.dp)
-                            ) {
-                                MenuAction(Icons.Rounded.VisibilityOff, tr("New private tab", "ĞĞ¾Ğ²Ğ°Ñ Ğ¿Ñ€Ğ¸Ğ²Ğ°Ñ‚Ğ½Ğ°Ñ Ğ²ĞºĞ»Ğ°Ğ´ĞºĞ°")) {
-                                    showMenu = false
-                                    createTab(isPrivate = true)
-                                }
-                                MenuAction(Icons.Rounded.Home, tr("Home", "Ğ“Ğ»Ğ°Ğ²Ğ½Ğ°Ñ")) {
-                                    showMenu = false
-                                    openHome()
-                                }
-
-                                if (!isHome) {
-                                    MenuTextScaleControl(
-                                        scalePercent = ((settings.textScale * 100f) + 0.5f).toInt(),
-                                        onDecrease = {
-                                            val next = (settings.textScale - 0.05f).coerceAtLeast(0.85f)
-                                            if (kotlin.math.abs(next - settings.textScale) > 0.001f) {
-                                                onSettingsChange(settings.copy(textScale = next))
-                                                textScaleReloadRevision += 1
-                                            }
-                                        },
-                                        onIncrease = {
-                                            val next = (settings.textScale + 0.05f).coerceAtMost(1.30f)
-                                            if (kotlin.math.abs(next - settings.textScale) > 0.001f) {
-                                                onSettingsChange(settings.copy(textScale = next))
-                                                textScaleReloadRevision += 1
-                                            }
-                                        },
-                                        onReset = {
-                                            if (kotlin.math.abs(settings.textScale - 1.0f) > 0.001f) {
-                                                onSettingsChange(settings.copy(textScale = 1.0f))
-                                                textScaleReloadRevision += 1
-                                            }
-                                        }
-                                    )
-
-                                    MenuAction(
-                                        Icons.Rounded.Translate,
-                                        tr("Translate page", "ĞŸĞµÑ€ĞµĞ²ĞµÑÑ‚Ğ¸ ÑÑ‚Ñ€Ğ°Ğ½Ğ¸Ñ†Ñƒ"),
-                                        enabled = !readerModeActive && isHttpPage(effectivePageUrl)
-                                    ) {
-                                        showMenu = false
-                                        focusManager.clearFocus()
-                                        showFindInPage = false
-                                        showTranslation = true
-                                    }
-
-                                    MenuAction(
-                                        Icons.Rounded.Article,
-                                        when {
-                                            readerModeActive -> tr("Exit reader mode", "Ğ’Ñ‹Ğ¹Ñ‚Ğ¸ Ğ¸Ğ· Ñ€ĞµĞ¶Ğ¸Ğ¼Ğ° Ñ‡Ñ‚ĞµĞ½Ğ¸Ñ")
-                                            activeTab.readerLoading -> tr("Preparing reader modeâ€¦", "ĞŸĞ¾Ğ´Ğ³Ğ¾Ñ‚Ğ¾Ğ²ĞºĞ° Ñ€ĞµĞ¶Ğ¸Ğ¼Ğ° Ñ‡Ñ‚ĞµĞ½Ğ¸Ñâ€¦")
-                                            else -> tr("Reader mode", "Ğ ĞµĞ¶Ğ¸Ğ¼ Ñ‡Ñ‚ĞµĞ½Ğ¸Ñ")
-                                        },
-                                        enabled = readerModeActive ||
-                                            (activeTab.pageReaderable && !activeTab.readerLoading)
-                                    ) {
+         YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Ô€€€€€€€€€€€€€€€¹¹…Ù¥…Ñ¥½¹	…ÉÍA…‘‘¥¹œ ¤(€€€€€€€€€€€€€€€€€€€€€€€€¹Á…‘‘¥¹œ¡¡½É¥é½¹Ñ…°€ô€à¹‘À¤(€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€½±Õµ¸ (€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹İ•¥¡Ğ Å˜°™¥±°€ô™…±Í”¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹Ù•ÉÑ¥…±MÉ½±°¡µ•¹ÕMÉ½±±MÑ…Ñ”¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹Á…‘‘¥¹œ¡¡½É¥é½¹Ñ…°€ô€Ğ¹‘À°Ù•ÉÑ¥…°€ô€Ø¹‘À¤°(€€€€€€€€€€€€€€€€€€€€€€€Ù•ÉÑ¥…±ÉÉ…¹•µ•¹Ğ€ôÉÉ…¹•µ•¹Ğ¹ÍÁ…•‘	ä Ô¹‘À¤(€€€€€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€€€€€EÕ¥­5•¹ÕAÉ¥µ…ÉåI½Ü (€€€€€€€€€€€€€€€€€€€€€€€€€€€¥½¸€ô¥˜€¡¥Í	½½­µ…É­•¤%½¹Ì¹I½Õ¹‘•¹MÑ…È•±Í”%½¹Ì¹I½Õ¹‘•¹MÑ…É	½É‘•È°(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ¥Ñ±”€ô¥˜€¡¥Í	½½­µ…É­•¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑÈ ‰I•µ½Ù”‰½½­µ…É¬ˆ°€‹BBÓBÃBïBãFF0ƒBãBÜƒBßBÃBëBïBÃBÓBûBèˆ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑÈ ‰‘‰½½­µ…É¬ˆ°€‹BSBûBÇBÃBËBãFF0ƒBÈƒBßBÃBëBïBÃBÓBëBàˆ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€€€€€€€€€€€€€€€€€•¹…‰±•€ô€…¥Í!½µ”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•±•Ñ•€ô¥Í	½½­µ…É­•(€€€€€€€€€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ½±•	½½­µ…É¬ ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¡½İ5•¹Ô€ô™…±Í”(€€€€€€€€€€€€€€€€€€€€€€€ô((€€€€€€€€€€€€€€€€€€€€€€€EÕ¥­5•¹ÕAÉ¥µ…ÉåI½Ü (€€€€€€€€€€€€€€€€€€€€€€€€€€€¥½¸€ô%½¹Ì¹I½Õ¹‘•¹M•…É °(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ¥Ñ±”€ôÑÈ ‰¥¹¥¸Á…”ˆ°€‹BwBÃBçFBàƒB÷BÀƒFFFBÃB÷BãFBÔˆ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€•¹…‰±•€ô€…¥Í!½µ”(€€€€€€€€€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¡½İ5•¹Ô€ô™…±Í”(€€€€€€€€€€€€€€€€€€€€€€€€€€€™½ÕÍ5…¹…•È¹±•…É½ÕÌ ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¡½İQÉ…¹Í±…Ñ¥½¸€ô™…±Í”(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¡½İ¥¹‘%¹A…”€ôÑÉÕ”(€€€€€€€€€€€€€€€€€€€€€€€ô((€€€€€€€€€€€€€€€€€€€€€€€EÕ¥­5•¹ÕQ½±•I½Ü (€€€€€€€€€€€€€€€€€€€€€€€€€€€¥½¸€ô%½¹Ì¹I½Õ¹‘•¹•Í­Ñ½Á]¥¹‘½İÌ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ¥Ñ±”€ôÑÈ ‰•Í­Ñ½ÀÍ¥Ñ”ˆ°€‹BKBãBĞƒBÓBïF<ƒBBhˆ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€¡•­•€ô…Ñ¥Ù•M¥Ñ••Í­Ñ½Á5½‘”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€•¹…‰±•€ô€…¥Í!½µ”€˜˜€…É•…‘•É5½‘•Ñ¥Ù”(€€€€€€€€€€€€€€€€€€€€€€€€¤ì•¹…‰±•€´ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€M¥Ñ••Í­Ñ½Á5½‘•MÑ½É”¹Í•Ñ½ÉUÉ°¡ÁÉ•™Ì°•™™•Ñ¥Ù•A…•UÉ°°•¹…‰±•¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¥Ñ••Í­Ñ½ÁI•Ù¥Í¥½¸€¬ô€Ä(€€€€€€€€€€€€€€€€€€€€€€€€€€€…Ñ¥Ù•Q…ˆ¹…ÁÁ±å•Í­Ñ½Á5½‘”¡•¹…‰±•°É•±½…€ôÑÉÕ”¤(€€€€€€€€€€€€€€€€€€€€€€€ô((€€€€€€€€€€€€€€€€€€€€€€€EÕ¥­5•¹ÕAÉ¥µ…ÉåI½Ü (€€€€€€€€€€€€€€€€€€€€€€€€€€€¥½¸€ô%½¹Ì¹I½Õ¹‘•¹M•ÕÉ¥Ñä°(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ¥Ñ±”€ô€‰%1eI<M¡¥•±ˆ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€ÍÕ‰Ñ¥Ñ±”€ô¥˜€¡Í•ÑÑ¥¹Ì¹…‘	±½­¥¹¹…‰±•¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑÈ ‰Õ	±½¬=É¥¥¸ƒ
+ÜÁÉ½Ñ•Ñ¥½¸½¸ˆ°€‰Õ	±½¬=É¥¥¸ƒ
+ÜƒBßBÃF'BãFBÀƒBËBëBïF;FB×B÷BÀˆ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑÈ ‰Õ	±½¬=É¥¥¸ƒ
+ÜÁÉ½Ñ•Ñ¥½¸½™˜ˆ°€‰Õ	±½¬=É¥¥¸ƒ
+ÜƒBßBÃF'BãFBÀƒBËF/BëBïF;FB×B÷BÀˆ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•±•Ñ•€ôÍ•ÑÑ¥¹Ì¹…‘	±½­¥¹¹…‰±•(€€€€€€€€€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¡½İ5•¹Ô€ô™…±Í”(€€€€€€€€€€€€€€€€€€€€€€€€€€€½Á•¹AÉ½Ñ•Ñ¥½¹A…¹•° ¤(€€€€€€€€€€€€€€€€€€€€€€€ô((€€€€€€€€€€€€€€€€€€€€€€€EÕ¥­5•¹ÕAÉ¥µ…ÉåI½Ü (€€€€€€€€€€€€€€€€€€€€€€€€€€€¥½¸€ô%½¹Ì¹I½Õ¹‘•¹5½É•!½É¥è°(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ¥Ñ±”€ôÑÈ ‰5½É”ˆ°€‹BGBûBïF3F#BÔˆ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑÉ…¥±¥¹Q•áĞ€ô¥˜€¡µ•¹Õ5½É•áÁ…¹‘•¤€‹Š"Hˆ•±Í”€ˆ¬ˆ(€€€€€€€€€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€µ•¹Õ5½É•áÁ…¹‘•€ô€…µ•¹Õ5½É•áÁ…¹‘•(€€€€€€€€€€€€€€€€€€€€€€€ô((€€€€€€€€€€€€€€€€€€€€€€€¹¥µ…Ñ•‘Y¥Í¥‰¥±¥Ñä (€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù¥Í¥‰±”€ôµ•¹Õ5½É•áÁ…¹‘•°(€€€€€€€€€€€€€€€€€€€€€€€€€€€•¹Ñ•È€ô™…‘•%¸¡Ñİ••¸ ÄÈÀ¤¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€•á¥Ğ€ô™…‘•=ÕĞ¡Ñİ••¸ äÀ¤¤(€€€€€€€€€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€½±Õµ¸ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹™¥±±5…á]¥‘Ñ  ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù•ÉÑ¥…±ÉÉ…¹•µ•¹Ğ€ôÉÉ…¹•µ•¹Ğ¹ÍÁ…•‘	ä Ì¹‘À¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€5•¹ÕÑ¥½¸¡%½¹Ì¹I½Õ¹‘•¹Y¥Í¥‰¥±¥Ñå=™˜°ÑÈ ‰9•ÜÁÉ¥Ù…Ñ”Ñ…ˆˆ°€‹BwBûBËBÃF<ƒBÿFBãBËBÃFB÷BÃF<ƒBËBëBïBÃBÓBëBÀˆ¤¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¡½İ5•¹Ô€ô™…±Í”(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€É•…Ñ•Q…ˆ¡¥ÍAÉ¥Ù…Ñ”€ôÑÉÕ”¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€5•¹ÕÑ¥½¸¡%½¹Ì¹I½Õ¹‘•¹!½µ”°ÑÈ ‰!½µ”ˆ°€‹BOBïBÃBËB÷BÃF<ˆ¤¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í¡½İ5•¹Ô€ô™…±Í”(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½Á•¹!½µ” ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô((€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥˜€ …¥Í!½µ”¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€5•¹ÕQ•áÑM…±•½¹ÑÉ½° (€€€€€€€€€€€€€€€€€ƒ]4ÒÚ$z{-®éÜj×                         ) {
                                         showMenu = false
                                         showFindInPage = false
                                         showTranslation = false

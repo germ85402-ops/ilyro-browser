@@ -62,4 +62,11 @@ class PasswordVaultCodecTest {
         assertTrue(passwordDomainMatches("https://EXAMPLE.com", "example.COM."))
         assertFalse(passwordDomainMatches("https://www.example.com", "example.com"))
     }
+
+    @Test
+    fun domainMatcherUsesSchemeAndPortWhenProvided() {
+        assertFalse(passwordDomainMatches("https://example.com", "http://example.com"))
+        assertFalse(passwordDomainMatches("https://example.com:443", "https://example.com:8443"))
+        assertTrue(passwordDomainMatches("https://example.com:443", "https://example.com"))
+    }
 }

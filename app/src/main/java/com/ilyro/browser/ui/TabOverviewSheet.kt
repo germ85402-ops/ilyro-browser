@@ -1,174 +1,4 @@
-package com.ilyro.browser.ui
-
-import android.graphics.Bitmap
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.Image as ComposeImage
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.CreateNewFolder
-import androidx.compose.material.icons.rounded.Language
-import androidx.compose.material.icons.rounded.VisibilityOff
-import androidx.compose.material.icons.rounded.PushPin
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberSwipeToDismissBoxState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.key
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import kotlinx.coroutines.delay
-
-internal data class TabOverviewItem(
-    val id: String,
-    val title: String,
-    val host: String,
-    val isHome: Boolean,
-    val isPrivate: Boolean,
-    val selected: Boolean,
-    val isPinned: Boolean,
-    val groupName: String?,
-    val preview: Bitmap? = null
-)
-
-private enum class TabOverviewSection { NORMAL, PRIVATE, GROUPS }
-
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
-@Composable
-internal fun TabOverviewSheet(
-    settings: BrowserSettings,
-    tabs: List<TabOverviewItem>,
-    onDismiss: () -> Unit,
-    onNewTab: () -> Unit,
-    onNewPrivateTab: () -> Unit,
-    onSelect: (String) -> Unit,
-    onClose: (String) -> Unit,
-    onCloseAll: () -> Unit,
-    onDismissNotice: () -> Unit = {},
-    onTogglePinned: (String) -> Unit,
-    onUpdateGroup: (String, String?) -> Unit,
-    tabCloseNotice: BrowserTopNotice? = null,
-    onUndoClose: () -> Unit = {},
-    restoredTabId: String? = null,
-    restoreGeneration: Long = 0L
-) {
-    val metrics = rememberIlyroLayoutMetrics()
-    var query by remember { mutableStateOf("") }
-    var section by remember { mutableStateOf(TabOverviewSection.NORMAL) }
-    var selectedGroup by remember { mutableStateOf<String?>(null) }
-    var editingGroupFor by remember { mutableStateOf<TabOverviewItem?>(null) }
-    var groupDraft by remember { mutableStateOf("") }
-    var actionTabId by remember { mutableStateOf<String?>(null) }
-    var openingTabId by remember { mutableStateOf<String?>(null) }
-    var showCloseAllDialog by remember { mutableStateOf(false) }
-    var sheetVisible by remember { mutableStateOf(false) }
-    var pendingExitAction by remember { mutableStateOf<(() -> Unit)?>(null) }
-
-    fun requestSheetDismiss(after: () -> Unit = onDismiss) {
-        if (!sheetVisible || pendingExitAction != null) return
-        pendingExitAction = after
-        sheetVisible = false
-    }
-
-    LaunchedEffect(Unit) {
-        sheetVisible = true
-    }
-
-    LaunchedEffect(sheetVisible, pendingExitAction) {
-        if (!sheetVisible) {
-            val action = pendingExitAction ?: return@LaunchedEffect
-            delay(260L)
-            if (!sheetVisible && pendingExitAction != null) {
-                action()
-            }
-        }
-    }
-
-    val groups = tabs
-        .mapNotNull { it.groupName?.trim()?.takeIf(String::isNotBlank) }
-        .distinct()
-        .sorted()
-    val queryValue = query.trim()
-
-    val sectionTabs = when (section) {
-        TabOverviewSection.NORMAL -> tabs.filterNot { it.isPrivate }
-        TabOverviewSection.PRIVATE -> tabs.filter { it.isPrivate }
-        TabOverviewSection.GROUPS -> tabs.filter { !it.groupName.isNullOrBlank() }
-    }
-
-    val visibleTabs = sectionTabs
-        .filter { tab ->
-            (section != TabOverviewSection.GROUPS || selectedGroup == null || tab.groupName == selectedGroup) &&
-                (queryValue.isBlank() ||
-                    tab.title.contains(queryValue, ignoreCase = true) ||
-                    tab.host.contains(queryValue, ignoreCase = true) ||
-                    tab.groupName.orEmpty().contains(queryValue, ignoreCase = true))
-        }
-        .sortedWith(
-            compareByDescending<TabOverviewItem> { it.isPinned }
-                .thenBy { it.groupName.orEmpty().lowercase() }
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬ÕÁ…­…”½´¹¥±åÉ¼¹‰É½İÍ•È¹Õ¤()¥µÁ½ÉĞ…¹‘É½¥¹É…Á¡¥Ì¹	¥Ñµ…À)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹¹¥µ…Ñ•‘Y¥Í¥‰¥±¥Ñä)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹…¹¥µ…Ñ•½¹Ñ•¹ÑM¥é”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹½É”¹…¹¥µ…Ñ•±½…ÑÍMÑ…Ñ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹½É”¹ÍÁÉ¥¹œ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹½É”¹Ñİ••¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹•áÁ…¹‘Y•ÉÑ¥…±±ä)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹™…‘•%¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹™…‘•=ÕĞ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹Í¡É¥¹­Y•ÉÑ¥…±±ä)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹Í±¥‘•%¹Y•ÉÑ¥…±±ä)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹…¹¥µ…Ñ¥½¸¹Í±¥‘•=ÕÑY•ÉÑ¥…±±ä)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹	½É‘•ÉMÑÉ½­”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹áÁ•É¥µ•¹Ñ…±½Õ¹‘…Ñ¥½¹Á¤)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹%µ…”…Ì½µÁ½Í•%µ…”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹½µ‰¥¹•‘±¥­…‰±”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹¡½É¥é½¹Ñ…±MÉ½±°)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹ÉÉ…¹•µ•¹Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹	½à)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹½±Õµ¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹A…‘‘¥¹Y…±Õ•Ì)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹I½Ü)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹MÁ…•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹™¥±±5…á!•¥¡Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹™¥±±5…áM¥é”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹™¥±±5…á]¥‘Ñ )¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹¡•¥¡Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹Á…‘‘¥¹œ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹Í…™•É…İ¥¹A…‘‘¥¹œ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹Í¥é”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹Í¥é•%¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹İ¥‘Ñ¡%¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…éä¹É¥¹É¥‘•±±Ì)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…éä¹É¥¹1…éåY•ÉÑ¥…±É¥)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…éä¹É¥¹¥Ñ•µÌ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹É•µ•µ‰•ÉMÉ½±±MÑ…Ñ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹Í¡…Á”¹¥É±•M¡…Á”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹Í¡…Á”¹I½Õ¹‘•‘½É¹•ÉM¡…Á”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹%½¹Ì)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹‘)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹±½Í”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹É•…Ñ•9•İ½±‘•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹1…¹Õ…”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹Y¥Í¥‰¥±¥Ñå=™˜)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹AÕÍ¡A¥¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹M•…É )¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹±•ÉÑ¥…±½œ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹áÁ•É¥µ•¹Ñ…±5…Ñ•É¥…°ÍÁ¤)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹¥±Ñ•É¡¥À)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹%½¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹5…Ñ•É¥…±Q¡•µ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹=ÕÑ±¥¹•‘Q•áÑ¥•±)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹MÕÉ™…”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹Mİ¥Á•Q½¥Íµ¥ÍÍ	½à)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹Mİ¥Á•Q½¥Íµ¥ÍÍ	½áY…±Õ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹Q•áĞ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹Q•áÑ	ÕÑÑ½¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹É•µ•µ‰•ÉMİ¥Á•Q½¥Íµ¥ÍÍ	½áMÑ…Ñ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹½µÁ½Í…‰±”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹1…Õ¹¡•‘™™•Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹­•ä)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹•ÑY…±Õ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹µÕÑ…‰±•MÑ…Ñ•=˜)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹É•µ•µ‰•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹Í•ÑY…±Õ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹±¥¹µ•¹Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹5½‘¥™¥•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹É…Á¡¥Ì¹½±½È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹É…Á¡¥Ì¹¥±Ñ•ÉEÕ…±¥Ñä)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹É…Á¡¥Ì¹…Í%µ…•	¥Ñµ…À)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹É…Á¡¥Ì¹É…Á¡¥Í1…å•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹É…Á¡¥Ì¹±Õµ¥¹…¹”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹±…å½ÕĞ¹½¹Ñ•¹ÑM…±”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Ñ•áĞ¹™½¹Ğ¹½¹Ñ]•¥¡Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Ñ•áĞ¹ÍÑå±”¹Q•áÑ=Ù•É™±½Ü)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Õ¹¥Ğ¹À)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Õ¹¥Ğ¹‘À)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Õ¹¥Ğ¹ÍÀ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Í•µ…¹Ñ¥Ì¹I½±”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Í•µ…¹Ñ¥Ì¹½¹Ñ•¹Ñ•ÍÉ¥ÁÑ¥½¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Í•µ…¹Ñ¥Ì¹É½±”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Í•µ…¹Ñ¥Ì¹Í•±•Ñ•)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Í•µ…¹Ñ¥Ì¹Í•µ…¹Ñ¥Ì)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Í•µ…¹Ñ¥Ì¹ÍÑ…Ñ••ÍÉ¥ÁÑ¥½¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹İ¥¹‘½Ü¹¥…±½œ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹İ¥¹‘½Ü¹¥…±½AÉ½Á•ÉÑ¥•Ì)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹‘•±…ä()¥¹Ñ•É¹…°‘…Ñ„±…ÍÌQ…‰=Ù•ÉÙ¥•İ%Ñ•´ (€€€Ù…°¥èMÑÉ¥¹œ°(€€€Ù…°Ñ¥Ñ±”èMÑÉ¥¹œ°(€€€Ù…°¡½ÍĞèMÑÉ¥¹œ°(€€€Ù…°¥Í!½µ”è	½½±•…¸°(€€€Ù…°¥ÍAÉ¥Ù…Ñ”è	½½±•…¸°(€€€Ù…°Í•±•Ñ•è	½½±•…¸°(€€€Ù…°¥ÍA¥¹¹•è	½½±•…¸°(€€€Ù…°Ÿ]4ÒÚ$z{-®éÜj×enBy { it.groupName.orEmpty().lowercase() }
                 .thenByDescending { it.selected }
         )
 
@@ -271,145 +101,7 @@ internal fun TabOverviewSheet(
                             }
                         )
 
-                        if (tabs.size >= 5 || query.isNotBlank()) {
-                            IlyroSearchField(
-                                value = query,
-                                onValueChange = { query = it },
-                                placeholder = tr("Search tabs", "ĞŸĞ¾Ğ¸ÑĞº Ğ¿Ğ¾ Ğ²ĞºĞ»Ğ°Ğ´ĞºĞ°Ğ¼")
-                            )
-                        }
-
-                        if (section == TabOverviewSection.GROUPS && groups.isNotEmpty()) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 10.dp)
-                                    .horizontalScroll(rememberScrollState()),
-                                horizontalArrangement = Arrangement.spacedBy(metrics.itemGap)
-                            ) {
-                                FilterChip(
-                                    selected = selectedGroup == null,
-                                    onClick = { selectedGroup = null },
-                                    label = { Text(tr("All groups", "Ğ’ÑĞµ Ğ³Ñ€ÑƒĞ¿Ğ¿Ñ‹")) }
-                                )
-                                groups.forEach { group ->
-                                    FilterChip(
-                                        selected = selectedGroup == group,
-                                        onClick = {
-                                            selectedGroup = if (selectedGroup == group) null else group
-                                        },
-                                        label = { Text(group) }
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(metrics.sectionGap))
-
-                        if (visibleTabs.isEmpty()) {
-                            EmptyTabsState(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
-                                section = section,
-                                queryActive = queryValue.isNotBlank(),
-                                groupsEmpty = groups.isEmpty()
-                            )
-                        } else {
-                            LazyVerticalGrid(
-                                columns = GridCells.Fixed(columns),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(1f),
-                                horizontalArrangement = Arrangement.spacedBy(gridGap),
-                                verticalArrangement = Arrangement.spacedBy(gridGap),
-                                contentPadding = PaddingValues(bottom = 10.dp)
-                            ) {
-                                items(visibleTabs, key = { it.id }) { tab ->
-                                    Box(
-                                        modifier = Modifier.animateItem(
-                                            fadeInSpec = tween(150),
-                                            placementSpec = spring(
-                                                dampingRatio = 0.90f,
-                                                stiffness = 420f
-                                            ),
-                                            fadeOutSpec = tween(190)
-                                        )
-                                    ) {
-                                        val restoreKey = if (tab.id == restoredTabId) restoreGeneration else 0L
-                                        key(tab.id, restoreKey) {
-                                            ModernTabCard(
-                                                tab = tab,
-                                                cardHeight = cardHeight,
-                                                previewSize = settings.tabPreviewSize,
-                                                actionsVisible = actionTabId == tab.id,
-                                                opening = openingTabId == tab.id,
-                                                dimmedForOpening = openingTabId != null && openingTabId != tab.id,
-                                                compact = metrics.isCompact,
-                                                onSelect = {
-                                                    if (openingTabId == null) {
-                                                        actionTabId = null
-                                                        openingTabId = tab.id
-                                                    }
-                                                },
-                                                onClose = {
-                                                    if (actionTabId == tab.id) actionTabId = null
-                                                    onClose(tab.id)
-                                                },
-                                                onLongPress = {
-                                                    if (openingTabId == null) {
-                                                        actionTabId = if (actionTabId == tab.id) null else tab.id
-                                                    }
-                                                },
-                                                onTogglePinned = {
-                                                    onTogglePinned(tab.id)
-                                                    actionTabId = null
-                                                },
-                                                onEditGroup = {
-                                                    groupDraft = tab.groupName.orEmpty()
-                                                    editingGroupFor = tab
-                                                    actionTabId = null
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                tabCloseNotice?.let { notice ->
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopCenter)
-                            .padding(top = 8.dp)
-                    ) {
-                        BrowserTopNoticeCard(
-                            notice = notice,
-                            onClick = {},
-                            onActionClick = onUndoClose,
-                            onDismiss = onDismissNotice,
-                            allowSwipeUp = true,
-                            allowSwipeDown = true
-                        )
-                    }
-                }
-
-                TabBottomControls(
-                    section = section,
-                    regularCount = tabs.count { !it.isPrivate },
-                    privateCount = tabs.count { it.isPrivate },
-                    groupCount = groups.size,
-                    compact = metrics.isCompact,
-                    narrow = metrics.isSmallPhone,
-                    horizontalPadding = metrics.horizontalPadding,
-                    onSectionChange = { next ->
-                        section = next
-                        selectedGroup = null
-                        actionTabId = null
-                    },
-                    onNewTab = {
+                        if (tabs.size >= 5 || query.iYªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬ÕÍ9½Ñ	±…¹¬ ¤¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€%±åÉ½M•…É¡¥•± (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù…±Õ”€ôÅÕ•Éä°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹Y…±Õ•¡…¹”€ôìÅÕ•Éä€ô¥Ğô°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Á±…•¡½±‘•È€ôÑÈ ‰M•…É Ñ…‰Ìˆ°€‹BBûBãFBèƒBÿBøƒBËBëBïBÃBÓBëBÃBğˆ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€€€€ô((€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡Í•Ñ¥½¸€ôôQ…‰=Ù•ÉÙ¥•İM•Ñ¥½¸¹I=UAL€˜˜É½ÕÁÌ¹¥Í9½ÑµÁÑä ¤¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€I½Ü (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹™¥±±5…á]¥‘Ñ  ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹Á…‘‘¥¹œ¡Ñ½À€ô€ÄÀ¹‘À¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹¡½É¥é½¹Ñ…±MÉ½±°¡É•µ•µ‰•ÉMÉ½±±MÑ…Ñ” ¤¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡½É¥é½¹Ñ…±ÉÉ…¹•µ•¹Ğ€ôÉÉ…¹•µ•¹Ğ¹ÍÁ…•‘	ä¡µ•ÑÉ¥Ì¹¥Ñ•µ…À¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥±Ñ•É¡¥À (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•±•Ñ•€ôÍ•±•Ñ•‘É½ÕÀ€ôô¹Õ±°°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹±¥¬€ôìÍ•±•Ñ•‘É½ÕÀ€ô¹Õ±°ô°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€±…‰•°€ôìQ•áĞ¡ÑÈ ‰±°É½ÕÁÌˆ°€‹BKFBÔƒBÏFFBÿBÿF,ˆ¤¤ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€É½ÕÁÌ¹™½É… ìÉ½ÕÀ€´ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥±Ñ•É¡¥À (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•±•Ñ•€ôÍ•±•Ñ•‘É½ÕÀ€ôôÉ½ÕÀ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹±¥¬€ôì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•±•Ñ•‘É½ÕÀ€ô¥˜€¡Í•±•Ñ•‘É½ÕÀ€ôôÉ½ÕÀ¤¹Õ±°•±Í”É½ÕÀ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€±…‰•°€ôìQ•áĞ¡É½ÕÀ¤ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€ô((€€€€€€€€€€€€€€€€€€€€€€€MÁ…•È¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹¡•¥¡Ğ¡µ•ÑÉ¥Ì¹Í•Ñ¥½¹…À¤¤((€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡Ù¥Í¥‰±•Q…‰Ì¹¥ÍµÁÑä ¤¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€µÁÑåQ…‰ÍMÑ…Ñ” (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹™¥±±5…á]¥‘Ñ  ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹İ•¥¡Ğ Å˜¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•Ñ¥½¸€ôÍ•Ñ¥½¸°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÅÕ•ÉåÑ¥Ù”€ôÅÕ•ÉåY…±Õ”¹¥Í9½Ñ	±…¹¬ ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€É½ÕÁÍµÁÑä€ôÉ½ÕÁÌ¹¥ÍµÁÑä ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€1…éåY•ÉÑ¥…±É¥ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½±Õµ¹Ì€ôÉ¥‘•±±Ì¹¥á•¡½±Õµ¹Ì¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹™¥±±5…á]¥‘Ñ  ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹İ•¥¡Ğ Å˜¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡½É¥é½¹Ñ…±ÉÉ…¹•µ•¹Ğ€ôÉÉ…¹•µ•¹Ğ¹ÍÁ…•‘	ä¡É¥‘…À¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù•ÉÑ¥…±ÉÉ…¹•µ•¹Ğ€ôÉÉ…¹•µ•¹Ğ¹ÍÁ…•‘	ä¡É¥‘…À¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹Ñ•¹ÑA…‘‘¥¹œ€ôA…‘‘¥¹Y…±Õ•Ì¡‰½ÑÑ½´€ô€ÄÀ¹‘À¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥Ñ•µÌ¡Ù¥Í¥‰±•Q…‰Ì°­•ä€ôì¥Ğ¹¥ô¤ìÑ…ˆ€´ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€	½à (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹…¹¥µ…Ñ•%Ñ•´ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€™…‘•%¹MÁ•Œ€ôÑİ••¸ ÄÔÀ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Á±…•µ•¹ÑMÁ•Œ€ôÍÁÉ¥¹œ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€‘…µÁ¥¹I…Ñ¥¼€ô€À¸äÁ˜°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÍÑ¥™™¹•ÍÌ€ô€ĞÈÁ˜(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€™…‘•=ÕÑMÁ•Œ€ôÑİ••¸ ÄäÀ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù…°É•ÍÑ½É•-•ä€ô¥˜€¡Ñ…ˆ¹¥€ôôÉ•ÍÑ½É•‘Q…‰%¤É•ÍÑ½É••¹•É…Ñ¥½¸•±Í”€Á0(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€­•ä¡Ñ…ˆ¹¥°É•ÍÑ½É•-•ä¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€5½‘•É¹Q…‰…É (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ…ˆ€ôÑ…ˆ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€…É‘!•¥¡Ğ€ô…É‘!•¥¡Ğ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÁÉ•Ù¥•İM¥é”€ôÍ•ÑÑ¥¹Ì¹Ñ…‰AÉ•Ù¥•İM¥é”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€…Ñ¥½¹ÍY¥Í¥‰±”€ô…Ñ¥½¹Q…‰%€ôôÑ…ˆ¹¥°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½Á•¹¥¹œ€ô½Á•¹¥¹Q…‰%€ôôÑ…ˆ¹¥°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€‘¥µµ•‘½É=Á•¹¥¹œ€ô½Á•¹¥¹Q…‰%€„ô¹Õ±°€˜˜½Á•¹¥¹Q…‰%€„ôÑ…ˆ¹¥°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½µÁ…Ğ€ôµ•ÑÉ¥Ì¹¥Í½µÁ…Ğ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹M•±•Ğ€ôì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡½Á•¹¥¹Q…‰%€ôô¹Õ±°¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ƒ]4ÒÚ$z{-®éÜj×              onNewTab = {
                         requestSheetDismiss {
                             if (section == TabOverviewSection.PRIVATE) {
                                 onNewPrivateTab()
@@ -532,184 +224,7 @@ private fun TabBottomControls(
         ) {
             Row(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(if (dense) 4.dp else 5.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                TabSectionButton(
-                    selected = section == TabOverviewSection.NORMAL,
-                    label = tr("Regular", "ĞĞ±Ñ‹Ñ‡Ğ½Ñ‹Ğµ"),
-                    count = regularCount,
-                    icon = Icons.Rounded.Language,
-                    narrow = narrow,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSectionChange(TabOverviewSection.NORMAL) }
-                )
-                TabSectionButton(
-                    selected = section == TabOverviewSection.PRIVATE,
-                    label = tr("Private", "ĞŸÑ€Ğ¸Ğ²Ğ°Ñ‚Ğ½Ñ‹Ğµ"),
-                    count = privateCount,
-                    icon = Icons.Rounded.VisibilityOff,
-                    privateAccent = true,
-                    narrow = narrow,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSectionChange(TabOverviewSection.PRIVATE) }
-                )
-                TabSectionButton(
-                    selected = section == TabOverviewSection.GROUPS,
-                    label = tr("Groups", "Ğ“Ñ€ÑƒĞ¿Ğ¿Ñ‹"),
-                    count = groupCount,
-                    icon = Icons.Rounded.CreateNewFolder,
-                    narrow = narrow,
-                    modifier = Modifier.weight(1f),
-                    onClick = { onSectionChange(TabOverviewSection.GROUPS) }
-                )
-            }
-        }
-
-        NewTabFab(
-            isPrivate = section == TabOverviewSection.PRIVATE,
-            compact = compact,
-            onClick = onNewTab
-        )
-    }
-}
-
-@Composable
-private fun TabSectionButton(
-    selected: Boolean,
-    label: String,
-    count: Int,
-    icon: androidx.compose.ui.graphics.vector.ImageVector?,
-    privateAccent: Boolean = false,
-    narrow: Boolean,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    val dense = LocalIlyroUiDensity.current == UiDensity.COMPACT
-    val darkScheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val accent = if (privateAccent) {
-        if (darkScheme) Color(0xFFC4B5FD) else Color(0xFF7048D8)
-    } else {
-        MaterialTheme.colorScheme.primary
-    }
-
-    Surface(
-        onClick = onClick,
-        modifier = modifier.fillMaxHeight(),
-        shape = RoundedCornerShape(if (dense) 17.dp else 19.dp),
-        color = if (selected) accent.copy(alpha = 0.13f) else Color.Transparent,
-        border = if (selected) BorderStroke(1.dp, accent.copy(alpha = 0.26f)) else null,
-        tonalElevation = 0.dp,
-        shadowElevation = 0.dp
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = if (narrow) 4.dp else if (dense) 6.dp else 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            if (icon != null) {
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(if (narrow || dense) 17.dp else 19.dp),
-                    tint = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            } else {
-                Surface(
-                    modifier = Modifier.size(if (narrow) 17.dp else 19.dp),
-                    shape = RoundedCornerShape(5.dp),
-                    color = Color.Transparent,
-                    border = BorderStroke(
-                        1.5.dp,
-                        if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant
-                    ),
-                    tonalElevation = 0.dp,
-                    shadowElevation = 0.dp
-                ) {}
-            }
-
-            if (!narrow) {
-                Text(
-                    text = label,
-                    modifier = Modifier.padding(start = 6.dp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
-                    color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            if (count > 0) {
-                Surface(
-                    modifier = Modifier.padding(start = if (narrow) 5.dp else 6.dp),
-                    shape = CircleShape,
-                    color = if (selected) accent.copy(alpha = 0.16f)
-                    else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
-                    tonalElevation = 0.dp,
-                    shadowElevation = 0.dp
-                ) {
-                    Text(
-                        text = if (count > 99) "99+" else count.toString(),
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = if (selected) accent else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun EmptyTabsState(
-    modifier: Modifier,
-    section: TabOverviewSection,
-    queryActive: Boolean,
-    groupsEmpty: Boolean
-) {
-    Box(modifier = modifier, contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                when (section) {
-                    TabOverviewSection.PRIVATE -> Icons.Rounded.VisibilityOff
-                    TabOverviewSection.GROUPS -> Icons.Rounded.CreateNewFolder
-                    TabOverviewSection.NORMAL -> Icons.Rounded.Language
-                },
-                contentDescription = null,
-                modifier = Modifier.size(38.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.58f)
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                when {
-                    queryActive -> tr("No matching tabs", "ĞŸĞ¾Ğ´Ñ…Ğ¾Ğ´ÑÑ‰Ğ¸Ñ… Ğ²ĞºĞ»Ğ°Ğ´Ğ¾Ğº Ğ½ĞµÑ‚")
-                    section == TabOverviewSection.PRIVATE -> tr("No private tabs", "ĞĞµÑ‚ Ğ¿Ñ€Ğ¸Ğ²Ğ°Ñ‚Ğ½Ñ‹Ñ… Ğ²ĞºĞ»Ğ°Ğ´Ğ¾Ğº")
-                    section == TabOverviewSection.GROUPS -> tr("No tab groups", "ĞĞµÑ‚ Ğ³Ñ€ÑƒĞ¿Ğ¿ Ğ²ĞºĞ»Ğ°Ğ´Ğ¾Ğº")
-                    else -> tr("No regular tabs", "ĞĞµÑ‚ Ğ¾Ğ±Ñ‹Ñ‡Ğ½Ñ‹Ñ… Ğ²ĞºĞ»Ğ°Ğ´Ğ¾Ğº")
-                },
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            if (section == TabOverviewSection.GROUPS && groupsEmpty && !queryActive) {
-                Text(
-                    tr(
-                        "Hold a tab and choose Group to create one.",
-                        "Ğ—Ğ°Ğ¶Ğ¼Ğ¸Ñ‚Ğµ Ğ²ĞºĞ»Ğ°Ğ´ĞºÑƒ Ğ¸ Ğ²Ñ‹Ğ±ĞµÑ€Ğ¸Ñ‚Ğµ Â«Ğ“Ñ€ÑƒĞ¿Ğ¿Ğ°Â», Ñ‡Ñ‚Ğ¾Ğ±Ñ‹ ÑĞ¾Ğ·Ğ´Ğ°Ñ‚ÑŒ ĞµÑ‘."
-                    ),
-                    modifier = Modifier.padding(top = 6.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
-                )
-            }
-        }
-    }
+                    YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Ô¹™¥±±5…áM¥é” ¤(€€€€€€€€€€€€€€€€€€€€¹Á…‘‘¥¹œ¡¥˜€¡‘•¹Í”¤€Ğ¹‘À•±Í”€Ô¹‘À¤°(€€€€€€€€€€€€€€€Ù•ÉÑ¥…±±¥¹µ•¹Ğ€ô±¥¹µ•¹Ğ¹•¹Ñ•ÉY•ÉÑ¥…±±ä°(€€€€€€€€€€€€€€€¡½É¥é½¹Ñ…±ÉÉ…¹•µ•¹Ğ€ôÉÉ…¹•µ•¹Ğ¹ÍÁ…•‘	ä Ì¹‘À¤(€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€Q…‰M•Ñ¥½¹	ÕÑÑ½¸ (€€€€€€€€€€€€€€€€€€€Í•±•Ñ•€ôÍ•Ñ¥½¸€ôôQ…‰=Ù•ÉÙ¥•İM•Ñ¥½¸¹9=I50°(€€€€€€€€€€€€€€€€€€€±…‰•°€ôÑÈ ‰I•Õ±…Èˆ°€‹B{BÇF/FB÷F/BÔˆ¤°(€€€€€€€€€€€€€€€€€€€½Õ¹Ğ€ôÉ•Õ±…É½Õ¹Ğ°(€€€€€€€€€€€€€€€€€€€¥½¸€ô%½¹Ì¹I½Õ¹‘•¹1…¹Õ…”°(€€€€€€€€€€€€€€€€€€€¹…ÉÉ½Ü€ô¹…ÉÉ½Ü°(€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹İ•¥¡Ğ Å˜¤°(€€€€€€€€€€€€€€€€€€€½¹±¥¬€ôì½¹M•Ñ¥½¹¡…¹”¡Q…‰=Ù•ÉÙ¥•İM•Ñ¥½¸¹9=I50¤ô(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€Q…‰M•Ñ¥½¹	ÕÑÑ½¸ (€€€€€€€€€€€€€€€€€€€Í•±•Ñ•€ôÍ•Ñ¥½¸€ôôQ…‰=Ù•ÉÙ¥•İM•Ñ¥½¸¹AI%YQ°(€€€€€€€€€€€€€€€€€€€±…‰•°€ôÑÈ ‰AÉ¥Ù…Ñ”ˆ°€‹BFBãBËBÃFB÷F/BÔˆ¤°(€€€€€€€€€€€€€€€€€€€½Õ¹Ğ€ôÁÉ¥Ù…Ñ•½Õ¹Ğ°(€€€€€€€€€€€€€€€€€€€¥½¸€ô%½¹Ì¹I½Õ¹‘•¹Y¥Í¥‰¥±¥Ñå=™˜°(€€€€€€€€€€€€€€€€€€€ÁÉ¥Ù…Ñ••¹Ğ€ôÑÉÕ”°(€€€€€€€€€€€€€€€€€€€¹…ÉÉ½Ü€ô¹…ÉÉ½Ü°(€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹İ•¥¡Ğ Å˜¤°(€€€€€€€€€€€€€€€€€€€½¹±¥¬€ôì½¹M•Ñ¥½¹¡…¹”¡Q…‰=Ù•ÉÙ¥•İM•Ñ¥½¸¹AI%YQ¤ô(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€Q…‰M•Ñ¥½¹	ÕÑÑ½¸ (€€€€€€€€€€€€€€€€€€€Í•±•Ñ•€ôÍ•Ñ¥½¸€ôôQ…‰=Ù•ÉÙ¥•İM•Ñ¥½¸¹I=UAL°(€€€€€€€€€€€€€€€€€€€±…‰•°€ôÑÈ ‰É½ÕÁÌˆ°€‹BOFFBÿBÿF,ˆ¤°(€€€€€€€€€€€€€€€€€€€½Õ¹Ğ€ôÉ½ÕÁ½Õ¹Ğ°(€€€€€€€€€€€€€€€€€€€¥½¸€ô%½¹Ì¹I½Õ¹‘•¹É•…Ñ•9•İ½±‘•È°(€€€€€€€€€€€€€€€€€€€¹…ÉÉ½Ü€ô¹…ÉÉ½Ü°(€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹İ•¥¡Ğ Å˜¤°(€€€€€€€€€€€€€€€€€€€½¹±¥¬€ôì½¹M•Ñ¥½¹¡…¹”¡Q…‰=Ù•ÉÙ¥•İM•Ñ¥½¸¹I=UAL¤ô(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€ô(€€€€€€€ô((€€€€€€€9•İQ…‰…ˆ (€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ôÍ•Ñ¥½¸€ôôQ…‰=Ù•ÉÙ¥•İM•Ñ¥½¸¹AI%YQ°(€€€€€€€€€€€½µÁ…Ğ€ô½µÁ…Ğ°(€€€€€€€€€€€½¹±¥¬€ô½¹9•İQ…ˆ(€€€€€€€€¤(€€€ô)ô()½µÁ½Í…‰±”)ÁÉ¥Ù…Ñ”™Õ¸Q…‰M•Ñ¥½¹	ÕÑÑ½¸ (€€€Í•±•Ñ•è	½½±•…¸°(€€€±…‰•°èMÑÉ¥¹œ°(€€€½Õ¹Ğè%¹Ğ°(€€€¥½¸è…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹É…Á¡¥Ì¹Ù•Ñ½È¹%µ…•Y•Ñ½Èü°(€€€ÁÉ¥Ù…Ñ••¹Ğè	½½±•…¸€ô™…±Í”°(€€€¹…ÉÉ½Üè	½½±•…¸°(€€€µ½‘¥™¥•Èè5½‘¥™¥•È€ô5½‘¥™¥•È°(€€€½¹±¥¬è€ ¤€´øU¹¥Ğ(¤ì(€€€Ù…°‘•¹Í”€ô1½…±%±åÉ½U¥•¹Í¥Ñä¹ÕÉÉ•¹Ğ€ôôU¥•¹Í¥Ñä¹=5AP(€€€Ù…°‘…É­M¡•µ”€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹‰…­É½Õ¹¹±Õµ¥¹…¹” ¤€ğ€À¸Õ˜(€€€Ù…°…•¹Ğ€ô¥˜€¡ÁÉ¥Ù…Ñ••¹Ğ¤ì(€€€€€€€¥˜€¡‘…É­M¡•µ”¤½±½È ÁáÑÕ¤•±Í”½±½È ÁáÜÀĞáà¤(€€€ô•±Í”ì(€€€€€€€5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÁÉ¥µ…Éä(€€€ô((€€€MÕÉ™…” (€€€€€€€½¹±¥¬€ô½¹±¥¬°(€€€€€€€µ½‘¥™¥•È€ôµ½‘¥™¥•È¹™¥±±5…á!•¥¡Ğ ¤°(€€€€€€€Í¡…Á”€ôI½Õ¹‘•‘½É¹•ÉM¡…Á”¡¥˜€¡‘•¹Í”¤€ÄÜ¹‘À•±Í”€Ää¹‘À¤°(€€€€€€€½±½È€ô¥˜€¡Í•±•Ñ•¤…•¹Ğ¹½Áä¡…±Á¡„€ô€À¸ÄÍ˜¤•±Í”½±½È¹QÉ…¹ÍÁ…É•¹Ğ°(€€€€€€€‰½É‘•È€ô¥˜€¡Í•±•Ñ•¤	½É‘•ÉMÑÉ½­” Ä¹‘À°…•¹Ğ¹½Áä¡…±Á¡„€ô€À¸ÈÙ˜¤¤•±Í”¹Õ±°°(€€€€€€€Ñ½¹…±±•Ù…Ñ¥½¸€ô€À¹‘À°(€€€€€€€Í¡…‘½İ±•Ù…Ñ¥½¸€ô€À¹‘À(€€€€¤ì(€€€€€€€I½Ü (€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€¹™¥±±5…áM¥é” ¤(€€€€€€€€€€€€€€€€¹Á…‘‘¥¹œ¡¡½É¥é½¹Ñ…°€ô¥˜€¡¹…ÉÉ½Ü¤€Ğ¹‘À•±Í”¥˜€¡‘•¹Í”¤€Ø¹‘À•±Í”€à¹‘À¤°(€€€€€€€€€€€Ù•ÉÑ¥…±±¥¹µ•¹Ğ€ô±¥¹µ•¹Ğ¹•¹Ñ•ÉY•ÉÑ¥…±±ä°(€€€€€€€€€€€¡½É¥é½¹Ñ…±ÉÉ…¹•µ•¹Ğ€ôÉÉ…¹•µ•¹Ğ¹•¹Ñ•È(€€€€€€€€¤ì(€€€€€€€€€€€¥˜€¡¥½¸€„ô¹Õ±°¤ì(€€€€€€€€€€€€€€€%½¸ (€€€€€€€€€€€€€€€€€€€¥½¸°(€€€€€€€€€€€€€€€€€€€½¹Ñ•¹Ñ•ÍÉ¥ÁÑ¥½¸€ô¹Õ±°°(€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Í¥é”¡¥˜€¡¹…ÉÉ½Üñğ‘•¹Í”¤€ÄÜ¹‘À•±Í”€Ää¹‘À¤°(€€€€€€€€€€€€€€€€€€€Ñ¥¹Ğ€ô¥˜€¡Í•±•Ñ•¤…•¹Ğ•±Í”5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½¹MÕÉ™…•Y…É¥…¹Ğ(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€MÕÉ™…” (€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Í¥é”¡¥˜€¡¹…ÉÉ½Ü¤€ÄÜ¹‘À•±Í”€Ää¹‘À¤°(€€€€€€€€€€€€€€€€€€€Í¡…Á”€ôI½Õ¹‘•‘½É¹•ÉM¡…Á” Ô¹‘À¤°(€€€€€€€€€€€€€€€€€€€½±½È€ô½±½È¹QÉ…¹ÍÁ…É•¹Ğ°(€€€€€€€€€€€€€€€€€€€‰½É‘•È€ô	½É‘•ÉMÑÉ½­” (€€€€€€€€€€€€€€€€€€€€€€€€Ä¸Ô¹‘À°(€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡Í•±•Ñ•¤…•¹Ğ•±Í”5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½¹MÕÉ™…•Y…É¥…¹Ğ(€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€€€€€Ñ½¹…±±•Ù…Ñ¥½¸€ô€À¹‘À°(€€€€€€€€€€€€€€€€€€€Í¡…‘½İ±•Ù…Ñ¥½¸€ô€À¹‘À(€€€€€€€€€€€€€€€€¤íô(€€€€€€€€€€€ô((€€€€€€€€€€€¥˜€ …¹…ÉÉ½Ü¤ì(€€€€€€€€€€€€€€€Q•áĞ (€€€€€€€€€€€€€€€€€€€Ñ•áĞ€ô±…‰•°°(€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Á…‘‘¥¹œ¡ÍÑ…ÉĞ€ô€Ø¹‘À¤°(€€€€€€€€€€€€€€€€€€€µ…á1¥¹•Ì€ô€Ä°(€€€€€€€€€€€€€€€€€€€½Ù•É™±½Ü€ôQ•áÑ=Ù•É™±½Ü¹±±¥ÁÍ¥Ì°(€€€€€€€€€€€€€€€€€€€ÍÑå±”€ô5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹±…‰•±1…É”°(€€€€€€€€€€€€€€€€€€€™½¹Ñ]•¥¡Ğ€ô¥˜€¡Í•±•Ñ•¤½¹Ñ]•¥¡Ğ¹	½±•±Í”½¹Ñ]•¥¡Ğ¹M•µ¥	½±°(€€€€€€€€€€€€€€€€€€€½±½È€ô¥˜€¡Í•±•Ñ•¤…•¹Ğ•±Í”5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½¹MÕÉ™…•Y…É¥…¹Ğ(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€ô((€€€€€€€€€€€¥˜€¡½Õ¹Ğ€ø€À¤ì(€€€€€€€€€€€€€€€MÕÉ™…” (€€€€€€€€€€€€ƒ]4ÒÚ$z{-®éÜj× }
 }
 
 @Composable
@@ -837,130 +352,8 @@ private fun ModernTabCard(
             Surface(
                 modifier = Modifier
                     .fillMaxSize()
-                    .animateContentSize()
-                    .combinedClickable(
-                        onClick = { if (actionsVisible) onLongPress() else onSelect() },
-                        onLongClick = onLongPress
-                    ),
-                shape = RoundedCornerShape(IlyroVisualTokens.CardRadius),
-                color = if (tab.isPrivate) privateCardColor else regularCardColor,
-                border = when {
-                    tab.selected && tab.isPrivate -> BorderStroke(
-                        2.dp,
-                        privateAccent.copy(alpha = 0.72f)
-                    )
-                    tab.selected -> BorderStroke(
-                        if (darkScheme) 2.dp else 1.5.dp,
-                        MaterialTheme.colorScheme.primary.copy(alpha = if (darkScheme) 0.74f else 0.68f)
-                    )
-                    tab.isPrivate -> BorderStroke(
-                        1.dp,
-                        privateAccent.copy(alpha = IlyroVisualTokens.SelectedBorderAlpha)
-                    )
-                    else -> BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.outlineVariant.copy(
-                            alpha = IlyroVisualTokens.SubtleBorderAlpha
-                        )
-                    )
-                },
-                tonalElevation = 0.dp,
-                shadowElevation = if (opening) 6.dp else if (tab.selected) 2.dp else 0.dp
-            ) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 12.dp, top = 9.dp, end = 4.dp, bottom = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (tab.isPrivate) {
-                                    Icon(
-                                        Icons.Rounded.VisibilityOff,
-                                        contentDescription = null,
-                                        tint = privateAccent,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                    Spacer(modifier = Modifier.size(5.dp))
-                                }
-                                Text(
-                                    tab.title,
-                                    modifier = Modifier.weight(1f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    style = if (compact) {
-                                        MaterialTheme.typography.bodyMedium
-                                    } else {
-                                        MaterialTheme.typography.bodyLarge
-                                    },
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                            val suffix = tab.groupName
-                                ?.takeIf { it.isNotBlank() }
-                                ?.let { " Â· $it" }
-                                .orEmpty()
-                            Text(
-                                tab.host + suffix,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (tab.isPrivate) {
-                                    privateAccent.copy(alpha = 0.84f)
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                }
-                            )
-                        }
-
-                        Surface(
-                            onClick = { removing = true },
-                            modifier = Modifier.size(if (compact) 34.dp else 38.dp),
-                            shape = CircleShape,
-                            color = Color.Transparent
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Rounded.Close,
-                                    contentDescription = tr("Close tab", "Ğ—Ğ°ĞºÑ€Ñ‹Ñ‚ÑŒ Ğ²ĞºĞ»Ğ°Ğ´ĞºÑƒ"),
-                                    modifier = Modifier.size(if (compact) 17.dp else 18.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-
-                    AnimatedVisibility(
-                        visible = actionsVisible,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 9.dp, end = 9.dp, bottom = 7.dp),
-                            horizontalArrangement = Arrangement.spacedBy(7.dp)
-                        ) {
-                            TabContextAction(
-                                modifier = Modifier.weight(1f),
-                                icon = Icons.Rounded.PushPin,
-                                label = if (tab.isPinned) {
-                                    tr("Unpin", "ĞÑ‚ĞºÑ€ĞµĞ¿Ğ¸Ñ‚ÑŒ")
-                                } else {
-                                    tr("Pin", "Ğ—Ğ°ĞºÑ€ĞµĞ¿Ğ¸Ñ‚ÑŒ")
-                                },
-                                active = tab.isPinned,
-                                onClick = onTogglePinned
-                            )
-                            TabContextAction(
-                                modifier = Modifier.weight(1f),
-                                icon = Icons.Rounded.CreateNewFolder,
-                                label = if (tab.groupName.isNullOrBlank()) {
-                                    tr("Group", "Ğ“Ñ€ÑƒĞ¿Ğ¿Ğ°")
-                                } else {
-                                    tr("Edit group", "Ğ˜Ğ·Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ")
+                    .animateContentSize(YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Ô¤(€€€€€€€€€€€€€€€€€€€€¹Í•µ…¹Ñ¥Ì¡µ•É••Í•¹‘…¹ÑÌ€ôÑÉÕ”¤ì(€€€€€€€€€€€€€€€€€€€€€€€É½±”€ôI½±”¹	ÕÑÑ½¸(€€€€€€€€€€€€€€€€€€€€€€€Í•±•Ñ•€ôÑ…ˆ¹Í•±•Ñ•(€€€€€€€€€€€€€€€€€€€€€€€½¹Ñ•¹Ñ•ÍÉ¥ÁÑ¥½¸€ô‰Õ¥±‘MÑÉ¥¹œì(€€€€€€€€€€€€€€€€€€€€€€€€€€€…ÁÁ•¹¡Ñ…ˆ¹Ñ¥Ñ±”¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡Ñ…ˆ¹¡½ÍĞ¹¥Í9½Ñ	±…¹¬ ¤¤…ÁÁ•¹ ˆ¸€‘íÑ…ˆ¹¡½ÍÑôˆ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡Ñ…ˆ¹¥ÍAÉ¥Ù…Ñ”¤…ÁÁ•¹ ˆ¸€‘íÑÈ ‰AÉ¥Ù…Ñ”Ñ…ˆˆ°€‹BFBãBËBÃFB÷BÃF<ƒBËBëBïBÃBÓBëBÀˆ¥ôˆ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡Ñ…ˆ¹¥ÍA¥¹¹•¤…ÁÁ•¹ ˆ¸€‘íÑÈ ‰A¥¹¹•ˆ°€‹B_BÃBëFB×BÿBïB×B÷BÀˆ¥ôˆ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ…ˆ¹É½ÕÁ9…µ”ü¹Ñ…­•%˜ì¥Ğ¹¥Í9½Ñ	±…¹¬ ¤ôü¹±•Ğì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€…ÁÁ•¹ ˆ¸€‘íÑÈ ‰É½ÕÀˆ°€‹BOFFBÿBÿBÀˆ¥ôè€‘¥Ğˆ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€ÍÑ…Ñ••ÍÉ¥ÁÑ¥½¸€ô¥˜€¡Ñ…ˆ¹Í•±•Ñ•¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑÈ ‰M•±•Ñ•ˆ°€‹BKF/BÇFBÃB÷BÀˆ¤(€€€€€€€€€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€ÑÈ ‰9½ĞÍ•±•Ñ•ˆ°€‹BwBÔƒBËF/BÇFBÃB÷BÀˆ¤(€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€¹½µ‰¥¹•‘±¥­…‰±” (€€€€€€€€€€€€€€€€€€€€€€€½¹±¥¬€ôì¥˜€¡…Ñ¥½¹ÍY¥Í¥‰±”¤½¹1½¹AÉ•ÍÌ ¤•±Í”½¹M•±•Ğ ¤ô°(€€€€€€€€€€€€€€€€€€€€€€€½¹1½¹±¥¬€ô½¹1½¹AÉ•ÍÌ(€€€€€€€€€€€€€€€€€€€€¤°(€€€€€€€€€€€€€€€Í¡…Á”€ôI½Õ¹‘•‘½É¹•ÉM¡…Á”¡%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹…É‘I…‘¥ÕÌ¤°(€€€€€€€€€€€€€€€½±½È€ô¥˜€¡Ñ…ˆ¹¥ÍAÉ¥Ù…Ñ”¤ÁÉ¥Ù…Ñ•…É‘½±½È•±Í”É•Õ±…É…É‘½±½È°(€€€€€€€€€€€€€€€‰½É‘•È€ôİ¡•¸ì(€€€€€€€€€€€€€€€€€€€Ñ…ˆ¹Í•±•Ñ•€˜˜Ñ…ˆ¹¥ÍAÉ¥Ù…Ñ”€´ø	½É‘•ÉMÑÉ½­” (€€€€€€€€€€€€€€€€€€€€€€€€È¹‘À°(€€€€€€€€€€€€€€€€€€€€€€€ÁÉ¥Ù…Ñ••¹Ğ¹½Áä¡…±Á¡„€ô€À¸ÜÉ˜¤(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€Ñ…ˆ¹Í•±•Ñ•€´ø	½É‘•ÉMÑÉ½­” (€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡‘…É­M¡•µ”¤€È¹‘À•±Í”€Ä¸Ô¹‘À°(€€€€€€€€€€€€€€€€€€€€€€€5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÁÉ¥µ…Éä¹½Áä¡…±Á¡„€ô¥˜€¡‘…É­M¡•µ”¤€À¸ÜÑ˜•±Í”€À¸Øá˜¤(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€Ñ…ˆ¹¥ÍAÉ¥Ù…Ñ”€´ø	½É‘•ÉMÑÉ½­” (€€€€€€€€€€€€€€€€€€€€€€€€Ä¹‘À°(€€€€€€€€€€€€€€€€€€€€€€€ÁÉ¥Ù…Ñ••¹Ğ¹½Áä¡…±Á¡„€ô%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹M•±•Ñ•‘	½É‘•É±Á¡„¤(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€•±Í”€´ø	½É‘•ÉMÑÉ½­” (€€€€€€€€€€€€€€€€€€€€€€€€Ä¹‘À°(€€€€€€€€€€€€€€€€€€€€€€€5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½ÕÑ±¥¹•Y…É¥…¹Ğ¹½Áä (€€€€€€€€€€€€€€€€€€€€€€€€€€€…±Á¡„€ô%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹MÕ‰Ñ±•	½É‘•É±Á¡„(€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€€€€€Ñ½¹…±±•Ù…Ñ¥½¸€ô€À¹‘À°(€€€€€€€€€€€€€€€Í¡…‘½İ±•Ù…Ñ¥½¸€ô¥˜€¡½Á•¹¥¹œ¤€Ø¹‘À•±Í”¥˜€¡Ñ…ˆ¹Í•±•Ñ•¤€È¹‘À•±Í”€À¹‘À(€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€½±Õµ¸¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹™¥±±5…áM¥é” ¤¤ì(€€€€€€€€€€€€€€€€€€€I½Ü (€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹™¥±±5…á]¥‘Ñ  ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹Á…‘‘¥¹œ¡ÍÑ…ÉĞ€ô€ÄÈ¹‘À°Ñ½À€ô€ä¹‘À°•¹€ô€Ğ¹‘À°‰½ÑÑ½´€ô€Ü¹‘À¤°(€€€€€€€€€€€€€€€€€€€€€€€Ù•ÉÑ¥…±±¥¹µ•¹Ğ€ô±¥¹µ•¹Ğ¹•¹Ñ•ÉY•ÉÑ¥…±±ä(€€€€€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€€€€€½±Õµ¸¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹İ•¥¡Ğ Å˜¤¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€I½Ü¡Ù•ÉÑ¥…±±¥¹µ•¹Ğ€ô±¥¹µ•¹Ğ¹•¹Ñ•ÉY•ÉÑ¥…±±ä¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡Ñ…ˆ¹¥ÍAÉ¥Ù…Ñ”¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€%½¸ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€%½¹Ì¹I½Õ¹‘•¹Y¥Í¥‰¥±¥Ñå=™˜°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹Ñ•¹Ñ•ÍÉ¥ÁÑ¥½¸€ô¹Õ±°°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ¥¹Ğ€ôÁÉ¥Ù…Ñ••¹Ğ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Í¥é” ÄĞ¹‘À¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€MÁ…•È¡µ½‘¥™¥•È€ô5½‘¥™¥•È¹Í¥é” Ô¹‘À¤¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Q•áĞ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ…ˆ¹Ñ¥Ñ±”°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹İ•¥¡Ğ Å˜¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€µ…á1¥¹•Ì€ô€Ä°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½Ù•É™±½Ü€ôQ•áÑ=Ù•É™±½Ü¹±±¥ÁÍ¥Ì°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÍÑå±”€ô¥˜€¡½µÁ…Ğ¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹‰½‘å5•‘¥Õ´(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹‰½‘å1…É”(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€™½¹Ñ]•¥¡Ğ€ô½¹Ñ]•¥¡Ğ¹M•µ¥	½±(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù…°ÍÕ™™¥à€ôÑ…ˆ¹É½ÕÁ9…µ”(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ü¹Ñ…­•%˜ì¥Ğ¹¥Í9½Ñ	±…¹¬ ¤ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ü¹±•Ğì€ˆƒ
+Ü€‘¥Ğˆô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹½ÉµÁÑä ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€Q•áĞ (€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ…ˆ¹¡½ÍĞ€¬ÍÕ™™¥à°(€€€€€€€€€€€€€€€€€€€€€€€ƒ]4ÒÚ$z{-®éÜj×                             tr("Edit group", "Ğ˜Ğ·Ğ¼ĞµĞ½Ğ¸Ñ‚ÑŒ")
                                 },
                                 active = !tab.groupName.isNullOrBlank(),
                                 onClick = onEditGroup

@@ -1,196 +1,4 @@
-package com.ilyro.browser.ui
-
-import android.app.DownloadManager
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.content.ActivityNotFoundException
-import android.content.ClipData
-import android.content.ContentValues
-import android.content.Context
-import android.content.Intent
-import android.content.SharedPreferences
-import android.net.Uri
-import android.os.Build
-import android.os.Environment
-import android.os.Handler
-import android.os.Looper
-import android.provider.MediaStore
-import android.provider.OpenableColumns
-import android.provider.Settings
-import android.webkit.MimeTypeMap
-import android.webkit.URLUtil
-import com.ilyro.browser.ACTION_OPEN_DOWNLOADS
-import com.ilyro.browser.R
-import org.json.JSONArray
-import org.json.JSONObject
-import org.mozilla.geckoview.GeckoResult
-import org.mozilla.geckoview.GeckoRuntime
-import org.mozilla.geckoview.GeckoSession
-import org.mozilla.geckoview.GeckoSessionSettings
-import org.mozilla.geckoview.GeckoWebExecutor
-import org.mozilla.geckoview.WebRequest
-import org.mozilla.geckoview.WebResponse
-import org.mozilla.geckoview.WebExtension
-import java.io.BufferedInputStream
-import java.io.ByteArrayOutputStream
-import java.io.File
-import java.io.InputStream
-import java.lang.ref.WeakReference
-import java.util.zip.ZipInputStream
-import java.util.ArrayDeque
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
-
-private const val DIRECT_NONE = 0
-private const val DIRECT_RUNNING = 1
-private const val DIRECT_SUCCESS = 2
-private const val DIRECT_FAILED = 3
-private const val DIRECT_PAUSED = 4
-private const val BODY_READ_TIMEOUT_MS = 300_000L
-private const val PREF_PENDING_APK_INSTALL_URI = "pending_apk_install_uri_v1"
-
-private class InvalidDownloadPayloadException(message: String) : Exception(message)
-
-private val DIRECT_DOWNLOAD_EXTENSIONS = setOf(
-    "apk", "xapk", "apks", "aab",
-    "zip", "rar", "7z", "tar", "tgz", "gz", "bz2", "xz",
-    "exe", "msi", "dmg", "pkg", "deb", "rpm", "iso", "jar"
-)
-
-internal fun isLikelyDirectDownloadUrl(url: String): Boolean {
-    val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
-    val scheme = uri.scheme?.lowercase() ?: return false
-    if (scheme != "http" && scheme != "https") return false
-    val segment = Uri.decode(uri.lastPathSegment.orEmpty()).lowercase()
-    val extension = segment.substringAfterLast('.', "")
-    return extension in DIRECT_DOWNLOAD_EXTENSIONS
-}
-
-private fun mimeTypeForDirectDownload(url: String): String? {
-    val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return null
-    val segment = Uri.decode(uri.lastPathSegment.orEmpty())
-    val extension = segment.substringAfterLast('.', "").lowercase()
-    return when (extension) {
-        "apk" -> "application/vnd.android.package-archive"
-        "xapk", "apks" -> "application/zip"
-        "aab" -> "application/octet-stream"
-        else -> MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
-    }
-}
-
-internal const val APK_MIME_TYPE = "application/vnd.android.package-archive"
-private val GENERIC_BINARY_MIME_TYPES = setOf(
-    "application/octet-stream",
-    "binary/octet-stream",
-    "application/binary"
-)
-
-private fun cleanDownloadName(name: String?): String? = name
-    ?.substringAfterLast('/')
-    ?.substringAfterLast('\\')
-    ?.trim()
-    ?.takeIf { it.isNotBlank() }
-
-private fun downloadExtension(name: String?): String = cleanDownloadName(name)
-    ?.substringAfterLast('.', "")
-    ?.lowercase()
-    .orEmpty()
-
-internal fun contentDispositionFileName(headerValue: String?): String? {
-    val header = headerValue?.trim().orEmpty()
-    if (header.isBlank()) return null
-
-    val extended = Regex(
-        pattern = "(?i)(?:^|;)\\s*filename\\*\\s*=\\s*(?:\\\"([^\\\"]+)\\\"|([^;]+))"
-    ).find(header)?.let { match ->
-        match.groupValues[1].ifBlank { match.groupValues[2] }.trim()
-    }
-    if (!extended.isNullOrBlank()) {
-        val encoded = extended.substringAfter("''", extended).trim().trim('"')
-        val decoded = runCatching { java.net.URLDecoder.decode(encoded.replace("+", "%2B"), "UTF-8") }.getOrDefault(encoded)
-        cleanDownloadName(decoded)?.let { return it }
-    }
-
-    val regular = Regex(
-        pattern = "(?i)(?:^|;)\\s*filename\\s*=\\s*(?:\\\"([^\\\"]+)\\\"|([^;]+))"
-    ).find(header)?.let { match ->
-        match.groupValues[1].ifBlank { match.groupValues[2] }.trim().trim('"')
-    }
-    return cleanDownloadName(regular)
-}
-
-internal fun resolveDownloadFileName(
-    guessedName: String,
-    suggestedName: String?,
-    mimeType: String?
-): String {
-    val guessed = cleanDownloadName(guessedName) ?: "download"
-    val suggested = cleanDownloadName(suggestedName)
-    val guessedExtension = downloadExtension(guessed)
-    val suggestedExtension = downloadExtension(suggested)
-    val normalizedMime = mimeType?.substringBefore(';')?.trim()?.lowercase()
-
-    if (normalizedMime == APK_MIME_TYPE) {
-        if (guessedExtension == "apk") return guessed
-        if (suggestedExtension == "apk") return suggested!!
-        val base = if (guessedExtension.isBlank()) {
-            guessed
-        } else {
-            guessed.substringBeforeLast('.', guessed)
-        }.ifBlank { "download" }
-        return "$base.apk"
-    }
-
-    // A very common APK response is a redirect to an opaque URL served as
-    // application/octet-stream. Android's URLUtil then invents a .bin suffix.
-    // Preserve a trustworthy .apk hint from the original request instead.
-    if (suggestedExtension == "apk" && guessedExtension in setOf("", "bin", "dat")) {
-        return suggested!!
-    }
-
-    return guessed
-}
-
-internal fun resolveDownloadMimeType(fileName: String, mimeType: String?): String? {
-    val normalizedMime = mimeType?.substringBefore(';')?.trim()?.lowercase()
-    return if (
-        fileName.endsWith(".apk", ignoreCase = true) &&
-        (normalizedMime.isNullOrBlank() || normalizedMime in GENERIC_BINARY_MIME_TYPES)
-    ) {
-        APK_MIME_TYPE
-    } else {
-        mimeType
-    }
-}
-
-private fun directDownloadNameHint(url: String): String? {
-    val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return null
-
-    fun accept(candidate: String?): String? {
-        val cleaned = cleanDownloadName(candidate) ?: return null
-        val extension = downloadExtension(cleaned)
-        return cleaned.takeIf { extension in DIRECT_DOWNLOAD_EXTENSIONS }
-    }
-
-    accept(Uri.decode(uri.lastPathSegment.orEmpty()))?.let { return it }
-
-    // Many download CDNs hide the real filename in a query parameter while the path is opaque.
-    val likelyNameKeys = listOf(
-        "filename", "file_name", "file", "name", "download", "attachment",
-        "response-content-disposition"
-    )
-    likelyNameKeys.forEach { key ->
-        runCatching { uri.getQueryParameters(key) }.getOrDefault(emptyList()).forEach { value ->
-            contentDispositionFileName(value)?.let { return it }
-            accept(Uri.decode(value))?.let { return it }
-        }
-    }
-
-    // Final fallback for encoded URLs such as ?target=https%3A%2F%2Fcdn%2Fapp.apk.
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬ÕÁ…­…”½´¹¥±åÉ¼¹‰É½İÍ•È¹Õ¤()¥µÁ½ÉĞ…¹‘É½¥¹…ÁÀ¹½İ¹±½…‘5…¹…•È)¥µÁ½ÉĞ…¹‘É½¥¹…ÁÀ¹9½Ñ¥™¥…Ñ¥½¸)¥µÁ½ÉĞ…¹‘É½¥¹…ÁÀ¹9½Ñ¥™¥…Ñ¥½¹¡…¹¹•°)¥µÁ½ÉĞ…¹‘É½¥¹…ÁÀ¹9½Ñ¥™¥…Ñ¥½¹5…¹…•È)¥µÁ½ÉĞ…¹‘É½¥¹…ÁÀ¹A•¹‘¥¹%¹Ñ•¹Ğ)¥µÁ½ÉĞ…¹‘É½¥¹½¹Ñ•¹Ğ¹Ñ¥Ù¥Ñå9½Ñ½Õ¹‘á•ÁÑ¥½¸)¥µÁ½ÉĞ…¹‘É½¥¹½¹Ñ•¹Ğ¹±¥Á…Ñ„)¥µÁ½ÉĞ…¹‘É½¥¹½¹Ñ•¹Ğ¹½¹Ñ•¹ÑY…±Õ•Ì)¥µÁ½ÉĞ…¹‘É½¥¹½¹Ñ•¹Ğ¹½¹Ñ•áĞ)¥µÁ½ÉĞ…¹‘É½¥¹½¹Ñ•¹Ğ¹%¹Ñ•¹Ğ)¥µÁ½ÉĞ…¹‘É½¥¹½¹Ñ•¹Ğ¹M¡…É•‘AÉ•™•É•¹•Ì)¥µÁ½ÉĞ…¹‘É½¥¹¹•Ğ¹½¹¹•Ñ¥Ù¥Ñå5…¹…•È)¥µÁ½ÉĞ…¹‘É½¥¹¹•Ğ¹9•Ñİ½É­…Á…‰¥±¥Ñ¥•Ì)¥µÁ½ÉĞ…¹‘É½¥¹¹•Ğ¹UÉ¤)¥µÁ½ÉĞ…¹‘É½¥¹½Ì¹	Õ¥±)¥µÁ½ÉĞ…¹‘É½¥¹½Ì¹¹Ù¥É½¹µ•¹Ğ)¥µÁ½ÉĞ…¹‘É½¥¹½Ì¹!…¹‘±•È)¥µÁ½ÉĞ…¹‘É½¥¹½Ì¹1½½Á•È)¥µÁ½ÉĞ…¹‘É½¥¹ÁÉ½Ù¥‘•È¹5•‘¥…MÑ½É”)¥µÁ½ÉĞ…¹‘É½¥¹ÁÉ½Ù¥‘•È¹=Á•¹…‰±•½±Õµ¹Ì)¥µÁ½ÉĞ…¹‘É½¥¹ÁÉ½Ù¥‘•È¹M•ÑÑ¥¹Ì)¥µÁ½ÉĞ…¹‘É½¥¹İ•‰­¥Ğ¹5¥µ•QåÁ•5…À)¥µÁ½ÉĞ…¹‘É½¥¹İ•‰­¥Ğ¹UI1UÑ¥°)¥µÁ½ÉĞ½´¹¥±åÉ¼¹‰É½İÍ•È¹Q%=9}=A9}=]91=L)¥µÁ½ÉĞ½´¹¥±åÉ¼¹‰É½İÍ•È¹H)¥µÁ½ÉĞ½Éœ¹©Í½¸¹)M=9ÉÉ…ä)¥µÁ½ÉĞ½Éœ¹©Í½¸¹)M=9=‰©•Ğ)¥µÁ½ÉĞ½Éœ¹µ½é¥±±„¹•­½Ù¥•Ü¹•­½I•ÍÕ±Ğ)¥µÁ½ÉĞ½Éœ¹µ½é¥±±„¹•­½Ù¥•Ü¹•­½IÕ¹Ñ¥µ”)¥µÁ½ÉĞ½Éœ¹µ½é¥±±„¹•­½Ù¥•Ü¹•­½M•ÍÍ¥½¸)¥µÁ½ÉĞ½Éœ¹µ½é¥±±„¹•­½Ù¥•Ü¹•­½M•ÍÍ¥½¹M•ÑÑ¥¹Ì)¥µÁ½ÉĞ½Éœ¹µ½é¥±±„¹•­½Ù¥•Ü¹•­½]•‰á•ÕÑ½È)¥µÁ½ÉĞ½Éœ¹µ½é¥±±„¹•­½Ù¥•Ü¹]•‰I•ÅÕ•ÍĞ)¥µÁ½ÉĞ½Éœ¹µ½é¥±±„¹•­½Ù¥•Ü¹]•‰I•ÍÁ½¹Í”)¥µÁ½ÉĞ½Éœ¹µ½é¥±±„¹•­½Ù¥•Ü¹]•‰áÑ•¹Í¥½¸)¥µÁ½ÉĞ©…Ù„¹¥¼¹	Õ™™•É•‘%¹ÁÕÑMÑÉ•…´)¥µÁ½ÉĞ©…Ù„¹¥¼¹	åÑ•ÉÉ…å=ÕÑÁÕÑMÑÉ•…´)¥µÁ½ÉĞ©…Ù„¹¥¼¹¥±”)¥µÁ½ÉĞ©…Ù„¹¥¼¹%¹ÁÕÑMÑÉ•…´)¥µÁ½ÉĞ©…Ù„¹±…¹œ¹É•˜¹]•…­I•™•É•¹”)¥µÁ½ÉĞ©…Ù„¹ÕÑ¥°¹é¥À¹i¥Á%¹ÁÕÑMÑÉ•…´)¥µÁ½ÉĞ©…Ù„¹ÕÑ¥°¹ÉÉ…å•ÅÕ”)¥µÁ½ÉĞ©…Ù„¹ÕÑ¥°¹½¹ÕÉÉ•¹Ğ¹½¹ÕÉÉ•¹Ñ!…Í¡5…À)¥µÁ½ÉĞ©…Ù„¹ÕÑ¥°¹½¹ÕÉÉ•¹Ğ¹á•ÕÑ½ÉÌ)¥µÁ½ÉĞ©…Ù„¹ÕÑ¥°¹½¹ÕÉÉ•¹Ğ¹…Ñ½µ¥Œ¹Ñ½µ¥	½½±•…¸)¥µÁ½ÉĞ©…Ù„¹ÕÑ¥°¹½¹ÕÉÉ•¹Ğ¹…Ñ½µ¥Œ¹Ñ½µ¥%¹Ñ••È)¥µÁ½ÉĞ©…Ù„¹ÕÑ¥°¹½¹ÕÉÉ•¹Ğ¹…Ñ½µ¥Œ¹Ñ½µ¥1½¹œ()ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°%IQ}9=9€ô€À)ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°%IQ}IU99%9€ô€Ä)ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°%IQ}MUML€ô€È)ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°%IQ}%1€ô€Ì)ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°%IQ}AUM€ô€Ğ)ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°	=e}I}Q%5=UQ}5L€ô€ÌÀÁ|ÀÀÁ0)ÁÉ¥Ù…Ñ”½¹ÍĞÙ…°AI}A9%9}A-}%9MQ11}UI$€ô€‰Á•¹‘¥¹}…Á­}¥¹ÍÑ…±±}ÕÉ¥}ØÄˆ()ÁÉ¥Ù…Ñ”±…ÍÌ%¹Ù…±¥‘½İ¹±½…‘A…å±½…‘á•ÁÑ¥½¸¡µ•ÍÍ…”èMÑÉ¥¹œ¤€èá•ÁÑ¥½¸¡µ•ÍÍ…”¤()ÁÉ¥Ù…Ñ”±…ÍÌ5•Ñ•É•‘9•Ñİ½É­	±½­•‘á•ÁÑ¥½¸€è©…Ù„¹¥¼¹%=á•ÁÑ¥½¸ (€€€€‰½İ¹±½…Á…ÕÍ•‰•…ÕÍ”‘½İ¹±½…‘Ì½Ù•Èµ•Ñ•É•¹•Ñİ½É­Ì…É”‘¥Í…‰±•ˆ(¤()ÁÉ¥Ù…Ñ”Ù…°%IQ}=]91=}aQ9M%=9L€ôÍ•Ñ=˜ (€€€€‰…Á¬ˆ°€‰á…Á¬ˆ°€‰…Á­Ìˆ°€‰……ˆˆ°(€€€€‰é¥Àˆ°€‰É…Èˆ°€ˆİèˆ°€‰Ñ…Èˆ°€‰Ñèˆ°€‰èˆ°€‰‰èÈˆ°€‰áèˆ°(€€€€‰•á”ˆ°€‰µÍ¤ˆ°€‰‘µœˆ°€‰Á­œˆ°€‰‘•ˆˆ°€‰ÉÁ´ˆ°€‰¥Í¼ˆ°€‰©…Èˆ(¤()¥¹Ñ•É¹…°™Õ¸¥Í1¥­•±å¥É•Ñ½İ¹±½…‘UÉ°¡ÕÉ°èMÑÉ¥¹œ¤è	½½±•…¸ì(€€€Ù…°ÕÉ¤€ôÉÕ¹…Ñ¡¥¹œìUÉ¤¹Á…ÉÍ”¡ÕÉ°¤ô¹•Ñ=É9Õ±° ¤€üèÉ•ÑÕÉ¸™…±Í”(€€€Ù…°Í¡•µ”€ôÕÉ¤¹Í¡•µ”ü¹±½İ•É…Í” ¤€üèÉ•ÑÕÉ¸™…±Í”(€€€¥˜€¡Í¡•µ”€„ô€‰¡ÑÑÀˆ€˜˜Í¡•µ”€„ô€‰¡ÑÑÁÌˆ¤É•ÑÕÉ¸™…±Í”(€€€Ù…°Í•µ•¹Ğ€ôUÉ¤¹‘•½‘”¡ÕÉ¤¹±…ÍÑA…Ñ¡M•µ•¹Ğ¹½ÉµÁÑä ¤¤¹±½İ•É…Í” ¤(€€€Ù…°•áÑ•¹Í¥½¸€ôÍ•µ•¹Ğ¹ÍÕ‰ÍÑÉ¥¹™Ñ•É1…ÍĞ œ¸œ°€ˆˆ¤(€€€É•ÑÕÉ¸•áÑ•¹Í¥½¸¥¸%IQ}=]91=}aQ9M%=9L)ô()ÁÉ¥Ù…Ñ”™Õ¸µ¥µ•QåÁ•½É¥É•Ñ½İ¹±½…¡ÕÉ°èMÑÉ¥¹œ¤èMÑÉ¥¹œüì(€€€Ù…°ÕÉ¤€ôÉÕ¹…Ñ¡¥¹œìUÉ¤¹Á…ÉÍ”¡ÕÉ°¤ô¹•Ñ=É9Õ±° ¤€üèÉ•ÑÕÉ¸¹Õ±°(€€€Ù…°Í•µ•¹Ğ€ôUÉ¤¹‘•½‘”¡ÕÉ¤¹±…ÍÑA…Ñ¡M•µ•¹Ğ¹½ÉµÁÑä ¤¤(€€€Ù…°•áÑ•¹Í¥½¸€ôÍ•µ•¹Ğ¹ÍÕ‰ÍÑÉ¥¹™Ñ•É1…ÍĞ œ¸œ°€ˆˆ¤¹±½İ•É…Í” ¤(€€€É•ÑÕÉ¸İ¡•¸€¡•áÑ•¹Í¥½¸¤ì(€€€€€€€€‰…Á¬ˆ€´ø€‰…ÁÁ±¥…Ñ¥½¸½Ù¹¹…¹‘É½¥¹Á…­…”µ…É¡¥Ù”ˆ(€€€€€€€€‰á…Á¬ˆ°€‰…Á­Ìˆ€´ø€‰…ÁÁ±¥…Ñ¥½¸½é¥Àˆ(€€€€€€€€‰……ˆˆ€´ø€‰…ÁÁ±¥…Ñ¥½¸½½Ñ•ĞµÍÑÉ•…´ˆ(€€€€€€€•±Í”€´ø5¥µ•QåÁ•5…À¹•ÑM¥¹±•Ñ½¸ ¤¹•Ñ5¥µ•QåÁ•É½µáÑ•¹Í¥½¸¡•áÑ•¹Í¥½¸¤(€€€ô)ô()¥¹Ñ•É¹…°½¹ÍĞÙ…°A-}5%5}QeA€ô€‰…ÁÁ±¥…Ñ¥½¸½Ù¹¹…¹‘É½¥¹Á…­…”µ…É¡¥Ù”ˆ)ÁÉ¥Ù…Ñ”Ù…°9I%}	%9Ie}5%5}QeAL€ôÍ•Ñ=˜ (€€€€‰…ÁÁ±¥…Ñ¥½¸½½Ñ•ĞµÍÑÉ•…´ˆ°(€€€€‰‰¥¹…Éä½½Ñ•ĞµÍÑÉ•…´ˆ°(€€€€‰…ÁÁ±¥…Ñ¥½¸½‰¥¹…Éäˆ(¤()ÁÉ¥Ù…Ñ”™Õ¸±•…¹½İ¹±½…‘9…µ”¡¹…µ”èMÑÉ¥¹œü¤èMÑÉ¥¹œü€ô¹…µ”(€€€€ü¹ÍÕ‰ÍÑÉ¥¹™Ñ•É1…ÍĞ œ¼œ¤(€€€€ü¹ÍÕ‰ÍÑÉ¥¹™Ñ•É1…ÍĞ qpœ¤(€€€€ü¹ÑÉ¥´ ¤(€€€€ü¹Ñ…­•%˜ì¥Ğ¹¥Í9½Ñ	±…¹¬ ¤ô()ÁÉ¥Ù…Ñ”™Õ¸‘½İ¹±½…‘áÑ•¹Í¥½¸¡¹…µ”èMÑÉ¥¹œü¤èMÑÉ¥¹œ€ô±•…¹½İ¹±½…‘9…µ”¡¹…µ”¤(€€€€ü¹ÍÕ‰ÍÑÉ¥¹™Ñ•É1…ÍĞ œ¸œ°€ˆˆ¤(€€€€ü¹±½İ•É…Í” ¤(€€€€¹½ÉµÁÑä ¤()¥¹Ñ•É¹…°™Õ¸½¹Ñ•¹Ñ¥ÍÁ½Í¥Ñ¥½¹¥±•9…µ”¡¡•…‘•ÉY…±Õ”èMÑÉ¥¹œü¤èMÑÉ¥¹œüì(€€€Ù…°¡•…‘•È€ô¡•…‘•ÉY…±Õ”ü¹ÑÉ¥´ ¤¹½ÉµÁÑä ¤(€€€¥˜€¡¡•…‘•È¹¥Í	±…¹¬ ¤¤É•ÑÕÉ¸¹Õ±°((€€€Ù…°•áÑ•¹‘•€ôI••à (€€€€€€€Á…ÑÑ•É¸€ô€ˆ ı¤¤ üéyğì¥qqÌ©™¥±•¹…µ•qp©qqÌ¨õqqÌ¨ üéqqpˆ¡myqqp‰t¬¥qqp‰ğ¡mxít¬¤¤ˆ(€€€€¤¹™¥¹¡¡•…‘•È¤ü¹±•Ğìµ…Ñ €´ø(€€€€€€€µ…Ñ ¹É½ÕÁY…±Õ•ÍlÅt¹¥™	±…¹¬ìµ…Ñ ¹É½ÕÁY…±Õ•ÍlÉtô¹ÑÉ¥´ ¤(€€€ô(€€€¥˜€ …•áÑ•¹‘•¹¥Í9Õ±±=É	±…¹¬ ¤¤ì(€€€€€€€Ù…°•¹½‘•€ô•áÑ•¹‘•¹ÍÕ‰ÍÑÉ¥¹™Ñ•È ˆœœˆ°•áÑ•¹‘•¤¹ÑÉ¥´ ¤¹ÑÉ¥´ œˆœ¤(€€€€€€€Ù…°‘•½‘•€ôÉÕ¹…Ñ¡¥¹œì©…Ù„¹¹•Ğ¹UI1]4ÒÚ$z{-®éÜj×A%2F%2Fcdn%2Fapp.apk.
     val decodedUrl = runCatching { Uri.decode(url) }.getOrDefault(url)
     Regex("(?i)([^/?#&=]+\\.(?:apk|xapk|apks|aab))(?:$|[?&#])")
         .find(decodedUrl)
@@ -212,7 +20,10 @@ internal data class DownloadRecord(
     val expectedBytes: Long = -1L,
     val directState: Int = DIRECT_NONE,
     val referrer: String? = null,
-    val isPrivate: Boolean = false
+    val isPrivate: Boolean = false,
+    /** The policy selected when this transfer was created. Older records default to allowed. */
+    val allowMetered: Boolean = true,
+    val isHls: Boolean = false
 )
 
 
@@ -305,161 +116,10 @@ internal class DownloadController(
         ((System.currentTimeMillis() and 0x3fffffffL).toInt()).coerceAtLeast(1)
     )
 
-    init {
-        // minSdk is 26, so the downloads notification channel is always available.
-        notificationManager.createNotificationChannel(
-            NotificationChannel(
-                DOWNLOAD_CHANNEL_ID,
-                "Downloads",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "ILYRO download progress"
-                setSound(null, null)
-                enableVibration(false)
-            }
-        )
-
-        // The foreground-service companion is process-wide. Keep only a weak reference here so
-        // recreating BrowserScreen/DownloadController cannot pin an obsolete controller/runtime.
-        val controllerRef = WeakReference(this)
-        DownloadKeepAliveService.setControlHandler { id, pauseRequested ->
-            controllerRef.get()?.let { controller ->
-                if (pauseRequested) controller.pause(id) else controller.resume(id)
-            } ?: false
-        }
-        DownloadKeepAliveService.setCancelHandler { id ->
-            controllerRef.get()?.let { controller ->
-                val item = runCatching {
-                    controller.snapshot().firstOrNull { it.record.id == id }
-                }.getOrNull()
-                if (item != null) {
-                    controller.cancel(item)
-                    true
-                } else {
-                    false
-                }
-            } ?: false
-        }
-    }
-
-
-    fun enqueueExtensionDownload(
-        request: WebExtension.DownloadRequest,
-        allowMetered: Boolean,
-        onRecordsChanged: (() -> Unit)? = null
-    ): GeckoResult<WebExtension.DownloadInitData> {
-        val result = GeckoResult<WebExtension.DownloadInitData>(mainHandler)
-        mainHandler.post {
-            val id = nextExtensionDownloadId.getAndIncrement().let { if (it <= 0) 1 else it }
-            val extensionDownload = try {
-                runtime.webExtensionController.createDownload(id)
-            } catch (error: Throwable) {
-                result.completeExceptionally(error)
-                return@post
-            }
-            if (extensionDownload == null) {
-                result.completeExceptionally(IllegalStateException("Could not allocate extension download"))
-                return@post
-            }
-
-            val startedAt = System.currentTimeMillis()
-            val requestedUrl = request.request.uri
-            val requestedName = request.filename
-                ?.substringAfterLast('/')
-                ?.substringAfterLast('\\')
-                ?.takeIf { it.isNotBlank() }
-                ?: URLUtil.guessFileName(requestedUrl, null, null)
-            val referrer = request.request.referrer.orEmpty()
-            val initial = ExtensionDownloadInfo(
-                name = requestedName,
-                mimeType = "application/octet-stream",
-                referrerUrl = referrer,
-                startedAt = startedAt
-            )
-            result.complete(WebExtension.DownloadInitData(extensionDownload, initial))
-
-            fun fail(reason: Int = WebExtension.Download.INTERRUPT_REASON_NETWORK_FAILED) {
-                mainHandler.post {
-                    extensionDownload.update(
-                        initial.copy(
-                            endedAt = System.currentTimeMillis(),
-                            downloadState = WebExtension.Download.STATE_INTERRUPTED,
-                            interruptReason = reason
-                        )
-                    )
-                }
-                onRecordsChanged?.invoke()
-            }
-
-            val privateRequest = request.downloadFlags and GeckoWebExecutor.FETCH_FLAGS_PRIVATE != 0
-            runCatching {
-                executor.fetch(request.request, request.downloadFlags).accept(
-                    { response ->
-                        if (response == null) {
-                            fail()
-                            return@accept
-                        }
-                        if (!request.allowHttpErrors && response.statusCode !in 200..299) {
-                            runCatching { response.body?.close() }
-                            val reason = when (response.statusCode) {
-                                401 -> WebExtension.Download.INTERRUPT_REASON_SERVER_UNAUTHORIZED
-                                403 -> WebExtension.Download.INTERRUPT_REASON_SERVER_FORBIDDEN
-                                else -> WebExtension.Download.INTERRUPT_REASON_SERVER_FAILED
-                            }
-                            fail(reason)
-                            return@accept
-                        }
-
-                        val record = enqueue(
-                            response = response,
-                            allowMetered = allowMetered,
-                            referrer = referrer.takeIf { it.isNotBlank() },
-                            isPrivate = privateRequest,
-                            suggestedName = requestedName
-                        )
-                        if (record == null) {
-                            fail(WebExtension.Download.INTERRUPT_REASON_FILE_FAILED)
-                            return@accept
-                        }
-                        onRecordsChanged?.invoke()
-                        monitorExtensionDownload(extensionDownload, record.id, startedAt, initial)
-                    },
-                    { _ -> fail() }
-                )
-            }.onFailure { fail() }
-        }
-        return result
-    }
-
-    private fun monitorExtensionDownload(
-        extensionDownload: WebExtension.Download,
-        recordId: Long,
-        startedAt: Long,
-        initial: ExtensionDownloadInfo
-    ) {
-        Thread({
-            var missingPolls = 0
-            while (true) {
-                try { Thread.sleep(500L) } catch (_: InterruptedException) { return@Thread }
-                val item = runCatching { snapshot().firstOrNull { it.record.id == recordId } }.getOrNull()
-                if (item == null) {
-                    missingPolls += 1
-                    if (missingPolls < 4) continue
-                    mainHandler.post {
-                        extensionDownload.update(
-                            initial.copy(
-                                endedAt = System.currentTimeMillis(),
-                                downloadState = WebExtension.Download.STATE_INTERRUPTED,
-                                interruptReason = WebExtension.Download.INTERRUPT_REASON_USER_CANCELED
-                            )
-                        )
-                    }
-                    return@Thread
-                }
-                missingPolls = 0
-
-                val state = when (item.status) {
-                    DownloadManager.STATUS_SUCCESSFUL -> WebExtension.Download.STATE_COMPLETE
+    private fun isMeteredNetwork(): Boolean {
+        val connectivity = appContext.getSystemService(ConnectivityManager::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val network = connectYªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Õ¥Ù¥Ñä¹…Ñ¥Ù•9•Ñİ½É¬€üèÉ•ÑÕÉ¸™…±Í”(€€€€€€€€€€€Ù…°…Á…‰¥±¥Ñ¥•Ì€ô½¹¹•Ñ¥Ù¥Ñä¹•Ñ9•Ñİ½É­…Á…‰¥±¥Ñ¥•Ì¡¹•Ñİ½É¬¤€üèÉ•ÑÕÉ¸ÑÉÕ”(€€€€€€€€€€€É•ÑÕÉ¸€……Á…‰¥±¥Ñ¥•Ì¹¡…Í…Á…‰¥±¥Ñä¡9•Ñİ½É­…Á…‰¥±¥Ñ¥•Ì¹9Q}A	%1%Qe}9=Q}5QI¤(€€€€€€€ô(€€€€€€€MÕÁÁÉ•ÍÌ ‰AIQ%=8ˆ¤(€€€€€€€É•ÑÕÉ¸½¹¹•Ñ¥Ù¥Ñä¹¥ÍÑ¥Ù•9•Ñİ½É­5•Ñ•É•(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸É•ÅÕ¥É•9•Ñİ½É­±±½İ•¡…±±½İ5•Ñ•É•è	½½±•…¸¤ì(€€€€€€€¥˜€ ……±±½İ5•Ñ•É•€˜˜¥Í5•Ñ•É•‘9•Ñİ½É¬ ¤¤ì(€€€€€€€€€€€Ñ¡É½Ü5•Ñ•É•‘9•Ñİ½É­	±½­•‘á•ÁÑ¥½¸ ¤(€€€€€€€ô(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸¹•Ñİ½É­±±½İ•¡…±±½İ5•Ñ•É•è	½½±•…¸¤è	½½±•…¸€ô(€€€€€€€ÉÕ¹…Ñ¡¥¹œìÉ•ÅÕ¥É•9•Ñİ½É­±±½İ•¡…±±½İ5•Ñ•É•¤ô¹¥ÍMÕ•ÍÌ((€€€¥¹¥Ğì(€€€€€€€€¼¼µ¥¹M‘¬¥Ì€ÈØ°Í¼Ñ¡”‘½İ¹±½…‘Ì¹½Ñ¥™¥…Ñ¥½¸¡…¹¹•°¥Ì…±İ…åÌ…Ù…¥±…‰±”¸(€€€€€€€¹½Ñ¥™¥…Ñ¥½¹5…¹…•È¹É•…Ñ•9½Ñ¥™¥…Ñ¥½¹¡…¹¹•° (€€€€€€€€€€€9½Ñ¥™¥…Ñ¥½¹¡…¹¹•° (€€€€€€€€€€€€€€€=]91=}!991}%°(€€€€€€€€€€€€€€€€‰½İ¹±½…‘Ìˆ°(€€€€€€€€€€€€€€€9½Ñ¥™¥…Ñ¥½¹5…¹…•È¹%5A=IQ9}1=\(€€€€€€€€€€€€¤¹…ÁÁ±äì(€€€€€€€€€€€€€€€‘•ÍÉ¥ÁÑ¥½¸€ô€‰%1eI<‘½İ¹±½…ÁÉ½É•ÍÌˆ(€€€€€€€€€€€€€€€Í•ÑM½Õ¹¡¹Õ±°°¹Õ±°¤(€€€€€€€€€€€€€€€•¹…‰±•Y¥‰É…Ñ¥½¸¡™…±Í”¤(€€€€€€€€€€€ô(€€€€€€€€¤((€€€€€€€€¼¼Q¡”™½É•É½Õ¹µÍ•ÉÙ¥”½µÁ…¹¥½¸¥ÌÁÉ½•ÍÌµİ¥‘”¸-••À½¹±ä„İ•…¬É•™•É•¹”¡•É”Í¼(€€€€€€€€¼¼É•É•…Ñ¥¹œ	É½İÍ•ÉMÉ••¸½½İ¹±½…‘½¹ÑÉ½±±•È…¹¹½ĞÁ¥¸…¸½‰Í½±•Ñ”½¹ÑÉ½±±•È½ÉÕ¹Ñ¥µ”¸(€€€€€€€Ù…°½¹ÑÉ½±±•ÉI•˜€ô]•…­I•™•É•¹”¡Ñ¡¥Ì¤(€€€€€€€½İ¹±½…‘-••Á±¥Ù•M•ÉÙ¥”¹Í•Ñ½¹ÑÉ½±!…¹‘±•Èì¥°Á…ÕÍ•I•ÅÕ•ÍÑ•€´ø(€€€€€€€€€€€½¹ÑÉ½±±•ÉI•˜¹•Ğ ¤ü¹±•Ğì½¹ÑÉ½±±•È€´ø(€€€€€€€€€€€€€€€¥˜€¡Á…ÕÍ•I•ÅÕ•ÍÑ•¤½¹ÑÉ½±±•È¹Á…ÕÍ”¡¥¤•±Í”½¹ÑÉ½±±•È¹É•ÍÕµ”¡¥¤(€€€€€€€€€€€ô€üè™…±Í”(€€€€€€€ô(€€€€€€€½İ¹±½…‘-••Á±¥Ù•M•ÉÙ¥”¹Í•Ñ…¹•±!…¹‘±•Èì¥€´ø(€€€€€€€€€€€½¹ÑÉ½±±•ÉI•˜¹•Ğ ¤ü¹±•Ğì½¹ÑÉ½±±•È€´ø(€€€€€€€€€€€€€€€Ù…°¥Ñ•´€ôÉÕ¹…Ñ¡¥¹œì(€€€€€€€€€€€€€€€€€€€½¹ÑÉ½±±•È¹Í¹…ÁÍ¡½Ğ ¤¹™¥ÉÍÑ=É9Õ±°ì¥Ğ¹É•½É¹¥€ôô¥ô(€€€€€€€€€€€€€€€ô¹•Ñ=É9Õ±° ¤(€€€€€€€€€€€€€€€¥˜€¡¥Ñ•´€„ô¹Õ±°¤ì(€€€€€€€€€€€€€€€€€€€½¹ÑÉ½±±•È¹…¹•°¡¥Ñ•´¤(€€€€€€€€€€€€€€€€€€€ÑÉÕ”(€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€™…±Í”(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô€üè™…±Í”(€€€€€€€ô(€€€ô(((€€€™Õ¸•¹ÅÕ•Õ•áÑ•¹Í¥½¹½İ¹±½… (€€€€€€€É•ÅÕ•ÍĞè]•‰áÑ•¹Í¥½¸¹½İ¹±½…‘I•ÅÕ•ÍĞ°(€€€€€€€…±±½İ5•Ñ•É•è	½½±•…¸°(€€€€€€€½¹I•½É‘Í¡…¹•è€  ¤€´øU¹¥Ğ¤ü€ô¹Õ±°(€€€€¤è•­½I•ÍÕ±Ğñ]•‰áÑ•¹Í¥½¸¹½İ¹±½…‘%¹¥Ñ…Ñ„øì(€€€€€€€Ù…°É•ÍÕ±Ğ€ô•­½I•ÍÕ±Ğñ]•‰áÑ•¹Í¥½¸¹½İ¹±½…‘%¹¥Ñ…Ñ„ø¡µ…¥¹!…¹‘±•È¤(€€€€€€€µ…¥¹!…¹‘±•È¹Á½ÍĞì(€€€€€€€€€€€Ù…°¥€ô¹•áÑáÑ•¹Í¥½¹½İ¹±½…‘%¹•Ñ¹‘%¹É•µ•¹Ğ ¤¹±•Ğì¥˜€¡¥Ğ€ğô€À¤€Ä•±Í”¥Ğô(€€€€€€€€€€€Ù…°•áÑ•¹Í¥½¹½İ¹±½…€ôÑÉäì(€€€€€€€€€€€€€€€ÉÕ¹Ñ¥µ”¹İ•‰áÑ•¹Í¥½¹½¹ÑÉ½±±•È¹É•…Ñ•½İ¹±½…¡¥¤(€€€€€€€€€€€ô…Ñ €¡•ÉÉ½ÈèQ¡É½İ…‰±”¤ì(€€€€€€€€€€€€€€€É•ÍÕ±Ğ¹½µÁ±•Ñ•á•ÁÑ¥½¹…±±ä¡•ÉÉ½È¤(€€€€€€€€€€€€€€€É•ÑÕÉ¹Á½ÍĞ(€€€€€€€€€€€ô(€€€€€€€€€€€¥˜€¡•áÑ•¹Í¥½¹½İ¹±½…€ôô¹Õ±°¤ì(€€€€€€€€€€€€€€€É•ÍÕ±Ğ¹½µÁ±•Ñ•á•ÁÑ¥½¹…±±ä¡%±±•…±MÑ…Ñ•á•ÁÑ¥½¸ ‰½Õ±¹½Ğ…±±½…Ñ”•áÑ•¹Í¥½¸‘½İ¹±½…ˆ¤¤(€€€€€€€€€€€€€€€É•ÑÕÉ¹Á½ÍĞ(€€€€€€€€€€€ô((€€€€€€€€€€€Ù…°ÍÑ…ÉÑ•‘Ğ€ôMåÍÑ•´¹ÕÉÉ•¹ÑQ¥µ•5¥±±¥Ì ¤(€€€€€€€€€€€Ù…°É•ÅÕ•ÍÑ•‘UÉ°€ôÉ•ÅÕ•ÍĞ¹É•ÅÕ•ÍĞ¹ÕÉ¤(€€€€€€€€€€€Ù…°É•ÅÕ•ÍÑ•‘9…µ”€ôÉ•ÅÕ•ÍĞ¹™¥±•¹…µ”(€€€€€€€€€€€€€€€€ü¹ÍÕ‰ÍÑÉ¥¹™Ñ•É1…ÍĞ œ¼œ¤(€€€€€€€€€€€€€€€€ü¹ÍÕ‰ÍÑÉ¥¹™Ñ•É1…ÍĞ qpœ¤(€€€€€€€€€€€€€€€€ü¹Ñ…­•%˜ì¥Ğ¹¥Í9½Ñ	±…¹¬ ¤ô(€€€€€€€€€€€€€€€€üèUI1UÑ¥°¹Õ•ÍÍ¥±•9…µ”¡É•ÅÕ•ÍÑ•‘UÉ°°¹Õ±°°¹Õ±°¤(€€€€€€€€€€€Ù…°É•™•ÉÉ•È€ôÉ•ÅÕ•ÍĞ¹É•ÅÕ•ÍĞ¹É•™•ÉÉ•È¹½ÉµÁÑä ¤(€€€€€€€€€€€Ù…°¥¹¥Ñ¥…°€ôáÑ•¹Í¥½¹½İ¹±½…‘%¹™¼ (€€€€€€€€€€€€€€€¹…µ”€ôÉ•ÅÕ•ÍÑ•‘9…µ”°(€€€€€€€€€€€€€€€µ¥µ•QåÁ”€ô€‰…ÁÁ±¥…Ñ¥½¸½½Ñ•ĞµÍÑÉ•…´ˆ°(€€€€€€€€€€€€€€€É•™•ÉÉ•ÉUÉ°€ôÉ•™•ÉÉ•È°(€€€€€€€€€€€€€€€ÍÑ…ÉÑ•‘Ğ€ôÍÑ…ÉÑ•‘Ğ(€€€€€€€€€€€€¤(€€€€€€€€€€€É•ÍÕ±Ğ¹½µÁ±•Ñ”¡]•‰áÑ•¹Í¥½¸¹½İ¹±½…‘%¹¥Ñ…Ñ„¡•áÑ•¹Í¥½¹½İ¹±½…°¥¹¥Ñ¥…°¤¤((€€€€€€€€€€€™Õ¸™…¥°¡É•…Í½¸è%¹Ğ€ô]•‰áÑ•¹Í¥½¸¹½İ¹±½…¹%9QIIUAQ}IM=9}9Q]=I-}%1¤ì(€€€€€€€€€€€€€€€µ…¥¹!…¹‘±•È¹Á½ÍĞì(€€€€€€€€€€€€€€€€€€€•áÑ•¹Í¥½¹½İ¹±½…¹ÕÁ‘…Ñ” (€€€€€€€€€€€€€€€€€€€€€€€¥¹¥Ñ¥…°¹½Áä (€€€€€€€€€€€€€€€€€€€€€€€€€€€•¹‘•‘Ğ€ôMåÍÑ•´¹ÕÉÉ•¹ÑQ¥µ•5¥±±¥Ì ¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€‘½İ¹±½…‘MÑ…Ñ”€ô]•‰áÑ•¹Í¥½¸¹½İ¹±½…¹MQQ}%9QIIUAQ°(€€€€€€€€€€€€€€€€€€€€€€€€€€€¥¹Ñ•ÉÉÕÁÑI•…Í½¸€ôÉ•…Í½¸(€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€½¹I•½É‘Í¡…¹•ü¹¥¹Ù½­” ¤(€€€€€€€€€€€ô((€€€€€€€€€€€¥˜€ …¹•Ñİ½É­±±½İ•¡…±±½İ5•Ñ•É•¤¤ì(€€€€€€€€€€€€€€€™…¥° ¤(€€€€€€€€€€€€€€€É•ÑÕÉ¹Á½ÍĞ(€€€€€€€€€€€ô((€€€€€€€€€€€Ù…°ÁÉ¥Ù…Ñ•I•ÅÕ•ÍĞ€ôÉ•ÅÕ•ÍĞ¹‘½İ¹±½…‘±…Ì…¹•­½]•‰á•ÕÑ½È¹Q!}1M}AI%YQ€„ô€À(€€€€€€€€€€€ÉÕ¹…Ñ¡¥¹œì(€€€€€€€€€€€€€€€•á•ÕÑ½È¹™•Ñ ¡É•ÅÕ•ÍĞ¹É•ÅÕ•ÍĞ°É•ÅÕ—]4ÒÚ$z{-®éÜj×Download.STATE_COMPLETE
                     DownloadManager.STATUS_FAILED -> WebExtension.Download.STATE_INTERRUPTED
                     else -> WebExtension.Download.STATE_IN_PROGRESS
                 }
@@ -497,6 +157,11 @@ internal class DownloadController(
         onFinished: (() -> Unit)? = null
     ): DownloadRecord? {
         val url = response.uri
+        if (!networkAllowed(allowMetered)) {
+            runCatching { response.body?.close() }
+            runCatching { onFinished?.invoke() }
+            return null
+        }
         val responseMimeType = header(response, "content-type")
             ?.substringBefore(';')
             ?.trim()
@@ -552,188 +217,7 @@ internal class DownloadController(
                 url = url,
                 fileName = fileName,
                 mimeType = mimeType,
-                expectedBytes = expectedBytes,
-                allowMetered = allowMetered,
-                referrer = referrer,
-                isPrivate = isPrivate
-            )
-            if (geckoRetry != null) return geckoRetry
-        } else {
-            runCatching { body?.close() }
-            runCatching { onFinished?.invoke() }
-        }
-
-        return enqueueUrl(
-            url = url,
-            fileName = fileName,
-            mimeType = mimeType,
-            allowMetered = allowMetered,
-            referrer = referrer,
-            isPrivate = isPrivate
-        )
-    }
-
-    fun enqueueNavigationWithSession(
-        url: String,
-        sourceSettings: GeckoSessionSettings,
-        suggestedName: String? = null,
-        allowMetered: Boolean,
-        referrer: String?,
-        isPrivate: Boolean,
-        onRecordsChanged: (() -> Unit)? = null
-    ): Boolean {
-        val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
-        val scheme = uri.scheme?.lowercase()
-        if (scheme != "http" && scheme != "https") return false
-
-        // Always let a real GeckoSession own top-level downloads, including obvious .apk/.zip
-        // links. The earlier WebExecutor fast path lost navigation context on redirect/cookie
-        // protected download hosts and could save an HTML/intermediate response as the file.
-        val now = android.os.SystemClock.elapsedRealtime()
-        val navigationKey = "${if (isPrivate) 1 else 0}|$url|${referrer.orEmpty()}"
-        recentNavigationStarts.entries.removeIf { now - it.value > NAVIGATION_DEDUPE_RETENTION_MS }
-        val previousStart = recentNavigationStarts.put(navigationKey, now)
-        if (previousStart != null && now - previousStart < NAVIGATION_DEDUPE_WINDOW_MS) {
-            // Gecko can report the same user click more than once while a redirect is being
-            // resolved. Treat it as the already-running download instead of creating a duplicate.
-            return true
-        }
-
-        val provisionalId = -System.nanoTime()
-        val downloadNameHint = suggestedName?.takeIf { it.isNotBlank() }
-            ?: directDownloadNameHint(url)
-        val provisionalName = downloadNameHint
-            ?: Uri.decode(uri.lastPathSegment.orEmpty()).takeIf { it.isNotBlank() }
-            ?: "Media download"
-        DownloadKeepAliveService.track(appContext, provisionalId, provisionalName)
-
-        val downloadSession = GeckoSession(
-            GeckoSessionSettings.Builder(sourceSettings).build()
-        )
-        var handedOff = false
-
-        fun closeDownloadSession() {
-            val closeAction = {
-                activeDownloadSessions.remove(downloadSession)
-                if (downloadSession.isOpen) {
-                    runCatching { downloadSession.close() }
-                }
-            }
-            if (Looper.myLooper() == Looper.getMainLooper()) {
-                closeAction()
-            } else {
-                mainHandler.post(closeAction)
-            }
-        }
-
-        fun fallback() {
-            if (handedOff) return
-            handedOff = true
-            closeDownloadSession()
-            val record = enqueueNavigation(
-                url = url,
-                allowMetered = allowMetered,
-                referrer = referrer,
-                isPrivate = isPrivate,
-                suggestedName = downloadNameHint
-            )
-            if (record != null) {
-                DownloadKeepAliveService.replace(appContext, provisionalId, record.id, record.fileName)
-            } else {
-                DownloadKeepAliveService.finish(appContext, provisionalId)
-            }
-            onRecordsChanged?.invoke()
-        }
-
-        downloadSession.setContentDelegate(object : GeckoSession.ContentDelegate {
-            override fun onExternalResponse(session: GeckoSession, response: WebResponse) {
-                if (handedOff) return
-                handedOff = true
-                val record = enqueue(
-                    response = response,
-                    allowMetered = allowMetered,
-                    referrer = referrer,
-                    isPrivate = isPrivate,
-                    suggestedName = downloadNameHint,
-                    onFinished = { closeDownloadSession() }
-                )
-                onRecordsChanged?.invoke()
-                if (record != null) {
-                    DownloadKeepAliveService.replace(appContext, provisionalId, record.id, record.fileName)
-                } else {
-                    closeDownloadSession()
-                    val fallbackRecord = enqueueNavigation(
-                        url = url,
-                        allowMetered = allowMetered,
-                        referrer = referrer,
-                        isPrivate = isPrivate,
-                        suggestedName = downloadNameHint
-                    )
-                    if (fallbackRecord != null) {
-                        DownloadKeepAliveService.replace(
-                            appContext,
-                            provisionalId,
-                            fallbackRecord.id,
-                            fallbackRecord.fileName
-                        )
-                    } else {
-                        DownloadKeepAliveService.finish(appContext, provisionalId)
-                    }
-                    onRecordsChanged?.invoke()
-                }
-            }
-        })
-        downloadSession.setProgressDelegate(object : GeckoSession.ProgressDelegate {
-            override fun onPageStop(session: GeckoSession, success: Boolean) {
-                // Some download pages briefly render a redirect/challenge document and then
-                // start the real attachment from JavaScript. Keep the hidden session alive for
-                // a short grace period instead of closing it at the first HTML page stop.
-                if (!handedOff) {
-                    mainHandler.postDelayed({
-                        if (!handedOff) fallback()
-                    }, DOWNLOAD_PAGE_SETTLE_GRACE_MS)
-                }
-            }
-        })
-
-        activeDownloadSessions.add(downloadSession)
-        return runCatching {
-            downloadSession.open(runtime)
-            downloadSession.loadUri(url)
-            mainHandler.postDelayed({
-                if (!handedOff) fallback()
-            }, DOWNLOAD_SESSION_RESPONSE_TIMEOUT_MS)
-            true
-        }.getOrElse {
-            fallback()
-            false
-        }
-    }
-
-    /**
-     * Expands detected HLS master playlists into user-facing quality choices. This runs only
-     * when the media sheet is opened, so ordinary browsing never pays for playlist inspection.
-     */
-    fun resolveMediaQualities(
-        media: List<DetectedMedia>,
-        isPrivate: Boolean,
-        onResolved: (List<DetectedMedia>) -> Unit
-    ) {
-        if (media.none { it.kind == DetectedMediaKind.HLS }) {
-            mainHandler.post {
-                onResolved(
-                    media.map(::enrichMediaQualityFromUrl)
-                        .distinctBy(::mediaQualityIdentity)
-                )
-            }
-            return
-        }
-
-        Thread({
-            val expanded = mutableListOf<DetectedMedia>()
-            media.forEach { item ->
-                if (item.kind != DetectedMediaKind.HLS) {
-                    expanded += enrichMediaQualityFromUrl(item)
+                expeYªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬ÕÑ•‘	åÑ•Ì€ô•áÁ•Ñ•‘	åÑ•Ì°(€€€€€€€€€€€€€€€…±±½İ5•Ñ•É•€ô…±±½İ5•Ñ•É•°(€€€€€€€€€€€€€€€É•™•ÉÉ•È€ôÉ•™•ÉÉ•È°(€€€€€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ô¥ÍAÉ¥Ù…Ñ”(€€€€€€€€€€€€¤(€€€€€€€€€€€¥˜€¡•­½I•ÑÉä€„ô¹Õ±°¤É•ÑÕÉ¸•­½I•ÑÉä(€€€€€€€ô•±Í”ì(€€€€€€€€€€€ÉÕ¹…Ñ¡¥¹œì‰½‘äü¹±½Í” ¤ô(€€€€€€€€€€€ÉÕ¹…Ñ¡¥¹œì½¹¥¹¥Í¡•ü¹¥¹Ù½­” ¤ô(€€€€€€€ô((€€€€€€€É•ÑÕÉ¸•¹ÅÕ•Õ•UÉ° (€€€€€€€€€€€ÕÉ°€ôÕÉ°°(€€€€€€€€€€€™¥±•9…µ”€ô™¥±•9…µ”°(€€€€€€€€€€€µ¥µ•QåÁ”€ôµ¥µ•QåÁ”°(€€€€€€€€€€€…±±½İ5•Ñ•É•€ô…±±½İ5•Ñ•É•°(€€€€€€€€€€€É•™•ÉÉ•È€ôÉ•™•ÉÉ•È°(€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ô¥ÍAÉ¥Ù…Ñ”(€€€€€€€€¤(€€€ô((€€€™Õ¸•¹ÅÕ•Õ•9…Ù¥…Ñ¥½¹]¥Ñ¡M•ÍÍ¥½¸ (€€€€€€€ÕÉ°èMÑÉ¥¹œ°(€€€€€€€Í½ÕÉ•M•ÑÑ¥¹Ìè•­½M•ÍÍ¥½¹M•ÑÑ¥¹Ì°(€€€€€€€ÍÕ•ÍÑ•‘9…µ”èMÑÉ¥¹œü€ô¹Õ±°°(€€€€€€€…±±½İ5•Ñ•É•è	½½±•…¸°(€€€€€€€É•™•ÉÉ•ÈèMÑÉ¥¹œü°(€€€€€€€¥ÍAÉ¥Ù…Ñ”è	½½±•…¸°(€€€€€€€½¹I•½É‘Í¡…¹•è€  ¤€´øU¹¥Ğ¤ü€ô¹Õ±°(€€€€¤è	½½±•…¸ì(€€€€€€€Ù…°ÕÉ¤€ôÉÕ¹…Ñ¡¥¹œìUÉ¤¹Á…ÉÍ”¡ÕÉ°¤ô¹•Ñ=É9Õ±° ¤€üèÉ•ÑÕÉ¸™…±Í”(€€€€€€€Ù…°Í¡•µ”€ôÕÉ¤¹Í¡•µ”ü¹±½İ•É…Í” ¤(€€€€€€€¥˜€¡Í¡•µ”€„ô€‰¡ÑÑÀˆ€˜˜Í¡•µ”€„ô€‰¡ÑÑÁÌˆ¤É•ÑÕÉ¸™…±Í”(€€€€€€€¥˜€ …¹•Ñİ½É­±±½İ•¡…±±½İ5•Ñ•É•¤¤É•ÑÕÉ¸™…±Í”((€€€€€€€€¼¼±İ…åÌ±•Ğ„É•…°•­½M•ÍÍ¥½¸½İ¸Ñ½Àµ±•Ù•°‘½İ¹±½…‘Ì°¥¹±Õ‘¥¹œ½‰Ù¥½ÕÌ€¹…Á¬¼¹é¥À(€€€€€€€€¼¼±¥¹­Ì¸Q¡”•…É±¥•È]•‰á•ÕÑ½È™…ÍĞÁ…Ñ ±½ÍĞ¹…Ù¥…Ñ¥½¸½¹Ñ•áĞ½¸É•‘¥É•Ğ½½½­¥”(€€€€€€€€¼¼ÁÉ½Ñ•Ñ•‘½İ¹±½…¡½ÍÑÌ…¹½Õ±Í…Ù”…¸!Q50½¥¹Ñ•Éµ•‘¥…Ñ”É•ÍÁ½¹Í”…ÌÑ¡”™¥±”¸(€€€€€€€Ù…°¹½Ü€ô…¹‘É½¥¹½Ì¹MåÍÑ•µ±½¬¹•±…ÁÍ•‘I•…±Ñ¥µ” ¤(€€€€€€€Ù…°¹…Ù¥…Ñ¥½¹-•ä€ô€ˆ‘í¥˜€¡¥ÍAÉ¥Ù…Ñ”¤€Ä•±Í”€Áõğ‘ÕÉ±ğ‘íÉ•™•ÉÉ•È¹½ÉµÁÑä ¥ôˆ(€€€€€€€É••¹Ñ9…Ù¥…Ñ¥½¹MÑ…ÉÑÌ¹•¹ÑÉ¥•Ì¹É•µ½Ù•%˜ì¹½Ü€´¥Ğ¹Ù…±Õ”€ø9Y%Q%=9}UA}IQ9Q%=9}5Lô(€€€€€€€Ù…°ÁÉ•Ù¥½ÕÍMÑ…ÉĞ€ôÉ••¹Ñ9…Ù¥…Ñ¥½¹MÑ…ÉÑÌ¹ÁÕĞ¡¹…Ù¥…Ñ¥½¹-•ä°¹½Ü¤(€€€€€€€¥˜€¡ÁÉ•Ù¥½ÕÍMÑ…ÉĞ€„ô¹Õ±°€˜˜¹½Ü€´ÁÉ•Ù¥½ÕÍMÑ…ÉĞ€ğ9Y%Q%=9}UA}]%9=]}5L¤ì(€€€€€€€€€€€€¼¼•­¼…¸É•Á½ÉĞÑ¡”Í…µ”ÕÍ•È±¥¬µ½É”Ñ¡…¸½¹”İ¡¥±”„É•‘¥É•Ğ¥Ì‰•¥¹œ(€€€€€€€€€€€€¼¼É•Í½±Ù•¸QÉ•…Ğ¥Ğ…ÌÑ¡”…±É•…‘äµÉÕ¹¹¥¹œ‘½İ¹±½…¥¹ÍÑ•…½˜É•…Ñ¥¹œ„‘ÕÁ±¥…Ñ”¸(€€€€€€€€€€€É•ÑÕÉ¸ÑÉÕ”(€€€€€€€ô((€€€€€€€Ù…°ÁÉ½Ù¥Í¥½¹…±%€ô€µMåÍÑ•´¹¹…¹½Q¥µ” ¤(€€€€€€€Ù…°‘½İ¹±½…‘9…µ•!¥¹Ğ€ôÍÕ•ÍÑ•‘9…µ”ü¹Ñ…­•%˜ì¥Ğ¹¥Í9½Ñ	±…¹¬ ¤ô(€€€€€€€€€€€€üè‘¥É•Ñ½İ¹±½…‘9…µ•!¥¹Ğ¡ÕÉ°¤(€€€€€€€Ù…°ÁÉ½Ù¥Í¥½¹…±9…µ”€ô‘½İ¹±½…‘9…µ•!¥¹Ğ(€€€€€€€€€€€€üèUÉ¤¹‘•½‘”¡ÕÉ¤¹±…ÍÑA…Ñ¡M•µ•¹Ğ¹½ÉµÁÑä ¤¤¹Ñ…­•%˜ì¥Ğ¹¥Í9½Ñ	±…¹¬ ¤ô(€€€€€€€€€€€€üè€‰5•‘¥„‘½İ¹±½…ˆ(€€€€€€€½İ¹±½…‘-••Á±¥Ù•M•ÉÙ¥”¹ÑÉ…¬¡…ÁÁ½¹Ñ•áĞ°ÁÉ½Ù¥Í¥½¹…±%°ÁÉ½Ù¥Í¥½¹…±9…µ”¤((€€€€€€€Ù…°‘½İ¹±½…‘M•ÍÍ¥½¸€ô•­½M•ÍÍ¥½¸ (€€€€€€€€€€€•­½M•ÍÍ¥½¹M•ÑÑ¥¹Ì¹	Õ¥±‘•È¡Í½ÕÉ•M•ÑÑ¥¹Ì¤¹‰Õ¥± ¤(€€€€€€€€¤(€€€€€€€Ù…È¡…¹‘•‘=™˜€ô™…±Í”((€€€€€€€™Õ¸±½Í•½İ¹±½…‘M•ÍÍ¥½¸ ¤ì(€€€€€€€€€€€Ù…°±½Í•Ñ¥½¸€ôì(€€€€€€€€€€€€€€€…Ñ¥Ù•½İ¹±½…‘M•ÍÍ¥½¹Ì¹É•µ½Ù”¡‘½İ¹±½…‘M•ÍÍ¥½¸¤(€€€€€€€€€€€€€€€¥˜€¡‘½İ¹±½…‘M•ÍÍ¥½¸¹¥Í=Á•¸¤ì(€€€€€€€€€€€€€€€€€€€ÉÕ¹…Ñ¡¥¹œì‘½İ¹±½…‘M•ÍÍ¥½¸¹±½Í” ¤ô(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô(€€€€€€€€€€€¥˜€¡1½½Á•È¹µå1½½Á•È ¤€ôô1½½Á•È¹•Ñ5…¥¹1½½Á•È ¤¤ì(€€€€€€€€€€€€€€€±½Í•Ñ¥½¸ ¤(€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€µ…¥¹!…¹‘±•È¹Á½ÍĞ¡±½Í•Ñ¥½¸¤(€€€€€€€€€€€ô(€€€€€€€ô((€€€€€€€™Õ¸™…±±‰…¬ ¤ì(€€€€€€€€€€€¥˜€¡¡…¹‘•‘=™˜¤É•ÑÕÉ¸(€€€€€€€€€€€¡…¹‘•‘=™˜€ôÑÉÕ”(€€€€€€€€€€€±½Í•½İ¹±½…‘M•ÍÍ¥½¸ ¤(€€€€€€€€€€€Ù…°É•½É€ô•¹ÅÕ•Õ•9…Ù¥…Ñ¥½¸ (€€€€€€€€€€€€€€€ÕÉ°€ôÕÉ°°(€€€€€€€€€€€€€€€…±±½İ5•Ñ•É•€ô…±±½İ5•Ñ•É•°(€€€€€€€€€€€€€€€É•™•ÉÉ•È€ôÉ•™•ÉÉ•È°(€€€€€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ô¥ÍAÉ¥Ù…Ñ”°(€€€€€€€€€€€€€€€ÍÕ•ÍÑ•‘9…µ”€ô‘½İ¹±½…‘9…µ•!¥¹Ğ(€€€€€€€€€€€€¤(€€€€€€€€€€€¥˜€¡É•½É€„ô¹Õ±°¤ì(€€€€€€€€€€€€€€€½İ¹±½…‘-••Á±¥Ù•M•ÉÙ¥”¹É•Á±…”¡…ÁÁ½¹Ñ•áĞ°ÁÉ½Ù¥Í¥½¹…±%°É•½É¹¥°É•½É¹™¥±•9…µ”¤(€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€½İ¹±½…‘-••Á±¥Ù•M•ÉÙ¥”¹™¥¹¥Í ¡…ÁÁ½¹Ñ•áĞ°ÁÉ½Ù¥Í¥½¹…±%¤(€€€€€€€€€€€ô(€€€€€€€€€€€½¹I•½É‘Í¡…¹•ü¹¥¹Ù½­” ¤(€€€€€€€ô((€€€€€€€‘½İ¹±½…‘M•ÍÍ¥½¸¹Í•Ñ½¹Ñ•¹Ñ•±•…Ñ”¡½‰©•Ğ€è•­½M•ÍÍ¥½¸¹½¹Ñ•¹Ñ•±•…Ñ”ì(€€€€€€€€€€€½Ù•ÉÉ¥‘”™Õ¸½¹áÑ•É¹…±I•ÍÁ½¹Í”¡Í•ÍÍ¥½¸è•­½M•ÍÍ¥½¸°É•ÍÁ½¹Í”è]•‰I•ÍÁ½¹Í”¤ì(€€€€€€€€€€€€€€€¥˜€¡¡…¹‘•‘=™˜¤É•ÑÕÉ¸(€€€€€€€€€€€€€€€¡…¹‘•‘=™˜€ôÑÉÕ”(€€€€€€€€€€€€€€€Ù…°É•½É€ô•¹ÅÕ•Õ” (€€€€€€€€€€€€€€€€€€€É•ÍÁ½¹Í”€ôÉ•ÍÁ½¹Í”°(€€€€€€€€€€€€€€€€€€€…±±½İ5•Ñ•É•€ô…±±½İ5•Ñ•É•°(€€€€€€€€€€€€€€€€€€€É•™•ÉÉ•È€ôÉ•™•ÉÉ•È°(€€€€€€€€€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ô¥ÍAÉ¥Ù…Ñ”°(€€€€€€€€€€€€€€€€€€€ÍÕ•ÍÑ•‘9…µ”€ô‘½İ¹±½…‘9…µ•!¥¹Ğ°(€€€€€€€€€€€€€€€€€€€½¹¥¹¥Í¡•€ôì±½Í•½İ¹±½…‘M•ÍÍ¥½¸ ¤ô(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€½¹I•½É‘Í¡…¹•ü¹¥¹Ù½­” ¤(€€€€€€€€€€€€€€€¥˜€¡É•½É€„ô¹Õ±°¤ì(€€€€€€€€€€€€€€€€€€€½İ¹±½…‘-••Á±¥Ù•M•ÉÙ¥”¹É•Á±…”¡…ÁÁ½¹Ñ•áĞ°ÁÉ½Ù¥Í¥½¹…±%°É•½É¹¥°É•½É¹™¥±•9…µ”§]4ÒÚ$z{-®éÜj×           expanded += enrichMediaQualityFromUrl(item)
                     return@forEach
                 }
 
@@ -753,6 +237,7 @@ internal class DownloadController(
                 }
 
                 variants.take(MAX_HLS_QUALITY_VARIANTS).forEach { variant ->
+                    if (cancelled.get() || Thread.currentThread().isInterrupted) return@Thread
                     var candidate = item.copy(
                         url = variant.url,
                         width = variant.width.takeIf { it > 0 } ?: item.width,
@@ -770,6 +255,7 @@ internal class DownloadController(
                     // actual resolution one level deeper. Inspect unresolved children so the UI
                     // can show real 1080p/720p/etc. instead of a wall of "Auto" entries.
                     if (candidate.height <= 0) {
+                        if (cancelled.get() || Thread.currentThread().isInterrupted) return@Thread
                         val nested = runCatching {
                             val fetched = fetchHlsText(
                                 url = variant.url,
@@ -814,156 +300,10 @@ internal class DownloadController(
                 )
                 .distinctBy(::mediaQualityIdentity)
 
-            mainHandler.post { onResolved(resolved) }
-        }, "ILYRO-media-quality-resolver").start()
-    }
-
-    private fun mediaResolvePriority(kind: DetectedMediaKind): Int = when (kind) {
-        DetectedMediaKind.VIDEO -> 0
-        DetectedMediaKind.HLS -> 1
-        DetectedMediaKind.DASH -> 2
-        DetectedMediaKind.AUDIO -> 3
-    }
-
-    private fun enrichMediaQualityFromUrl(item: DetectedMedia): DetectedMedia {
-        if (item.height > 0 && item.width > 0) return item
-        val decoded = runCatching { Uri.decode(item.url) }.getOrDefault(item.url)
-        val dimensions = Regex(
-            "(?i)(?:^|[^0-9])(\\d{3,4})[xÃ—](\\d{3,4})(?:[^0-9]|$)"
-        ).find(decoded)
-        val inferredWidth = dimensions?.groupValues?.getOrNull(1)?.toIntOrNull()?.coerceAtLeast(0) ?: 0
-        val inferredHeightFromDimensions =
-            dimensions?.groupValues?.getOrNull(2)?.toIntOrNull()?.coerceAtLeast(0) ?: 0
-        val inferredHeight = inferredHeightFromDimensions.takeIf { it > 0 }
-            ?: Regex(
-                "(?i)(?:^|[/_.-])(4320|2160|1440|1080|900|720|576|540|480|360|240|144)p(?:[/_.?#&-]|$)"
-            ).find(decoded)?.groupValues?.getOrNull(1)?.toIntOrNull()
-            ?: Regex(
-                "(?i)(?:^|[/_.-])(4320|2160|1440|1080|900|720|576|540|480|360|240|144)(?:[/_.-]|$)"
-            ).find(decoded)?.groupValues?.getOrNull(1)?.toIntOrNull()
-            ?: 0
-
-        if (inferredHeight <= 0 && inferredWidth <= 0) return item
-        return item.copy(
-            width = item.width.takeIf { it > 0 } ?: inferredWidth,
-            height = item.height.takeIf { it > 0 } ?: inferredHeight
-        )
-    }
-
-    private fun mediaQualityIdentity(item: DetectedMedia): String {
-        return "${item.kind}|${MediaDetectorBridge.canonicalMediaIdentity(item.url)}"
-    }
-
-    /**
-     * Saves a common HLS VOD stream as one playable local file without bundling a media
-     * transcoder. MPEG-TS segments are concatenated into .ts; fragmented MP4 playlists with
-     * EXT-X-MAP are written as init + media fragments into .mp4. Master playlists select the
-     * highest advertised resolution/bandwidth variant unless the UI already supplied a variant.
-     *
-     * Segment downloads use a small bounded parallel window. HLS servers commonly cap the
-     * throughput of one request; four concurrent segment requests fill the connection better
-     * while preserving segment order and keeping cache usage bounded.
-     *
-     * Live, encrypted, and separate-audio HLS variants are rejected explicitly rather than
-     * producing a corrupt or silent file. Those formats need a real mux/decrypt pipeline.
-     */
-    fun enqueueHlsDownload(
-        url: String,
-        suggestedTitle: String?,
-        referrer: String?,
-        isPrivate: Boolean,
-        onRecordsChanged: (() -> Unit)? = null,
-        onError: ((String) -> Unit)? = null
-    ): Boolean {
-        val parsed = runCatching { Uri.parse(url) }.getOrNull() ?: return false
-        if (parsed.scheme?.lowercase() !in setOf("http", "https")) return false
-
-        val keepAliveToken = -System.nanoTime()
-        DownloadKeepAliveService.track(
-            appContext,
-            keepAliveToken,
-            suggestedTitle?.takeIf { it.isNotBlank() } ?: "Video download"
-        )
-
-        Thread({
-            var createdRecord: DownloadRecord? = null
-            var workerPool: java.util.concurrent.ExecutorService? = null
-            val temporarySegments = ConcurrentHashMap.newKeySet<File>()
-
-            fun reportError(message: String) {
+            if (!cancelled.get()) {
                 mainHandler.post {
-                    onRecordsChanged?.invoke()
-                    onError?.invoke(message)
-                }
-            }
-
-            try {
-                var playlistUrl = url
-                var playlistText = ""
-                var separateAudio = false
-                var depth = 0
-
-                // Follow nested master playlists, but keep a strict bound so malformed or cyclic
-                // manifests cannot keep a download worker alive forever.
-                while (true) {
-                    val fetched = fetchHlsText(playlistUrl, referrer, isPrivate)
-                    playlistUrl = fetched.first
-                    playlistText = fetched.second
-                    val variant = selectBestHlsVariant(playlistText, playlistUrl) ?: break
-                    separateAudio = separateAudio || variant.hasSeparateAudio
-                    depth += 1
-                    if (depth >= 3) error("Nested HLS master playlist is too deep")
-                    playlistUrl = variant.url
-                }
-
-                if (separateAudio) error("This HLS stream uses a separate audio track")
-
-                val playlist = parseHlsMediaPlaylist(playlistText, playlistUrl)
-                if (!playlist.isVod) error("Live HLS streams cannot be saved as a complete video yet")
-                if (playlist.hasUnsupportedEncryption) error("Encrypted HLS streams are not supported yet")
-
-                val extension = if (playlist.prefersMp4Container) "mp4" else "ts"
-                val mimeType = if (playlist.prefersMp4Container) "video/mp4" else "video/mp2t"
-                val fileName = buildHlsFileName(suggestedTitle, playlistUrl, extension)
-                val destination = createDestination(fileName, mimeType)
-                    ?: error("Could not create a Downloads destination")
-                val record = newDirectRecord(
-                    url = url,
-                    fileName = fileName,
-                    mimeType = mimeType,
-                    expectedBytes = -1L,
-                    destination = destination,
-                    referrer = referrer,
-                    isPrivate = isPrivate
-                )
-                createdRecord = record
-                addRecord(record)
-                // Switch the foreground-service token to the real record id so progress
-                // updates and completion all refer to the same single system notification.
-                DownloadKeepAliveService.replace(appContext, keepAliveToken, record.id, fileName)
-                mainHandler.post { onRecordsChanged?.invoke() }
-
-                val nextRangeOffset = mutableMapOf<String, Long>()
-                fun prepare(resource: HlsResource): PreparedHlsResource {
-                    val range = resource.byteRange?.let { requested ->
-                        val start = requested.offset ?: nextRangeOffset[resource.url] ?: 0L
-                        nextRangeOffset[resource.url] = start + requested.length
-                        start to (start + requested.length - 1L)
-                    }
-                    return PreparedHlsResource(resource, range)
-                }
-
-                val orderedResources = buildList {
-                    playlist.initSegment?.let { add(it) }
-                    addAll(playlist.segments)
-                }.map(::prepare)
-                if (orderedResources.isEmpty()) error("HLS playlist contains no downloadable media")
-
-                val receivedBytes = AtomicLong(0L)
-                val progressLock = Any()
-                val knownResourceBytes = AtomicLong(0L)
-                val knownResourceCount = AtomicInteger(0)
-                val exactRangeTotal = if (orderedResources.all { it.byteRange != null }) {
+                    if (!cancelled.get()) onResolved(resolved)
+         YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Ô€€€€€€ô(€€€€€€€€€€€ô(€€€€€€€ô°€‰%1eI<µµ•‘¥„µÅÕ…±¥ÑäµÉ•Í½±Ù•Èˆ¤¹…±Í¼ì¥Ğ¹ÍÑ…ÉĞ ¤ô(€€€€€€€É•ÑÕÉ¸ì(€€€€€€€€€€€…¹•±±•¹Í•Ğ¡ÑÉÕ”¤(€€€€€€€€€€€İ½É­•È¹¥¹Ñ•ÉÉÕÁĞ ¤(€€€€€€€ô(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸µ•‘¥…I•Í½±Ù•AÉ¥½É¥Ñä¡­¥¹è•Ñ•Ñ•‘5•‘¥…-¥¹¤è%¹Ğ€ôİ¡•¸€¡­¥¹¤ì(€€€€€€€•Ñ•Ñ•‘5•‘¥…-¥¹¹Y%<€´ø€À(€€€€€€€•Ñ•Ñ•‘5•‘¥…-¥¹¹!1L€´ø€Ä(€€€€€€€•Ñ•Ñ•‘5•‘¥…-¥¹¹M €´ø€È(€€€€€€€•Ñ•Ñ•‘5•‘¥…-¥¹¹U%<€´ø€Ì(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸•¹É¥¡5•‘¥…EÕ…±¥ÑåÉ½µUÉ°¡¥Ñ•´è•Ñ•Ñ•‘5•‘¥„¤è•Ñ•Ñ•‘5•‘¥„ì(€€€€€€€¥˜€¡¥Ñ•´¹¡•¥¡Ğ€ø€À€˜˜¥Ñ•´¹İ¥‘Ñ €ø€À¤É•ÑÕÉ¸¥Ñ•´(€€€€€€€Ù…°‘•½‘•€ôÉÕ¹…Ñ¡¥¹œìUÉ¤¹‘•½‘”¡¥Ñ•´¹ÕÉ°¤ô¹•Ñ=É•™…Õ±Ğ¡¥Ñ•´¹ÕÉ°¤(€€€€€€€Ù…°‘¥µ•¹Í¥½¹Ì€ôI••à (€€€€€€€€€€€€ˆ ı¤¤ üéyñmxÀ´åt¤¡qq‘ìÌ°Ñô¥mã]t¡qq‘ìÌ°Ñô¤ üémxÀ´åuğ¤ˆ(€€€€€€€€¤¹™¥¹¡‘•½‘•¤(€€€€€€€Ù…°¥¹™•ÉÉ•‘]¥‘Ñ €ô‘¥µ•¹Í¥½¹Ìü¹É½ÕÁY…±Õ•Ìü¹•Ñ=É9Õ±° Ä¤ü¹Ñ½%¹Ñ=É9Õ±° ¤ü¹½•É•Ñ1•…ÍĞ À¤€üè€À(€€€€€€€Ù…°¥¹™•ÉÉ•‘!•¥¡ÑÉ½µ¥µ•¹Í¥½¹Ì€ô(€€€€€€€€€€€‘¥µ•¹Í¥½¹Ìü¹É½ÕÁY…±Õ•Ìü¹•Ñ=É9Õ±° È¤ü¹Ñ½%¹Ñ=É9Õ±° ¤ü¹½•É•Ñ1•…ÍĞ À¤€üè€À(€€€€€€€Ù…°¥¹™•ÉÉ•‘!•¥¡Ğ€ô¥¹™•ÉÉ•‘!•¥¡ÑÉ½µ¥µ•¹Í¥½¹Ì¹Ñ…­•%˜ì¥Ğ€ø€Àô(€€€€€€€€€€€€üèI••à (€€€€€€€€€€€€€€€€ˆ ı¤¤ üéyñl½|¸µt¤ ĞÌÈÁğÈÄØÁğÄĞĞÁğÄÀàÁğäÀÁğÜÈÁğÔÜÙğÔĞÁğĞàÁğÌØÁğÈĞÁğÄĞĞ¥À üél½|¸üŒ˜µuğ¤ˆ(€€€€€€€€€€€€¤¹™¥¹¡‘•½‘•¤ü¹É½ÕÁY…±Õ•Ìü¹•Ñ=É9Õ±° Ä¤ü¹Ñ½%¹Ñ=É9Õ±° ¤(€€€€€€€€€€€€üèI••à (€€€€€€€€€€€€€€€€ˆ ı¤¤ üéyñl½|¸µt¤ ĞÌÈÁğÈÄØÁğÄĞĞÁğÄÀàÁğäÀÁğÜÈÁğÔÜÙğÔĞÁğĞàÁğÌØÁğÈĞÁğÄĞĞ¤ üél½|¸µuğ¤ˆ(€€€€€€€€€€€€¤¹™¥¹¡‘•½‘•¤ü¹É½ÕÁY…±Õ•Ìü¹•Ñ=É9Õ±° Ä¤ü¹Ñ½%¹Ñ=É9Õ±° ¤(€€€€€€€€€€€€üè€À((€€€€€€€¥˜€¡¥¹™•ÉÉ•‘!•¥¡Ğ€ğô€À€˜˜¥¹™•ÉÉ•‘]¥‘Ñ €ğô€À¤É•ÑÕÉ¸¥Ñ•´(€€€€€€€É•ÑÕÉ¸¥Ñ•´¹½Áä (€€€€€€€€€€€İ¥‘Ñ €ô¥Ñ•´¹İ¥‘Ñ ¹Ñ…­•%˜ì¥Ğ€ø€Àô€üè¥¹™•ÉÉ•‘]¥‘Ñ °(€€€€€€€€€€€¡•¥¡Ğ€ô¥Ñ•´¹¡•¥¡Ğ¹Ñ…­•%˜ì¥Ğ€ø€Àô€üè¥¹™•ÉÉ•‘!•¥¡Ğ(€€€€€€€€¤(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸µ•‘¥…EÕ…±¥Ñå%‘•¹Ñ¥Ñä¡¥Ñ•´è•Ñ•Ñ•‘5•‘¥„¤èMÑÉ¥¹œì(€€€€€€€É•ÑÕÉ¸€ˆ‘í¥Ñ•´¹­¥¹‘õğ‘í5•‘¥…•Ñ•Ñ½É	É¥‘”¹…¹½¹¥…±5•‘¥…%‘•¹Ñ¥Ñä¡¥Ñ•´¹ÕÉ°¥ôˆ(€€€ô((€€€€¼¨¨(€€€€€¨M…Ù•Ì„½µµ½¸!1LY=ÍÑÉ•…´…Ì½¹”Á±…å…‰±”±½…°™¥±”İ¥Ñ¡½ÕĞ‰Õ¹‘±¥¹œ„µ•‘¥„(€€€€€¨ÑÉ…¹Í½‘•È¸5AµQLÍ•µ•¹ÑÌ…É”½¹…Ñ•¹…Ñ•¥¹Ñ¼€¹ÑÌì™É…µ•¹Ñ•5@ĞÁ±…å±¥ÍÑÌİ¥Ñ (€€€€€¨aPµ`µ5@…É”İÉ¥ÑÑ•¸…Ì¥¹¥Ğ€¬µ•‘¥„™É…µ•¹ÑÌ¥¹Ñ¼€¹µÀĞ¸5…ÍÑ•ÈÁ±…å±¥ÍÑÌÍ•±•ĞÑ¡”(€€€€€¨¡¥¡•ÍĞ…‘Ù•ÉÑ¥Í•É•Í½±ÕÑ¥½¸½‰…¹‘İ¥‘Ñ Ù…É¥…¹ĞÕ¹±•ÍÌÑ¡”U$…±É•…‘äÍÕÁÁ±¥•„Ù…É¥…¹Ğ¸(€€€€€¨(€€€€€¨M•µ•¹Ğ‘½İ¹±½…‘ÌÕÍ”„Íµ…±°‰½Õ¹‘•Á…É…±±•°İ¥¹‘½Ü¸!1LÍ•ÉÙ•ÉÌ½µµ½¹±ä…ÀÑ¡”(€€€€€¨Ñ¡É½Õ¡ÁÕĞ½˜½¹”É•ÅÕ•ÍĞì™½ÕÈ½¹ÕÉÉ•¹ĞÍ•µ•¹ĞÉ•ÅÕ•ÍÑÌ™¥±°Ñ¡”½¹¹•Ñ¥½¸‰•ÑÑ•È(€€€€€¨İ¡¥±”ÁÉ•Í•ÉÙ¥¹œÍ•µ•¹Ğ½É‘•È…¹­••Á¥¹œ…¡”ÕÍ…”‰½Õ¹‘•¸(€€€€€¨(€€€€€¨1¥Ù”°•¹ÉåÁÑ•°…¹Í•Á…É…Ñ”µ…Õ‘¥¼!1LÙ…É¥…¹ÑÌ…É”É•©•Ñ••áÁ±¥¥Ñ±äÉ…Ñ¡•ÈÑ¡…¸(€€€€€¨ÁÉ½‘Õ¥¹œ„½ÉÉÕÁĞ½ÈÍ¥±•¹Ğ™¥±”¸Q¡½Í”™½Éµ…ÑÌ¹••„É•…°µÕà½‘•ÉåÁĞÁ¥Á•±¥¹”¸(€€€€€¨¼(€€€™Õ¸•¹ÅÕ•Õ•!±Í½İ¹±½… (€€€€€€€ÕÉ°èMÑÉ¥¹œ°(€€€€€€€ÍÕ•ÍÑ•‘Q¥Ñ±”èMÑÉ¥¹œü°(€€€€€€€É•™•ÉÉ•ÈèMÑÉ¥¹œü°(€€€€€€€¥ÍAÉ¥Ù…Ñ”è	½½±•…¸°(€€€€€€€…±±½İ5•Ñ•É•è	½½±•…¸°(€€€€€€€½¹I•½É‘Í¡…¹•è€  ¤€´øU¹¥Ğ¤ü€ô¹Õ±°°(€€€€€€€½¹ÉÉ½Èè€ ¡MÑÉ¥¹œ¤€´øU¹¥Ğ¤ü€ô¹Õ±°(€€€€¤è	½½±•…¸ì(€€€€€€€Ù…°Á…ÉÍ•€ôÉÕ¹…Ñ¡¥¹œìUÉ¤¹Á…ÉÍ”¡ÕÉ°¤ô¹•Ñ=É9Õ±° ¤€üèÉ•ÑÕÉ¸™…±Í”(€€€€€€€¥˜€¡Á…ÉÍ•¹Í¡•µ”ü¹±½İ•É…Í” ¤€…¥¸Í•Ñ=˜ ‰¡ÑÑÀˆ°€‰¡ÑÑÁÌˆ¤¤É•ÑÕÉ¸™…±Í”(€€€€€€€¥˜€ …¹•Ñİ½É­±±½İ•¡…±±½İ5•Ñ•É•¤¤É•ÑÕÉ¸™…±Í”((€€€€€€€Ù…°­••Á±¥Ù•Q½­•¸€ô€µMåÍÑ•´¹¹…¹½Q¥µ” ¤(€€€€€€€½İ¹±½…‘-••Á±¥Ù•M•ÉÙ¥”¹ÑÉ…¬ (€€€€€€€€€€€…ÁÁ½¹Ñ•áĞ°(€€€€€€€€€€€­••Á±¥Ù•Q½­•¸°(€€€€€€€€€€€ÍÕ•ÍÑ•‘Q¥Ñ±”ü¹Ñ…­•%˜ì¥Ğ¹¥Í9½Ñ	±…¹¬ ¤ô€üè€‰Y¥‘•¼‘½İ¹±½…ˆ(€€€€€€€€¤((€€€€€€€Q¡É•…¡ì(€€€€€€€€€€€Ù…ÈÉ•…Ñ•‘I•½Éè½İ¹±½…‘I•½Éü€ô¹Õ±°(€€€€€€€€€€€Ù…Èİ½É­•ÉA½½°è©…Ù„¹ÕÑ¥°¹½¹ÕÉÉ•¹Ğ¹á•ÕÑ½ÉM•ÉÙ¥”ü€ô¹Õ±°(€€€€€€€€€€€Ù…°Ñ•µÁ½É…ÉåM•µ•¹ÑÌ€ô½¹ÕÉÉ•¹Ñ!…Í¡5…À¹¹•İ-•åM•Ğñ¥±”ø ¤((€€€€€€€€€€€™Õ¸É•Á½ÉÑÉÉ½È¡µ•ÍÍ…”èMÑÉ¥¹œ¤ì(€€€€€€€€€€€€€€€µ…¥¹!…¹‘±•È¹Á½ÍĞì(€€€€€€€€€€€€€€€€€€€½¹I•½É‘Í¡…¹•ü¹¥¹Ù½­” ¤(€€€€€€€€€€€€€€€€€€€½¹ÉÉ½Èü¹¥¹Ù½­”¡µ•ÍÍ…”¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô((€€€€€€€€€€€ÑÉäì(€€€€€€€€€€€€€€€Ù…ÈÁ±…å±¥ÍÑUÉ°€ôÕÉ°(€€€€€€€€€€€€€€€Ù…ÈÁ±…å±¥ÍÑQ•áĞ€ô€ˆˆ(€€€€€€€€€€€€€€€Ù…ÈÍ•Á…É…Ñ•Õ‘¥¼€ô™…±Í”(€€€€€€€€€€€€€€€Ù…È‘•ÁÑ €ô€À((€€€€€€€€€€€€€€€€¼¼½±±½Ü¹•ÍÑ•µ…ÍÑ•ÈÁ±…å±¥ÍÑÌ°‰ÕĞ­••À„ÍÑÉ¥Ğ‰½Õ¹Í¼µ…±™½Éµ•½Èå±¥Œ(€€€€€€€€€€€€€€€€¼¼µ…¹¥™•ÍÑÌ…¹¹½Ğ­••À„‘½İ¹±½…İ½É­•È…±¥Ù”™½É•Ù•È¸(€€€€€€€€€€€€€€€İ¡¥±”€¡ÑÉÕ”¤ì(€€€€€€€€€€€€€€€€€€€Ù…°™•Ñ¡•€ô™•Ñ¡!±ÍQ•áĞ¡Á±…å±¥ÍÑUÉ°°É•™•ÉÉ•È°¥ÍAÉ¥Ù…Ñ”°…±±½İ5•Ñ•É•¤(€€€€€€€€€€€€€€€€€€€Á±…å±¥ÍÑUÉ°€ô™•Ñ¡•¹™¥ÉÍĞ(€€€€€€€€€€€€€€€€€€€Á±…å±¥ÍÑQ•áĞ€ô™•Ñ¡•¹Í•½¹(€€€€€€€€€€€€€€€€€€€Ù…°Ù…É¥…¹Ğ€ôÍ•±•Ñ	•ÍÑ!±ÍY…É¥…¹Ğ¡Á±…å±¥ÍÑS]4ÒÚ$z{-®éÜj×RangeTotal = if (orderedResources.all { it.byteRange != null }) {
                     orderedResources.sumOf { prepared ->
                         val range = prepared.byteRange!!
                         (range.second - range.first + 1L).coerceAtLeast(0L)
@@ -1036,7 +376,8 @@ internal class DownloadController(
                         url = prepared.resource.url,
                         referrer = referrer ?: playlistUrl,
                         isPrivate = isPrivate,
-                        byteRange = prepared.byteRange
+                        byteRange = prepared.byteRange,
+                        allowMetered = allowMetered
                     )
                     if (prepared.byteRange != null && response.statusCode != 206) {
                         runCatching { response.body?.close() }
@@ -1046,139 +387,7 @@ internal class DownloadController(
                     response.setReadTimeoutMillis(BODY_READ_TIMEOUT_MS)
                     val resourceLength = prepared.byteRange?.let { range ->
                         (range.second - range.first + 1L).coerceAtLeast(0L)
-                    } ?: header(response, "content-length")?.trim()?.toLongOrNull() ?: -1L
-                    registerResourceLength(resourceLength)
-                    activeHlsBodySet.add(body)
-
-                    val temp = File.createTempFile("ilyro-hls-", ".part", appContext.cacheDir)
-                    temporarySegments.add(temp)
-                    var bytes = 0L
-                    try {
-                        temp.outputStream().buffered(HLS_COPY_BUFFER_BYTES).use { output ->
-                            body.use { input ->
-                                val buffer = ByteArray(HLS_COPY_BUFFER_BYTES)
-                                while (true) {
-                                    if (cancelledIds.contains(record.id) || Thread.currentThread().isInterrupted) {
-                                        throw java.io.InterruptedIOException("Download cancelled")
-                                    }
-                                    if (!waitUntilResumed(record.id)) {
-                                        throw java.io.InterruptedIOException("Download cancelled")
-                                    }
-                                    val count = input.read(buffer)
-                                    if (count < 0) break
-                                    if (count == 0) continue
-                                    output.write(buffer, 0, count)
-                                    bytes += count
-                                    publishProgress(count)
-                                }
-                            }
-                        }
-                    } catch (error: Throwable) {
-                        temporarySegments.remove(temp)
-                        runCatching { temp.delete() }
-                        throw error
-                    } finally {
-                        activeHlsBodySet.remove(body)
-                    }
-                    if (resourceLength <= 0L) registerResourceLength(bytes)
-                    return BufferedHlsResource(temp)
-                }
-
-                val initialTotal = currentTotalBytes(0L)
-                liveTransfers[record.id] = LiveTransfer(0L, initialTotal, 0L)
-                notifyDownloadProgress(record.id, fileName, 0L, initialTotal)
-
-                val workerCount = minOf(HLS_PARALLEL_FETCHES, orderedResources.size).coerceAtLeast(1)
-                val pool = Executors.newFixedThreadPool(workerCount) { runnable ->
-                    Thread(runnable, "ILYRO-hls-segment").apply { isDaemon = true }
-                }
-                workerPool = pool
-                activeHlsPools[record.id] = pool
-
-                resolver.openOutputStream(destination, "w")?.use { output ->
-                    val pending = ArrayDeque<java.util.concurrent.Future<BufferedHlsResource>>()
-                    var nextResource = 0
-
-                    while (nextResource < workerCount) {
-                        val prepared = orderedResources[nextResource++]
-                        pending.addLast(pool.submit<BufferedHlsResource> { bufferResource(prepared) })
-                    }
-
-                    repeat(orderedResources.size) {
-                        if (cancelledIds.contains(record.id)) {
-                            throw java.io.InterruptedIOException("Download cancelled")
-                        }
-                        if (!waitUntilResumed(record.id)) {
-                            throw java.io.InterruptedIOException("Download cancelled")
-                        }
-                        val future = pending.removeFirst()
-                        val buffered = try {
-                            future.get()
-                        } catch (execution: java.util.concurrent.ExecutionException) {
-                            throw (execution.cause ?: execution)
-                        }
-
-                        buffered.file.inputStream().buffered(HLS_COPY_BUFFER_BYTES).use { input ->
-                            input.copyTo(output, HLS_COPY_BUFFER_BYTES)
-                        }
-                        temporarySegments.remove(buffered.file)
-                        runCatching { buffered.file.delete() }
-
-                        if (nextResource < orderedResources.size) {
-                            val prepared = orderedResources[nextResource++]
-                            pending.addLast(pool.submit<BufferedHlsResource> { bufferResource(prepared) })
-                        }
-                    }
-                    output.flush()
-                } ?: error("Could not open Downloads destination")
-
-                pool.shutdown()
-                activeHlsPools.remove(record.id, pool)
-                workerPool = null
-
-                if (cancelledIds.contains(record.id)) {
-                    throw java.io.InterruptedIOException("Download cancelled")
-                }
-                val copied = receivedBytes.get()
-                resolver.update(
-                    destination,
-                    ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) },
-                    null,
-                    null
-                )
-                markDirectSuccess(record.id, copied)
-                liveTransfers[record.id] = LiveTransfer(copied, copied, 0L)
-                notifyDownloadComplete(record.id, fileName, copied)
-                cancelledIds.remove(record.id)
-                mainHandler.post { onRecordsChanged?.invoke() }
-            } catch (error: Throwable) {
-                workerPool?.shutdownNow()
-                createdRecord?.let { record -> activeHlsPools.remove(record.id)?.shutdownNow() }
-                workerPool = null
-                val record = createdRecord
-                if (record != null) {
-                    activeHlsBodies.remove(record.id)?.forEach { stream -> runCatching { stream.close() } }
-                    liveTransfers.remove(record.id)
-                    cancelDownloadNotification(record.id)
-                    record.localUri?.let { runCatching { resolver.delete(Uri.parse(it), null, null) } }
-                    synchronized(recordLock) {
-                        saveRecordsUnsafe(restoreRecordsUnsafe().filterNot { it.id == record.id })
-                    }
-                    val wasCancelled = cancelledIds.remove(record.id)
-                    if (wasCancelled) {
-                        mainHandler.post { onRecordsChanged?.invoke() }
-                        return@Thread
-                    }
-                }
-                val root = (error as? java.util.concurrent.ExecutionException)?.cause ?: error
-                reportError(root.message?.takeIf { it.isNotBlank() } ?: "HLS video download failed")
-            } finally {
-                workerPool?.shutdownNow()
-                createdRecord?.let { record ->
-                    activeHlsPools.remove(record.id)?.shutdownNow()
-                    activeHlsBodies.remove(record.id)?.forEach { stream -> runCatching { stream.close() } }
-                }
-                temporarySegments.forEach { file -> runCatching { file.delete() } }
+                    } ?: header(response, "content-lengthYªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Ôˆ¤ü¹ÑÉ¥´ ¤ü¹Ñ½1½¹=É9Õ±° ¤€üè€´Å0(€€€€€€€€€€€€€€€€€€€É•¥ÍÑ•ÉI•Í½ÕÉ•1•¹Ñ ¡É•Í½ÕÉ•1•¹Ñ ¤(€€€€€€€€€€€€€€€€€€€…Ñ¥Ù•!±Í	½‘åM•Ğ¹…‘¡‰½‘ä¤((€€€€€€€€€€€€€€€€€€€Ù…°Ñ•µÀ€ô¥±”¹É•…Ñ•Q•µÁ¥±” ‰¥±åÉ¼µ¡±Ì´ˆ°€ˆ¹Á…ÉĞˆ°…ÁÁ½¹Ñ•áĞ¹…¡•¥È¤(€€€€€€€€€€€€€€€€€€€Ñ•µÁ½É…ÉåM•µ•¹ÑÌ¹…‘¡Ñ•µÀ¤(€€€€€€€€€€€€€€€€€€€Ù…È‰åÑ•Ì€ô€Á0(€€€€€€€€€€€€€€€€€€€ÑÉäì(€€€€€€€€€€€€€€€€€€€€€€€Ñ•µÀ¹½ÕÑÁÕÑMÑÉ•…´ ¤¹‰Õ™™•É•¡!1M}=Ae}	UI}	eQL¤¹ÕÍ”ì½ÕÑÁÕĞ€´ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€‰½‘ä¹ÕÍ”ì¥¹ÁÕĞ€´ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù…°‰Õ™™•È€ô	åÑ•ÉÉ…ä¡!1M}=Ae}	UI}	eQL¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€İ¡¥±”€¡ÑÉÕ”¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡…¹•±±•‘%‘Ì¹½¹Ñ…¥¹Ì¡É•½É¹¥¤ñğQ¡É•…¹ÕÉÉ•¹ÑQ¡É•… ¤¹¥Í%¹Ñ•ÉÉÕÁÑ•¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ¡É½Ü©…Ù„¹¥¼¹%¹Ñ•ÉÉÕÁÑ•‘%=á•ÁÑ¥½¸ ‰½İ¹±½……¹•±±•ˆ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥˜€ …İ…¥ÑU¹Ñ¥±I•ÍÕµ•¡É•½É¹¥¤¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ¡É½Ü©…Ù„¹¥¼¹%¹Ñ•ÉÉÕÁÑ•‘%=á•ÁÑ¥½¸ ‰½İ¹±½……¹•±±•ˆ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€É•ÅÕ¥É•9•Ñİ½É­±±½İ•¡…±±½İ5•Ñ•É•¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù…°½Õ¹Ğ€ô¥¹ÁÕĞ¹É•…¡‰Õ™™•È¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡½Õ¹Ğ€ğ€À¤‰É•…¬(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡½Õ¹Ğ€ôô€À¤½¹Ñ¥¹Õ”(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€½ÕÑÁÕĞ¹İÉ¥Ñ”¡‰Õ™™•È°€À°½Õ¹Ğ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€‰åÑ•Ì€¬ô½Õ¹Ğ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÁÕ‰±¥Í¡AÉ½É•ÍÌ¡½Õ¹Ğ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€ô…Ñ €¡•ÉÉ½ÈèQ¡É½İ…‰±”¤ì(€€€€€€€€€€€€€€€€€€€€€€€Ñ•µÁ½É…ÉåM•µ•¹ÑÌ¹É•µ½Ù”¡Ñ•µÀ¤(€€€€€€€€€€€€€€€€€€€€€€€ÉÕ¹…Ñ¡¥¹œìÑ•µÀ¹‘•±•Ñ” ¤ô(€€€€€€€€€€€€€€€€€€€€€€€Ñ¡É½Ü•ÉÉ½È(€€€€€€€€€€€€€€€€€€€ô™¥¹…±±äì(€€€€€€€€€€€€€€€€€€€€€€€…Ñ¥Ù•!±Í	½‘åM•Ğ¹É•µ½Ù”¡‰½‘ä¤(€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€¥˜€¡É•Í½ÕÉ•1•¹Ñ €ğô€Á0¤É•¥ÍÑ•ÉI•Í½ÕÉ•1•¹Ñ ¡‰åÑ•Ì¤(€€€€€€€€€€€€€€€€€€€É•ÑÕÉ¸	Õ™™•É•‘!±ÍI•Í½ÕÉ”¡Ñ•µÀ¤(€€€€€€€€€€€€€€€ô((€€€€€€€€€€€€€€€Ù…°¥¹¥Ñ¥…±Q½Ñ…°€ôÕÉÉ•¹ÑQ½Ñ…±	åÑ•Ì Á0¤(€€€€€€€€€€€€€€€±¥Ù•QÉ…¹Í™•ÉÍmÉ•½É¹¥‘t€ô1¥Ù•QÉ…¹Í™•È Á0°¥¹¥Ñ¥…±Q½Ñ…°°€Á0¤(€€€€€€€€€€€€€€€¹½Ñ¥™å½İ¹±½…‘AÉ½É•ÍÌ¡É•½É¹¥°™¥±•9…µ”°€Á0°¥¹¥Ñ¥…±Q½Ñ…°¤((€€€€€€€€€€€€€€€Ù…°İ½É­•É½Õ¹Ğ€ôµ¥¹=˜¡!1M}AI111}Q!L°½É‘•É•‘I•Í½ÕÉ•Ì¹Í¥é”¤¹½•É•Ñ1•…ÍĞ Ä¤(€€€€€€€€€€€€€€€Ù…°Á½½°€ôá•ÕÑ½ÉÌ¹¹•İ¥á•‘Q¡É•…‘A½½°¡İ½É­•É½Õ¹Ğ¤ìÉÕ¹¹…‰±”€´ø(€€€€€€€€€€€€€€€€€€€Q¡É•…¡ÉÕ¹¹…‰±”°€‰%1eI<µ¡±ÌµÍ•µ•¹Ğˆ¤¹…ÁÁ±äì¥Í…•µ½¸€ôÑÉÕ”ô(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€İ½É­•ÉA½½°€ôÁ½½°(€€€€€€€€€€€€€€€…Ñ¥Ù•!±ÍA½½±ÍmÉ•½É¹¥‘t€ôÁ½½°((€€€€€€€€€€€€€€€É•Í½±Ù•È¹½Á•¹=ÕÑÁÕÑMÑÉ•…´¡‘•ÍÑ¥¹…Ñ¥½¸°€‰Üˆ¤ü¹ÕÍ”ì½ÕÑÁÕĞ€´ø(€€€€€€€€€€€€€€€€€€€Ù…°Á•¹‘¥¹œ€ôÉÉ…å•ÅÕ”ñ©…Ù„¹ÕÑ¥°¹½¹ÕÉÉ•¹Ğ¹ÕÑÕÉ”ñ	Õ™™•É•‘!±ÍI•Í½ÕÉ”øø ¤(€€€€€€€€€€€€€€€€€€€Ù…È¹•áÑI•Í½ÕÉ”€ô€À((€€€€€€€€€€€€€€€€€€€İ¡¥±”€¡¹•áÑI•Í½ÕÉ”€ğİ½É­•É½Õ¹Ğ¤ì(€€€€€€€€€€€€€€€€€€€€€€€Ù…°ÁÉ•Á…É•€ô½É‘•É•‘I•Í½ÕÉ•Ím¹•áÑI•Í½ÕÉ”¬­t(€€€€€€€€€€€€€€€€€€€€€€€Á•¹‘¥¹œ¹…‘‘1…ÍĞ¡Á½½°¹ÍÕ‰µ¥Ğñ	Õ™™•É•‘!±ÍI•Í½ÕÉ”øì‰Õ™™•ÉI•Í½ÕÉ”¡ÁÉ•Á…É•¤ô¤(€€€€€€€€€€€€€€€€€€€ô((€€€€€€€€€€€€€€€€€€€É•Á•…Ğ¡½É‘•É•‘I•Í½ÕÉ•Ì¹Í¥é”¤ì(€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡…¹•±±•‘%‘Ì¹½¹Ñ…¥¹Ì¡É•½É¹¥¤¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ¡É½Ü©…Ù„¹¥¼¹%¹Ñ•ÉÉÕÁÑ•‘%=á•ÁÑ¥½¸ ‰½İ¹±½……¹•±±•ˆ¤(€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€¥˜€ …İ…¥ÑU¹Ñ¥±I•ÍÕµ•¡É•½É¹¥¤¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ¡É½Ü©…Ù„¹¥¼¹%¹Ñ•ÉÉÕÁÑ•‘%=á•ÁÑ¥½¸ ‰½İ¹±½……¹•±±•ˆ¤(€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€Ù…°™ÕÑÕÉ”€ôÁ•¹‘¥¹œ¹É•µ½Ù•¥ÉÍĞ ¤(€€€€€€€€€€€€€€€€€€€€€€€Ù…°‰Õ™™•É•€ôÑÉäì(€€€€€€€€€€€€€€€€€€€€€€€€€€€™ÕÑÕÉ”¹•Ğ ¤(€€€€€€€€€€€€€€€€€€€€€€€ô…Ñ €¡•á•ÕÑ¥½¸è©…Ù„¹ÕÑ¥°¹½¹ÕÉÉ•¹Ğ¹á•ÕÑ¥½¹á•ÁÑ¥½¸¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ¡É½Ü€¡•á•ÕÑ¥½¸¹…ÕÍ”€üè•á•ÕÑ¥½¸¤(€€€€€€€€€€€€€€€€€€€€€€€ô((€€€€€€€€€€€€€€€€€€€€€€€‰Õ™™•É•¹™¥±”¹¥¹ÁÕÑMÑÉ•…´ ¤¹‰Õ™™•É•¡!1M}=Ae}	UI}	eQL¤¹ÕÍ”ì¥¹ÁÕĞ€´ø(€€€€€€€€€€€€€€€€€€€€€€€€€€€¥¹ÁÕĞ¹½ÁåQ¼¡½ÕÑÁÕĞ°!1M}=Ae}	UI}	eQL¤(€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€Ñ•µÁ½É…ÉåM•µ•¹ÑÌ¹É•µ½Ù”¡‰Õ™™•É•¹™¥±”¤(€€€€€€€€€€€€€€€€€€€€€€€ÉÕ¹…Ñ¡¥¹œì‰Õ™™•É•¹™¥±”¹‘•±•Ñ” ¤ô((€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡¹•áÑI•Í½ÕÉ”€ğ½É‘•É•‘I•Í½ÕÉ•Ì¹Í¥é”¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù…°ÁÉ•Á…É•€ô½É‘•É•‘I•Í½ÕÉ•Ím¹•áÑI•Í½ÕÉ”¬­t(€€€€€€€€€€€€€€€€€€€€€€€€€€€Á•¹‘¥¹œ¹…‘‘1…ÍĞ¡Á½½°¹ÍÕ‰µ¥Ğñ	Õ™™•É•‘!±ÍI•Í½ÕÉ”øì‰Õ™™•ÉI•Í½ÕÉ”¡ÁÉ•Á…É•¤ô¤(€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€½ÕÑÁÕĞ¹™±ÕÍ  ¤(€€€€€€€€€€€€ƒ]4ÒÚ$z{-®éÜj×
                 temporarySegments.clear()
                 DownloadKeepAliveService.finish(appContext, createdRecord?.id ?: keepAliveToken)
             }
@@ -1189,9 +398,10 @@ internal class DownloadController(
     private fun fetchHlsText(
         url: String,
         referrer: String?,
-        isPrivate: Boolean
+        isPrivate: Boolean,
+        allowMetered: Boolean = true
     ): Pair<String, String> {
-        val response = fetchHlsResponse(url, referrer, isPrivate, null)
+        val response = fetchHlsResponse(url, referrer, isPrivate, null, allowMetered)
         val body = response.body ?: error("HLS playlist response has no body")
         response.setReadTimeoutMillis(BODY_READ_TIMEOUT_MS)
         val bytes = body.use { input ->
@@ -1199,6 +409,7 @@ internal class DownloadController(
             val buffer = ByteArray(32 * 1024)
             var total = 0
             while (true) {
+                requireNetworkAllowed(allowMetered)
                 val count = input.read(buffer)
                 if (count < 0) break
                 if (count == 0) continue
@@ -1215,8 +426,10 @@ internal class DownloadController(
         url: String,
         referrer: String?,
         isPrivate: Boolean,
-        byteRange: Pair<Long, Long>?
+        byteRange: Pair<Long, Long>?,
+        allowMetered: Boolean = true
     ): WebResponse {
+        requireNetworkAllowed(allowMetered)
         val request = WebRequest.Builder(url).apply {
             if (!referrer.isNullOrBlank() &&
                 (referrer.startsWith("http://") || referrer.startsWith("https://"))) {
@@ -1264,6 +477,7 @@ internal class DownloadController(
         val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return null
         val scheme = uri.scheme?.lowercase()
         if (scheme != "http" && scheme != "https") return null
+        if (!networkAllowed(allowMetered)) return null
 
         val nameHint = suggestedName?.takeIf { it.isNotBlank() }
             ?: directDownloadNameHint(url)
@@ -1281,211 +495,7 @@ internal class DownloadController(
                 expectedBytes = -1L,
                 allowMetered = allowMetered,
                 referrer = referrer,
-                isPrivate = isPrivate
-            )
-            if (geckoDownload != null) return geckoDownload
-        }
-
-        return enqueueUrl(
-            url = url,
-            fileName = fileName,
-            mimeType = mimeType,
-            allowMetered = allowMetered,
-            referrer = referrer,
-            isPrivate = isPrivate
-        )
-    }
-
-    private fun enqueueResponseBody(
-        url: String,
-        fileName: String,
-        mimeType: String?,
-        expectedBytes: Long,
-        body: InputStream,
-        allowMetered: Boolean,
-        referrer: String?,
-        isPrivate: Boolean,
-        onFinished: (() -> Unit)? = null
-    ): DownloadRecord? {
-        val destination = createDestination(fileName, mimeType) ?: return null
-        val record = newDirectRecord(
-            url,
-            fileName,
-            mimeType,
-            expectedBytes,
-            destination,
-            referrer,
-            isPrivate
-        )
-        addRecord(record)
-        DownloadKeepAliveService.track(appContext, record.id, fileName)
-        writeBody(
-            id = record.id,
-            destination = destination,
-            body = body,
-            fileName = fileName,
-            totalBytes = expectedBytes,
-            onFinished = onFinished
-        ) {
-            retryAfterDirectFailure(
-                failedId = record.id,
-                failedDestination = destination,
-                url = url,
-                fileName = fileName,
-                mimeType = mimeType,
-                expectedBytes = expectedBytes,
-                allowMetered = allowMetered,
-                referrer = referrer,
-                isPrivate = isPrivate,
-                retryWithGecko = true
-            )
-        }
-        return record
-    }
-
-    private fun enqueueGeckoFetch(
-        url: String,
-        fileName: String,
-        mimeType: String?,
-        expectedBytes: Long,
-        allowMetered: Boolean,
-        referrer: String?,
-        isPrivate: Boolean
-    ): DownloadRecord? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null
-        val uri = Uri.parse(url)
-        if (uri.scheme != "http" && uri.scheme != "https") return null
-
-        val destination = createDestination(fileName, mimeType) ?: return null
-        val record = newDirectRecord(
-            url,
-            fileName,
-            mimeType,
-            expectedBytes,
-            destination,
-            referrer,
-            isPrivate
-        )
-        addRecord(record)
-        DownloadKeepAliveService.track(appContext, record.id, fileName)
-
-        val request = WebRequest.Builder(url).apply {
-            if (!referrer.isNullOrBlank() &&
-                (referrer.startsWith("http://") || referrer.startsWith("https://"))) {
-                this.referrer(referrer)
-            }
-        }.build()
-        val flags = if (isPrivate) {
-            GeckoWebExecutor.FETCH_FLAGS_PRIVATE
-        } else {
-            GeckoWebExecutor.FETCH_FLAGS_NONE
-        }
-
-        fun fallbackToSystem() {
-            if (cancelledIds.contains(record.id)) return
-            retryAfterDirectFailure(
-                failedId = record.id,
-                failedDestination = destination,
-                url = url,
-                fileName = fileName,
-                mimeType = mimeType,
-                expectedBytes = expectedBytes,
-                allowMetered = allowMetered,
-                referrer = referrer,
-                isPrivate = isPrivate,
-                retryWithGecko = false
-            )
-        }
-
-        runCatching {
-            executor.fetch(request, flags).accept(
-                { fetched ->
-                    val fetchedBody = fetched?.body
-                    if (fetched == null || fetched.statusCode !in 200..299 || fetchedBody == null) {
-                        runCatching { fetchedBody?.close() }
-                        fallbackToSystem()
-                    } else {
-                        fetched.setReadTimeoutMillis(BODY_READ_TIMEOUT_MS)
-                        val fetchedLength = header(fetched, "content-length")
-                            ?.trim()
-                            ?.toLongOrNull()
-                            ?: expectedBytes
-                        updateExpectedBytes(record.id, fetchedLength)
-                        writeBody(
-                            id = record.id,
-                            destination = destination,
-                            body = fetchedBody,
-                            fileName = fileName,
-                            totalBytes = fetchedLength
-                        ) { fallbackToSystem() }
-                    }
-                },
-                { _ -> fallbackToSystem() }
-            )
-        }.onFailure {
-            fallbackToSystem()
-        }
-
-        return record
-    }
-
-    private fun looksLikeApkArchive(destination: Uri): Boolean {
-        return runCatching {
-            val input = resolver.openInputStream(destination) ?: return@runCatching false
-            input.use { raw ->
-                val inputStream = BufferedInputStream(raw, 64 * 1024)
-                val signature = ByteArray(4)
-                var signatureRead = 0
-                while (signatureRead < signature.size) {
-                    val count = inputStream.read(signature, signatureRead, signature.size - signatureRead)
-                    if (count < 0) break
-                    if (count == 0) continue
-                    signatureRead += count
-                }
-                val isZip = signatureRead == 4 &&
-                    signature[0] == 0x50.toByte() && signature[1] == 0x4B.toByte() &&
-                    ((signature[2] == 0x03.toByte() && signature[3] == 0x04.toByte()) ||
-                     (signature[2] == 0x05.toByte() && signature[3] == 0x06.toByte()) ||
-                     (signature[2] == 0x07.toByte() && signature[3] == 0x08.toByte()))
-                if (!isZip) return@use false
-
-                val needle = "AndroidManifest.xml".toByteArray(Charsets.US_ASCII)
-                var matched = 0
-                val buffer = ByteArray(64 * 1024)
-                while (true) {
-                    val count = inputStream.read(buffer)
-                    if (count < 0) break
-                    for (index in 0 until count) {
-                        val value = buffer[index]
-                        if (value == needle[matched]) {
-                            matched += 1
-                            if (matched == needle.size) return@use true
-                        } else {
-                            matched = if (value == needle[0]) 1 else 0
-                        }
-                    }
-                }
-                false
-            }
-        }.getOrDefault(false)
-    }
-
-    private fun promoteGenericBinaryToApk(
-        id: Long,
-        destination: Uri,
-        fileName: String
-    ): String {
-        val extension = fileName.substringAfterLast('.', "").lowercase()
-        if (extension !in setOf("", "bin", "dat")) return fileName
-        if (!looksLikeApkArchive(destination)) return fileName
-
-        val base = if (extension.isBlank()) {
-            fileName
-        } else {
-            fileName.substringBeforeLast('.', fileName)
-        }.ifBlank { "download" }
-        val apkName = "$base.apk"
-        val values = ContentValues().apply {
+                isPrivatYªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Õ”€ô¥ÍAÉ¥Ù…Ñ”(€€€€€€€€€€€€¤(€€€€€€€€€€€¥˜€¡•­½½İ¹±½…€„ô¹Õ±°¤É•ÑÕÉ¸•­½½İ¹±½…(€€€€€€€ô((€€€€€€€É•ÑÕÉ¸•¹ÅÕ•Õ•UÉ° (€€€€€€€€€€€ÕÉ°€ôÕÉ°°(€€€€€€€€€€€™¥±•9…µ”€ô™¥±•9…µ”°(€€€€€€€€€€€µ¥µ•QåÁ”€ôµ¥µ•QåÁ”°(€€€€€€€€€€€…±±½İ5•Ñ•É•€ô…±±½İ5•Ñ•É•°(€€€€€€€€€€€É•™•ÉÉ•È€ôÉ•™•ÉÉ•È°(€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ô¥ÍAÉ¥Ù…Ñ”(€€€€€€€€¤(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸•¹ÅÕ•Õ•I•ÍÁ½¹Í•	½‘ä (€€€€€€€ÕÉ°èMÑÉ¥¹œ°(€€€€€€€™¥±•9…µ”èMÑÉ¥¹œ°(€€€€€€€µ¥µ•QåÁ”èMÑÉ¥¹œü°(€€€€€€€•áÁ•Ñ•‘	åÑ•Ìè1½¹œ°(€€€€€€€‰½‘äè%¹ÁÕÑMÑÉ•…´°(€€€€€€€…±±½İ5•Ñ•É•è	½½±•…¸°(€€€€€€€É•™•ÉÉ•ÈèMÑÉ¥¹œü°(€€€€€€€¥ÍAÉ¥Ù…Ñ”è	½½±•…¸°(€€€€€€€½¹¥¹¥Í¡•è€  ¤€´øU¹¥Ğ¤ü€ô¹Õ±°(€€€€¤è½İ¹±½…‘I•½Éüì(€€€€€€€Ù…°‘•ÍÑ¥¹…Ñ¥½¸€ôÉ•…Ñ••ÍÑ¥¹…Ñ¥½¸¡™¥±•9…µ”°µ¥µ•QåÁ”¤€üèÉ•ÑÕÉ¸¹Õ±°(€€€€€€€Ù…°É•½É€ô¹•İ¥É•ÑI•½É (€€€€€€€€€€€ÕÉ°°(€€€€€€€€€€€™¥±•9…µ”°(€€€€€€€€€€€µ¥µ•QåÁ”°(€€€€€€€€€€€•áÁ•Ñ•‘	åÑ•Ì°(€€€€€€€€€€€‘•ÍÑ¥¹…Ñ¥½¸°(€€€€€€€€€€€É•™•ÉÉ•È°(€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”°(€€€€€€€€€€€…±±½İ5•Ñ•É•(€€€€€€€€¤(€€€€€€€…‘‘I•½É¡É•½É¤(€€€€€€€½İ¹±½…‘-••Á±¥Ù•M•ÉÙ¥”¹ÑÉ…¬¡…ÁÁ½¹Ñ•áĞ°É•½É¹¥°™¥±•9…µ”¤(€€€€€€€İÉ¥Ñ•	½‘ä (€€€€€€€€€€€¥€ôÉ•½É¹¥°(€€€€€€€€€€€‘•ÍÑ¥¹…Ñ¥½¸€ô‘•ÍÑ¥¹…Ñ¥½¸°(€€€€€€€€€€€‰½‘ä€ô‰½‘ä°(€€€€€€€€€€€™¥±•9…µ”€ô™¥±•9…µ”°(€€€€€€€€€€€Ñ½Ñ…±	åÑ•Ì€ô•áÁ•Ñ•‘	åÑ•Ì°(€€€€€€€€€€€…±±½İ5•Ñ•É•€ô…±±½İ5•Ñ•É•°(€€€€€€€€€€€½¹¥¹¥Í¡•€ô½¹¥¹¥Í¡•(€€€€€€€€¤ì(€€€€€€€€€€€É•ÑÉå™Ñ•É¥É•Ñ…¥±ÕÉ” (€€€€€€€€€€€€€€€™…¥±•‘%€ôÉ•½É¹¥°(€€€€€€€€€€€€€€€™…¥±•‘•ÍÑ¥¹…Ñ¥½¸€ô‘•ÍÑ¥¹…Ñ¥½¸°(€€€€€€€€€€€€€€€ÕÉ°€ôÕÉ°°(€€€€€€€€€€€€€€€™¥±•9…µ”€ô™¥±•9…µ”°(€€€€€€€€€€€€€€€µ¥µ•QåÁ”€ôµ¥µ•QåÁ”°(€€€€€€€€€€€€€€€•áÁ•Ñ•‘	åÑ•Ì€ô•áÁ•Ñ•‘	åÑ•Ì°(€€€€€€€€€€€€€€€…±±½İ5•Ñ•É•€ô…±±½İ5•Ñ•É•°(€€€€€€€€€€€€€€€É•™•ÉÉ•È€ôÉ•™•ÉÉ•È°(€€€€€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ô¥ÍAÉ¥Ù…Ñ”°(€€€€€€€€€€€€€€€É•ÑÉå]¥Ñ¡•­¼€ôÑÉÕ”(€€€€€€€€€€€€¤(€€€€€€€ô(€€€€€€€É•ÑÕÉ¸É•½É(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸•¹ÅÕ•Õ••­½•Ñ  (€€€€€€€ÕÉ°èMÑÉ¥¹œ°(€€€€€€€™¥±•9…µ”èMÑÉ¥¹œ°(€€€€€€€µ¥µ•QåÁ”èMÑÉ¥¹œü°(€€€€€€€•áÁ•Ñ•‘	åÑ•Ìè1½¹œ°(€€€€€€€…±±½İ5•Ñ•É•è	½½±•…¸°(€€€€€€€É•™•ÉÉ•ÈèMÑÉ¥¹œü°(€€€€€€€¥ÍAÉ¥Ù…Ñ”è	½½±•…¸(€€€€¤è½İ¹±½…‘I•½Éüì(€€€€€€€¥˜€¡	Õ¥±¹YIM%=8¹M-}%9P€ğ	Õ¥±¹YIM%=9}=L¹D¤É•ÑÕÉ¸¹Õ±°(€€€€€€€Ù…°ÕÉ¤€ôUÉ¤¹Á…ÉÍ”¡ÕÉ°¤(€€€€€€€¥˜€¡ÕÉ¤¹Í¡•µ”€„ô€‰¡ÑÑÀˆ€˜˜ÕÉ¤¹Í¡•µ”€„ô€‰¡ÑÑÁÌˆ¤É•ÑÕÉ¸¹Õ±°(€€€€€€€¥˜€ …¹•Ñİ½É­±±½İ•¡…±±½İ5•Ñ•É•¤¤É•ÑÕÉ¸¹Õ±°((€€€€€€€Ù…°‘•ÍÑ¥¹…Ñ¥½¸€ôÉ•…Ñ••ÍÑ¥¹…Ñ¥½¸¡™¥±•9…µ”°µ¥µ•QåÁ”¤€üèÉ•ÑÕÉ¸¹Õ±°(€€€€€€€Ù…°É•½É€ô¹•İ¥É•ÑI•½É (€€€€€€€€€€€ÕÉ°°(€€€€€€€€€€€™¥±•9…µ”°(€€€€€€€€€€€µ¥µ•QåÁ”°(€€€€€€€€€€€•áÁ•Ñ•‘	åÑ•Ì°(€€€€€€€€€€€‘•ÍÑ¥¹…Ñ¥½¸°(€€€€€€€€€€€É•™•ÉÉ•È°(€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”°(€€€€€€€€€€€…±±½İ5•Ñ•É•(€€€€€€€€¤(€€€€€€€…‘‘I•½É¡É•½É¤(€€€€€€€½İ¹±½…‘-••Á±¥Ù•M•ÉÙ¥”¹ÑÉ…¬¡…ÁÁ½¹Ñ•áĞ°É•½É¹¥°™¥±•9…µ”¤((€€€€€€€Ù…°É•ÅÕ•ÍĞ€ô]•‰I•ÅÕ•ÍĞ¹	Õ¥±‘•È¡ÕÉ°¤¹…ÁÁ±äì(€€€€€€€€€€€¥˜€ …É•™•ÉÉ•È¹¥Í9Õ±±=É	±…¹¬ ¤€˜˜(€€€€€€€€€€€€€€€€¡É•™•ÉÉ•È¹ÍÑ…ÉÑÍ]¥Ñ  ‰¡ÑÑÀè¼¼ˆ¤ñğÉ•™•ÉÉ•È¹ÍÑ…ÉÑÍ]¥Ñ  ‰¡ÑÑÁÌè¼¼ˆ¤¤¤ì(€€€€€€€€€€€€€€€Ñ¡¥Ì¹É•™•ÉÉ•È¡É•™•ÉÉ•È¤(€€€€€€€€€€€ô(€€€€€€€ô¹‰Õ¥± ¤(€€€€€€€Ù…°™±…Ì€ô¥˜€¡¥ÍAÉ¥Ù…Ñ”¤ì(€€€€€€€€€€€•­½]•‰á•ÕÑ½È¹Q!}1M}AI%YQ(€€€€€€€ô•±Í”ì(€€€€€€€€€€€•­½]•‰á•ÕÑ½È¹Q!}1M}9=9(€€€€€€€ô((€€€€€€€™Õ¸™…±±‰…­Q½MåÍÑ•´ ¤ì(€€€€€€€€€€€¥˜€¡…¹•±±•‘%‘Ì¹½¹Ñ…¥¹Ì¡É•½É¹¥¤¤É•ÑÕÉ¸(€€€€€€€€€€€É•ÑÉå™Ñ•É¥É•Ñ…¥±ÕÉ” (€€€€€€€€€€€€€€€™…¥±•‘%€ôÉ•½É¹¥°(€€€€€€€€€€€€€€€™…¥±•‘•ÍÑ¥¹…Ñ¥½¸€ô‘•ÍÑ¥¹…Ñ¥½¸°(€€€€€€€€€€€€€€€ÕÉ°€ôÕÉ°°(€€€€€€€€€€€€€€€™¥±•9…µ”€ô™¥±•9…µ”°(€€€€€€€€€€€€€€€µ¥µ•QåÁ”€ôµ¥µ•QåÁ”°(€€€€€€€€€€€€€€€•áÁ•Ñ•‘	åÑ•Ì€ô•áÁ•Ñ•‘	åÑ•Ì°(€€€€€€€€€€€€€€€…±±½İ5•Ñ•É•€ô…±±½İ5•Ñ•É•°(€€€€€€€€€€€€€€€É•™•ÉÉ•È€ôÉ•™•ÉÉ•È°(€€€€€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ô¥ÍAÉ¥Ù…Ñ”°(€€€€€€€€€€€€€€€É•ÑÉå]¥Ñ¡•­¼€ô™…±Í”(€€€€€€€€€€€€¤(€€€€€€€ô((€€€€€€€ÉÕ¹…Ñ¡¥¹œì(€€€€€€€€€€€•á•ÕÑ½È¹™•Ñ ¡É•ÅÕ•ÍĞ°™±…Ì¤¹…•ÁĞ (€€€€€€€€€€€€€€€ì™•Ñ¡•€´ø(€€€€€€€€€€€€€€€€€€€Ù…°™•Ñ¡•‘	½‘ä€ô™•Ñ¡•ü¹‰½‘ä(€€€€€€€€€€€€€€€€€€€¥˜€¡™•Ñ¡•€ôô¹Õ±°ñğ™•Ñ¡•¹ÍÑ…ÑÕÍ½‘”€…¥¸€ÈÀÀ¸¸Èääñğ™•Ñ¡•‘	½‘ä€ôô¹Õ±°¤ì(€€€€€€€€€€€€€€€€€€€€€€€ÉÕ¹…Ñ¡¥¹œì™•Ñ¡•‘	½‘äü¹±½Í” ¤ô(€€€€€€€€€€€€€€€€€€€€€€€™…±±‰…­Q½MåÍÑ•´ ¤(€€€€€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€€€€€™•Ñ¡•¹Í•ÑI•…‘Q¥µ•½ÕÑ5¥±±¥Ì¡	=e}I}Q%5=UQ}5L¤(€€€€€€€€€€€€€€€€€€€€€€€Ù…°™•Ñ¡•‘1•¹Ñ €ô¡•…‘•È¡™•Ñ¡•°€‰½¹Ñ•¹Ğµ±•¹Ñ ˆ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ü¹ÑÉ¥´ ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€ü¹Ñ½1½¹=É9Õ±° ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€üè•áÁ•Ñ•‘	åÑ•Ì(€€€€€€€€€€€€€€€€€€€€€€€ÕÁ‘…Ñ•áÁ•Ñ•‘	åÑ•Ì¡É•½É¹¥°™•Ñ¡•‘1•¹Ñ ¤(€€€€€€€€€€€€€€€€€€€€€€€İÉ¥Ñ•	½‘ä (€€€€€€€€€€€€€€€€€€€€€€€€€€€¥€ôÉ•½É¹¥°(€€€€€ƒ]4ÒÚ$z{-®éÜj×lues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, apkName)
             put(MediaStore.Downloads.MIME_TYPE, APK_MIME_TYPE)
         }
@@ -1548,7 +558,9 @@ internal class DownloadController(
         expectedBytes: Long,
         destination: Uri,
         referrer: String?,
-        isPrivate: Boolean
+        isPrivate: Boolean,
+        allowMetered: Boolean,
+        isHls: Boolean = false
     ) = DownloadRecord(
         id = -System.nanoTime(),
         sourceUrl = url,
@@ -1559,7 +571,9 @@ internal class DownloadController(
         expectedBytes = expectedBytes,
         directState = DIRECT_RUNNING,
         referrer = referrer,
-        isPrivate = isPrivate
+        isPrivate = isPrivate,
+        allowMetered = allowMetered,
+        isHls = isHls
     )
 
     private fun writeBody(
@@ -1568,6 +582,7 @@ internal class DownloadController(
         body: InputStream,
         fileName: String,
         totalBytes: Long,
+        allowMetered: Boolean,
         startingBytes: Long = 0L,
         append: Boolean = false,
         onFinished: (() -> Unit)? = null,
@@ -1588,6 +603,7 @@ internal class DownloadController(
                 if (cancelledIds.contains(id)) {
                     throw java.io.InterruptedIOException("Download cancelled")
                 }
+                requireNetworkAllowed(allowMetered)
                 notifyDownloadProgress(id, fileName, copied, totalBytes)
                 resolver.openOutputStream(destination, if (append) "wa" else "w")?.use { output ->
                     body.use { input ->
@@ -1597,141 +613,7 @@ internal class DownloadController(
                                 throw java.io.InterruptedIOException("Download cancelled")
                             }
                             if (!waitUntilResumed(id)) {
-                                throw java.io.InterruptedIOException("Download cancelled")
-                            }
-                            val count = input.read(buffer)
-                            if (count < 0) break
-                            if (count == 0) continue
-                            output.write(buffer, 0, count)
-                            copied += count
-
-                            val now = android.os.SystemClock.elapsedRealtime()
-                            val elapsed = now - lastSpeedAt
-                            if (elapsed >= 500L) {
-                                val instant = ((copied - lastSpeedBytes).coerceAtLeast(0L) * 1000L / elapsed.coerceAtLeast(1L))
-                                speedBytesPerSecond = if (speedBytesPerSecond <= 0L) {
-                                    instant
-                                } else {
-                                    (speedBytesPerSecond * 3L + instant) / 4L
-                                }
-                                lastSpeedAt = now
-                                lastSpeedBytes = copied
-                            }
-                            liveTransfers[id] = LiveTransfer(copied, totalBytes, speedBytesPerSecond)
-
-                            if (now - lastNotificationAt >= 500L) {
-                                notifyDownloadProgress(id, fileName, copied, totalBytes)
-                                lastNotificationAt = now
-                            }
-                        }
-                        output.flush()
-                    }
-                } ?: error("Could not open Downloads destination")
-
-                if (cancelledIds.contains(id)) {
-                    throw java.io.InterruptedIOException("Download cancelled")
-                }
-                completedFileName = promoteGenericBinaryToApk(id, destination, fileName)
-                validateCompletedPayload(completedFileName, destination)
-                val done = ContentValues().apply {
-                    put(MediaStore.Downloads.IS_PENDING, 0)
-                }
-                resolver.update(destination, done, null, null)
-                pausedIds.remove(id)
-                markDirectSuccess(id, copied)
-                liveTransfers[id] = LiveTransfer(copied, copied, 0L)
-                notifyDownloadComplete(id, completedFileName, copied)
-                cancelledIds.remove(id)
-                runCatching { onFinished?.invoke() }
-            } catch (error: Throwable) {
-                runCatching { body.close() }
-                val cancelled = cancelledIds.remove(id)
-                cancelDownloadNotification(id)
-                runCatching { onFinished?.invoke() }
-                if (cancelled) {
-                    pausedIds.remove(id)
-                    runCatching { resolver.delete(destination, null, null) }
-                } else if (error is InvalidDownloadPayloadException) {
-                    pausedIds.remove(id)
-                    markDirectFailed(id, destination)
-                    notifyDownloadFailed(id, completedFileName)
-                } else if (onFailure != null) {
-                    pausedIds.remove(id)
-                    onFailure()
-                } else {
-                    pausedIds.remove(id)
-                    markDirectFailed(id, destination)
-                    notifyDownloadFailed(id, completedFileName)
-                }
-            } finally {
-                DownloadKeepAliveService.finish(appContext, id)
-                activeBodies.remove(id)
-                wakePaused(id)
-                pauseLocks.remove(id)
-                if (cancelledIds.contains(id)) cancelledIds.remove(id)
-                if (liveTransfers[id]?.downloadedBytes == copied &&
-                    liveTransfers[id]?.speedBytesPerSecond != 0L) {
-                    liveTransfers[id] = liveTransfers[id]!!.copy(speedBytesPerSecond = 0L)
-                }
-            }
-        }, "ILYRO-download-${kotlin.math.abs(id)}").start()
-    }
-
-    private fun waitUntilResumed(id: Long): Boolean {
-        if (!pausedIds.contains(id)) return !cancelledIds.contains(id)
-        val lock = pauseLocks.computeIfAbsent(id) { java.lang.Object() }
-        synchronized(lock) {
-            while (pausedIds.contains(id) && !cancelledIds.contains(id)) {
-                try {
-                    lock.wait(1000L)
-                } catch (_: InterruptedException) {
-                    Thread.currentThread().interrupt()
-                    return false
-                }
-            }
-        }
-        return !cancelledIds.contains(id)
-    }
-
-    private fun wakePaused(id: Long) {
-        pauseLocks[id]?.let { lock ->
-            synchronized(lock) { lock.notifyAll() }
-        }
-    }
-
-    private fun pause(id: Long): Boolean {
-        val record = synchronized(recordLock) {
-            restoreRecordsUnsafe().firstOrNull { it.id == id }
-        } ?: return false
-        if (record.localUri == null || record.directState != DIRECT_RUNNING) return false
-
-        pausedIds.add(id)
-        updateDirectState(id, DIRECT_PAUSED)
-        liveTransfers.computeIfPresent(id) { _, live -> live.copy(speedBytesPerSecond = 0L) }
-        DownloadKeepAliveService.setPaused(id, true)
-        return true
-    }
-
-    fun pause(item: DownloadUiItem): Boolean = pause(item.record.id)
-
-    private fun resume(id: Long): Boolean {
-        val record = synchronized(recordLock) {
-            restoreRecordsUnsafe().firstOrNull { it.id == id }
-        } ?: return false
-        if (record.localUri == null || record.directState != DIRECT_PAUSED) return false
-
-        pausedIds.remove(id)
-        updateDirectState(id, DIRECT_RUNNING)
-        if (!DownloadKeepAliveService.track(appContext, id, record.fileName)) {
-            pausedIds.add(id)
-            updateDirectState(id, DIRECT_PAUSED)
-            liveTransfers.computeIfPresent(id) { _, live -> live.copy(speedBytesPerSecond = 0L) }
-            return false
-        }
-        DownloadKeepAliveService.setPaused(id, false)
-        wakePaused(id)
-
-        val liveWorker = activeBodies.containsKey(id) ||
+                   YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Ô€€€€€€€€€€€€Ñ¡É½Ü©…Ù„¹¥¼¹%¹Ñ•ÉÉÕÁÑ•‘%=á•ÁÑ¥½¸ ‰½İ¹±½……¹•±±•ˆ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€É•ÅÕ¥É•9•Ñİ½É­±±½İ•¡…±±½İ5•Ñ•É•¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù…°½Õ¹Ğ€ô¥¹ÁÕĞ¹É•…¡‰Õ™™•È¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡½Õ¹Ğ€ğ€À¤‰É•…¬(€€€€€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡½Õ¹Ğ€ôô€À¤½¹Ñ¥¹Õ”(€€€€€€€€€€€€€€€€€€€€€€€€€€€½ÕÑÁÕĞ¹İÉ¥Ñ”¡‰Õ™™•È°€À°½Õ¹Ğ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€½Á¥•€¬ô½Õ¹Ğ((€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù…°¹½Ü€ô…¹‘É½¥¹½Ì¹MåÍÑ•µ±½¬¹•±…ÁÍ•‘I•…±Ñ¥µ” ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù…°•±…ÁÍ•€ô¹½Ü€´±…ÍÑMÁ••‘Ğ(€€€€€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡•±…ÁÍ•€øô€ÔÀÁ0¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Ù…°¥¹ÍÑ…¹Ğ€ô€ ¡½Á¥•€´±…ÍÑMÁ••‘	åÑ•Ì¤¹½•É•Ñ1•…ÍĞ Á0¤€¨€ÄÀÀÁ0€¼•±…ÁÍ•¹½•É•Ñ1•…ÍĞ Å0¤¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ÍÁ••‘	åÑ•ÍA•ÉM•½¹€ô¥˜€¡ÍÁ••‘	åÑ•ÍA•ÉM•½¹€ğô€Á0¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥¹ÍÑ…¹Ğ(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¡ÍÁ••‘	åÑ•ÍA•ÉM•½¹€¨€Í0€¬¥¹ÍÑ…¹Ğ¤€¼€Ñ0(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÑMÁ••‘Ğ€ô¹½Ü(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÑMÁ••‘	åÑ•Ì€ô½Á¥•(€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€€€€±¥Ù•QÉ…¹Í™•ÉÍm¥‘t€ô1¥Ù•QÉ…¹Í™•È¡½Á¥•°Ñ½Ñ…±	åÑ•Ì°ÍÁ••‘	åÑ•ÍA•ÉM•½¹¤((€€€€€€€€€€€€€€€€€€€€€€€€€€€¥˜€¡¹½Ü€´±…ÍÑ9½Ñ¥™¥…Ñ¥½¹Ğ€øô€ÔÀÁ0¤ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¹½Ñ¥™å½İ¹±½…‘AÉ½É•ÍÌ¡¥°™¥±•9…µ”°½Á¥•°Ñ½Ñ…±	åÑ•Ì¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€±…ÍÑ9½Ñ¥™¥…Ñ¥½¹Ğ€ô¹½Ü(€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€½ÕÑÁÕĞ¹™±ÕÍ  ¤(€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€ô€üè•ÉÉ½È ‰½Õ±¹½Ğ½Á•¸½İ¹±½…‘Ì‘•ÍÑ¥¹…Ñ¥½¸ˆ¤((€€€€€€€€€€€€€€€¥˜€¡…¹•±±•‘%‘Ì¹½¹Ñ…¥¹Ì¡¥¤¤ì(€€€€€€€€€€€€€€€€€€€Ñ¡É½Ü©…Ù„¹¥¼¹%¹Ñ•ÉÉÕÁÑ•‘%=á•ÁÑ¥½¸ ‰½İ¹±½……¹•±±•ˆ¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€½µÁ±•Ñ•‘¥±•9…µ”€ôÁÉ½µ½Ñ••¹•É¥	¥¹…ÉåQ½Á¬¡¥°‘•ÍÑ¥¹…Ñ¥½¸°™¥±•9…µ”¤(€€€€€€€€€€€€€€€Ù…±¥‘…Ñ•½µÁ±•Ñ•‘A…å±½…¡½µÁ±•Ñ•‘¥±•9…µ”°‘•ÍÑ¥¹…Ñ¥½¸¤(€€€€€€€€€€€€€€€Ù…°‘½¹”€ô½¹Ñ•¹ÑY…±Õ•Ì ¤¹…ÁÁ±äì(€€€€€€€€€€€€€€€€€€€ÁÕĞ¡5•‘¥…MÑ½É”¹½İ¹±½…‘Ì¹%M}A9%9°€À¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€É•Í½±Ù•È¹ÕÁ‘…Ñ”¡‘•ÍÑ¥¹…Ñ¥½¸°‘½¹”°¹Õ±°°¹Õ±°¤(€€€€€€€€€€€€€€€Á…ÕÍ•‘%‘Ì¹É•µ½Ù”¡¥¤(€€€€€€€€€€€€€€€µ…É­¥É•ÑMÕ•ÍÌ¡¥°½Á¥•¤(€€€€€€€€€€€€€€€±¥Ù•QÉ…¹Í™•ÉÍm¥‘t€ô1¥Ù•QÉ…¹Í™•È¡½Á¥•°½Á¥•°€Á0¤(€€€€€€€€€€€€€€€¹½Ñ¥™å½İ¹±½…‘½µÁ±•Ñ”¡¥°½µÁ±•Ñ•‘¥±•9…µ”°½Á¥•¤(€€€€€€€€€€€€€€€…¹•±±•‘%‘Ì¹É•µ½Ù”¡¥¤(€€€€€€€€€€€€€€€ÉÕ¹…Ñ¡¥¹œì½¹¥¹¥Í¡•ü¹¥¹Ù½­” ¤ô(€€€€€€€€€€€ô…Ñ €¡•ÉÉ½ÈèQ¡É½İ…‰±”¤ì(€€€€€€€€€€€€€€€ÉÕ¹…Ñ¡¥¹œì‰½‘ä¹±½Í” ¤ô(€€€€€€€€€€€€€€€Ù…°…¹•±±•€ô…¹•±±•‘%‘Ì¹É•µ½Ù”¡¥¤(€€€€€€€€€€€€€€€…¹•±½İ¹±½…‘9½Ñ¥™¥…Ñ¥½¸¡¥¤(€€€€€€€€€€€€€€€ÉÕ¹…Ñ¡¥¹œì½¹¥¹¥Í¡•ü¹¥¹Ù½­” ¤ô(€€€€€€€€€€€€€€€¥˜€¡…¹•±±•¤ì(€€€€€€€€€€€€€€€€€€€Á…ÕÍ•‘%‘Ì¹É•µ½Ù”¡¥¤(€€€€€€€€€€€€€€€€€€€ÉÕ¹…Ñ¡¥¹œìÉ•Í½±Ù•È¹‘•±•Ñ”¡‘•ÍÑ¥¹…Ñ¥½¸°¹Õ±°°¹Õ±°¤ô(€€€€€€€€€€€€€€€ô•±Í”¥˜€¡•ÉÉ½È¥Ì5•Ñ•É•‘9•Ñİ½É­	±½­•‘á•ÁÑ¥½¸¤ì(€€€€€€€€€€€€€€€€€€€€¼¼AÉ•Í•ÉÙ”Ñ¡”Á…ÉÑ¥…°5•‘¥…MÑ½É”™¥±”¸I•ÍÕµ”İ¥±°¥ÍÍÕ”„É…¹”É•ÅÕ•ÍĞ(€€€€€€€€€€€€€€€€€€€€¼¼…™Ñ•ÈÑ¡”ÕÍ•ÈÉ•ÑÕÉ¹ÌÑ¼…¸Õ¹µ•Ñ•É•¹•Ñİ½É¬½È•¹…‰±•Ìµ½‰¥±”µ‘…Ñ„(€€€€€€€€€€€€€€€€€€€€¼¼‘½İ¹±½…‘Ì¸(€€€€€€€€€€€€€€€€€€€Á…ÕÍ•‘%‘Ì¹…‘¡¥¤(€€€€€€€€€€€€€€€€€€€ÕÁ‘…Ñ•¥É•ÑMÑ…Ñ”¡¥°%IQ}AUM¤(€€€€€€€€€€€€€€€€€€€±¥Ù•QÉ…¹Í™•ÉÌ¹½µÁÕÑ•%™AÉ•Í•¹Ğ¡¥¤ì|°±¥Ù”€´ø(€€€€€€€€€€€€€€€€€€€€€€€±¥Ù”¹½Áä¡ÍÁ••‘	åÑ•ÍA•ÉM•½¹€ô€Á0¤(€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€½İ¹±½…‘-••Á±¥Ù•M•ÉÙ¥”¹Í•ÑA…ÕÍ•¡¥°ÑÉÕ”¤(€€€€€€€€€€€€€€€ô•±Í”¥˜€¡•ÉÉ½È¥Ì%¹Ù…±¥‘½İ¹±½…‘A…å±½…‘á•ÁÑ¥½¸¤ì(€€€€€€€€€€€€€€€€€€€Á…ÕÍ•‘%‘Ì¹É•µ½Ù”¡¥¤(€€€€€€€€€€€€€€€€€€€µ…É­¥É•Ñ…¥±•¡¥°‘•ÍÑ¥¹…Ñ¥½¸¤(€€€€€€€€€€€€€€€€€€€¹½Ñ¥™å½İ¹±½…‘…¥±•¡¥°½µÁ±•Ñ•‘¥±•9…µ”¤(€€€€€€€€€€€€€€€ô•±Í”¥˜€¡½¹…¥±ÕÉ”€„ô¹Õ±°¤ì(€€€€€€€€€€€€€€€€€€€Á…ÕÍ•‘%‘Ì¹É•µ½Ù”¡¥¤(€€€€€€€€€€€€€€€€€€€½¹…¥±ÕÉ” ¤(€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€Á…ÕÍ•‘%‘Ì¹É•µ½Ù”¡¥¤(€€€€€€€€€€€€€€€€€€€µ…É­¥É•Ñ…¥±•¡¥°‘•ÍÑ¥¹…Ñ¥½¸¤(€€€€€€€€€€€€€€€€€€€¹½Ñ¥™å½İ¹±½…‘…¥±•¡¥°½µÁ±•Ñ•‘¥±•9…µ”¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô™¥¹…±±äì(€€€€€€€€€€€€€€€½İ¹±½…‘-••Á±¥Ù•M•ÉÙ¥”¹™¥¹¥Í ¡…ÁÁ½¹Ñ•áĞ°¥¤(€€€€€€€€€€€€€€€…Ñ¥Ù•	½‘¥•Ì¹É•µ½Ù”¡¥¤(€€€€€€€€€€€€€€€İ…­•A…ÕÍ•¡¥¤(€€€€€€€€€€€€€€€Á…ÕÍ•1½­Ì¹É•µ½Ù”¡¥¤(€€€€€€€€€€€€€€€¥˜€¡…¹•±±•‘%‘Ì¹½¹Ñ…¥¹Ì¡¥¤¤…¹•±±•‘%‘Ì¹É•µ½Ù”¡¥¤(€€€€€€€€€€€€€€€¥˜€¡±¥Ù•QÉ…¹Í™•ÉÍm¥‘tü¹‘½İ¹±½…‘•‘	åÑ•Ì€ôô½Á¥•€˜˜(€€€€€€€€€€€€€€€€€€€±¥Ù•QÉ…¹Í™•ÉÍm¥‘tü¹ÍÁ••‘	åÑ•ÍA•ÉM•½¹€„ô€Á0¤ì(€€€€€€€€€€€€€€€€€€€±¥Ù•QÉ…¹Í™•ÉÍm¥‘t€ô±¥Ù•QÉ…¹Í™•ÉÍm¥‘t„„¹¿]4ÒÚ$z{-®éÜj×eWorker = activeBodies.containsKey(id) ||
             activeHlsPools.containsKey(id) ||
             activeHlsBodies.containsKey(id)
         if (liveWorker) return true
@@ -1806,6 +688,7 @@ internal class DownloadController(
                         body = body,
                         fileName = record.fileName,
                         totalBytes = totalBytes,
+                        allowMetered = record.allowMetered,
                         startingBytes = startingBytes,
                         append = append
                     )
@@ -1827,175 +710,7 @@ internal class DownloadController(
         val now = android.os.SystemClock.elapsedRealtime()
         val previous = managerSpeedSamples[id]
         val speed = if (previous != null && now > previous.timestampMs && downloaded >= previous.downloadedBytes) {
-            val elapsed = (now - previous.timestampMs).coerceAtLeast(1L)
-            ((downloaded - previous.downloadedBytes) * 1000L / elapsed).coerceAtLeast(0L)
-        } else {
-            previous?.speedBytesPerSecond ?: 0L
-        }
-        managerSpeedSamples[id] = SpeedSample(downloaded, now, speed)
-        return speed
-    }
-
-    private fun notificationId(id: Long): Int {
-        val folded = id xor (id ushr 32)
-        return (folded and 0x7fffffffL).toInt().coerceAtLeast(1)
-    }
-
-    private fun launchPendingIntent(): PendingIntent? {
-        val launchIntent = appContext.packageManager
-            .getLaunchIntentForPackage(appContext.packageName)
-            ?.setAction(ACTION_OPEN_DOWNLOADS)
-            ?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            ?: return null
-        return PendingIntent.getActivity(
-            appContext,
-            0,
-            launchIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-    }
-
-    private fun notifyDownloadProgress(id: Long, fileName: String, downloaded: Long, total: Long) {
-        // Direct Gecko/HLS transfers are already backed by the foreground service. Updating
-        // that service notification avoids showing a second, duplicate progress notification.
-        DownloadKeepAliveService.updateProgress(id, fileName, downloaded, total)
-    }
-
-    private fun notifyDownloadComplete(id: Long, fileName: String, bytes: Long) {
-        val builder = Notification.Builder(appContext, DOWNLOAD_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_ilyro_download)
-            .setContentTitle(fileName)
-            .setContentText("Download complete â€¢ ${formatBytes(bytes)}")
-            .setOnlyAlertOnce(true)
-            .setAutoCancel(true)
-            .setOngoing(false)
-            .setProgress(0, 0, false)
-        launchPendingIntent()?.let { builder.setContentIntent(it) }
-        runCatching { notificationManager.notify(notificationId(id), builder.build()) }
-    }
-
-    private fun notifyDownloadFailed(id: Long, fileName: String) {
-        val builder = Notification.Builder(appContext, DOWNLOAD_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_ilyro_download)
-            .setContentTitle(fileName)
-            .setContentText("Download failed")
-            .setAutoCancel(true)
-            .setOngoing(false)
-        launchPendingIntent()?.let { builder.setContentIntent(it) }
-        runCatching { notificationManager.notify(notificationId(id), builder.build()) }
-    }
-
-    private fun cancelDownloadNotification(id: Long) {
-        runCatching { notificationManager.cancel(notificationId(id)) }
-    }
-
-    private fun formatBytes(bytes: Long): String {
-        val safe = bytes.coerceAtLeast(0L)
-        return when {
-            safe >= 1024L * 1024L * 1024L -> String.format(java.util.Locale.US, "%.1f GB", safe / (1024.0 * 1024.0 * 1024.0))
-            safe >= 1024L * 1024L -> String.format(java.util.Locale.US, "%.1f MB", safe / (1024.0 * 1024.0))
-            safe >= 1024L -> String.format(java.util.Locale.US, "%.1f KB", safe / 1024.0)
-            else -> "$safe B"
-        }
-    }
-
-    fun retry(item: DownloadUiItem, allowMetered: Boolean): DownloadRecord? {
-        val source = item.record
-        remove(item)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val geckoRetry = enqueueGeckoFetch(
-                url = source.sourceUrl,
-                fileName = source.fileName,
-                mimeType = source.mimeType,
-                expectedBytes = source.expectedBytes,
-                allowMetered = allowMetered,
-                referrer = source.referrer,
-                isPrivate = source.isPrivate
-            )
-            if (geckoRetry != null) return geckoRetry
-        }
-        return enqueueUrl(
-            source.sourceUrl,
-            source.fileName,
-            source.mimeType,
-            allowMetered,
-            source.referrer,
-            source.isPrivate
-        )
-    }
-
-    private fun managerStatus(id: Long): Int? {
-        return runCatching {
-            manager.query(DownloadManager.Query().setFilterById(id))?.use { cursor ->
-                if (!cursor.moveToFirst()) return@use null
-                val column = cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)
-                cursor.getInt(column)
-            }
-        }.getOrNull()
-    }
-
-    private fun promoteManagerBinaryToApk(record: DownloadRecord): Boolean {
-        val extension = downloadExtension(record.fileName)
-        if (extension !in setOf("", "bin", "dat")) return false
-        val sourceUri = manager.getUriForDownloadedFile(record.id) ?: return false
-        if (!looksLikeApkArchive(sourceUri)) return false
-
-        val base = if (extension.isBlank()) {
-            record.fileName
-        } else {
-            record.fileName.substringBeforeLast('.', record.fileName)
-        }.ifBlank { "download" }
-        val apkName = "$base.apk"
-        val destination = createDestination(apkName, APK_MIME_TYPE) ?: return false
-        var copied = 0L
-
-        val copiedSuccessfully = runCatching {
-            val input = resolver.openInputStream(sourceUri) ?: error("Could not open completed download")
-            val output = resolver.openOutputStream(destination, "w") ?: error("Could not create APK destination")
-            input.use { source ->
-                output.use { target ->
-                    val buffer = ByteArray(128 * 1024)
-                    while (true) {
-                        val count = source.read(buffer)
-                        if (count < 0) break
-                        if (count == 0) continue
-                        target.write(buffer, 0, count)
-                        copied += count
-                    }
-                    target.flush()
-                }
-            }
-            true
-        }.getOrElse { false }
-
-        if (!copiedSuccessfully) {
-            runCatching { resolver.delete(destination, null, null) }
-            return false
-        }
-
-        val done = ContentValues().apply {
-            put(MediaStore.Downloads.IS_PENDING, 0)
-            put(MediaStore.Downloads.MIME_TYPE, APK_MIME_TYPE)
-            put(MediaStore.Downloads.DISPLAY_NAME, apkName)
-        }
-        if (runCatching { resolver.update(destination, done, null, null) }.getOrDefault(0) <= 0) {
-            runCatching { resolver.delete(destination, null, null) }
-            return false
-        }
-
-        synchronized(recordLock) {
-            val records = restoreRecordsUnsafe().map { current ->
-                if (current.id == record.id) {
-                    current.copy(
-                        fileName = apkName,
-                        mimeType = APK_MIME_TYPE,
-                        localUri = destination.toString(),
-                        expectedBytes = copied,
-                        directState = DIRECT_SUCCESS
-                    )
-                } else {
-                    current
-                }
+            val elapsed = (now - previous.timestaYªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬ÕµÁ5Ì¤¹½•É•Ñ1•…ÍĞ Å0¤(€€€€€€€€€€€€ ¡‘½İ¹±½…‘•€´ÁÉ•Ù¥½ÕÌ¹‘½İ¹±½…‘•‘	åÑ•Ì¤€¨€ÄÀÀÁ0€¼•±…ÁÍ•¤¹½•É•Ñ1•…ÍĞ Á0¤(€€€€€€€ô•±Í”ì(€€€€€€€€€€€ÁÉ•Ù¥½ÕÌü¹ÍÁ••‘	åÑ•ÍA•ÉM•½¹€üè€Á0(€€€€€€€ô(€€€€€€€µ…¹…•ÉMÁ••‘M…µÁ±•Ím¥‘t€ôMÁ••‘M…µÁ±”¡‘½İ¹±½…‘•°¹½Ü°ÍÁ••¤(€€€€€€€É•ÑÕÉ¸ÍÁ••(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸¹½Ñ¥™¥…Ñ¥½¹%¡¥è1½¹œ¤è%¹Ğì(€€€€€€€Ù…°™½±‘•€ô¥á½È€¡¥ÕÍ¡È€ÌÈ¤(€€€€€€€É•ÑÕÉ¸€¡™½±‘•…¹€Áàİ™™™™™™™0¤¹Ñ½%¹Ğ ¤¹½•É•Ñ1•…ÍĞ Ä¤(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸±…Õ¹¡A•¹‘¥¹%¹Ñ•¹Ğ ¤èA•¹‘¥¹%¹Ñ•¹Ğüì(€€€€€€€Ù…°±…Õ¹¡%¹Ñ•¹Ğ€ô…ÁÁ½¹Ñ•áĞ¹Á…­…•5…¹…•È(€€€€€€€€€€€€¹•Ñ1…Õ¹¡%¹Ñ•¹Ñ½ÉA…­…”¡…ÁÁ½¹Ñ•áĞ¹Á…­…•9…µ”¤(€€€€€€€€€€€€ü¹Í•ÑÑ¥½¸¡Q%=9}=A9}=]91=L¤(€€€€€€€€€€€€ü¹…‘‘±…Ì¡%¹Ñ•¹Ğ¹1}Q%Y%Qe}1I}Q=@½È%¹Ñ•¹Ğ¹1}Q%Y%Qe}M%91}Q=@¤(€€€€€€€€€€€€üèÉ•ÑÕÉ¸¹Õ±°(€€€€€€€É•ÑÕÉ¸A•¹‘¥¹%¹Ñ•¹Ğ¹•ÑÑ¥Ù¥Ñä (€€€€€€€€€€€…ÁÁ½¹Ñ•áĞ°(€€€€€€€€€€€€À°(€€€€€€€€€€€±…Õ¹¡%¹Ñ•¹Ğ°(€€€€€€€€€€€A•¹‘¥¹%¹Ñ•¹Ğ¹1}UAQ}UII9P½ÈA•¹‘¥¹%¹Ñ•¹Ğ¹1}%55UQ	1(€€€€€€€€¤(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸¹½Ñ¥™å½İ¹±½…‘AÉ½É•ÍÌ¡¥è1½¹œ°™¥±•9…µ”èMÑÉ¥¹œ°‘½İ¹±½…‘•è1½¹œ°Ñ½Ñ…°è1½¹œ¤ì(€€€€€€€€¼¼¥É•Ğ•­¼½!1LÑÉ…¹Í™•ÉÌ…É”…±É•…‘ä‰…­•‰äÑ¡”™½É•É½Õ¹Í•ÉÙ¥”¸UÁ‘…Ñ¥¹œ(€€€€€€€€¼¼Ñ¡…ĞÍ•ÉÙ¥”¹½Ñ¥™¥…Ñ¥½¸…Ù½¥‘ÌÍ¡½İ¥¹œ„Í•½¹°‘ÕÁ±¥…Ñ”ÁÉ½É•ÍÌ¹½Ñ¥™¥…Ñ¥½¸¸(€€€€€€€½İ¹±½…‘-••Á±¥Ù•M•ÉÙ¥”¹ÕÁ‘…Ñ•AÉ½É•ÍÌ¡¥°™¥±•9…µ”°‘½İ¹±½…‘•°Ñ½Ñ…°¤(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸¹½Ñ¥™å½İ¹±½…‘½µÁ±•Ñ”¡¥è1½¹œ°™¥±•9…µ”èMÑÉ¥¹œ°‰åÑ•Ìè1½¹œ¤ì(€€€€€€€Ù…°‰Õ¥±‘•È€ô9½Ñ¥™¥…Ñ¥½¸¹	Õ¥±‘•È¡…ÁÁ½¹Ñ•áĞ°=]91=}!991}%¤(€€€€€€€€€€€€¹Í•ÑMµ…±±%½¸¡H¹‘É…İ…‰±”¹¥}ÍÑ…Ñ}¥±åÉ½}‘½İ¹±½…¤(€€€€€€€€€€€€¹Í•Ñ½¹Ñ•¹ÑQ¥Ñ±”¡™¥±•9…µ”¤(€€€€€€€€€€€€¹Í•Ñ½¹Ñ•¹ÑQ•áĞ ‰½İ¹±½…½µÁ±•Ñ”ƒŠˆ€‘í™½Éµ…Ñ	åÑ•Ì¡‰åÑ•Ì¥ôˆ¤(€€€€€€€€€€€€¹Í•Ñ=¹±å±•ÉÑ=¹”¡ÑÉÕ”¤(€€€€€€€€€€€€¹Í•ÑÕÑ½…¹•°¡ÑÉÕ”¤(€€€€€€€€€€€€¹Í•Ñ=¹½¥¹œ¡™…±Í”¤(€€€€€€€€€€€€¹Í•ÑAÉ½É•ÍÌ À°€À°™…±Í”¤(€€€€€€€±…Õ¹¡A•¹‘¥¹%¹Ñ•¹Ğ ¤ü¹±•Ğì‰Õ¥±‘•È¹Í•Ñ½¹Ñ•¹Ñ%¹Ñ•¹Ğ¡¥Ğ¤ô(€€€€€€€ÉÕ¹…Ñ¡¥¹œì¹½Ñ¥™¥…Ñ¥½¹5…¹…•È¹¹½Ñ¥™ä¡¹½Ñ¥™¥…Ñ¥½¹%¡¥¤°‰Õ¥±‘•È¹‰Õ¥± ¤¤ô(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸¹½Ñ¥™å½İ¹±½…‘…¥±•¡¥è1½¹œ°™¥±•9…µ”èMÑÉ¥¹œ¤ì(€€€€€€€Ù…°‰Õ¥±‘•È€ô9½Ñ¥™¥…Ñ¥½¸¹	Õ¥±‘•È¡…ÁÁ½¹Ñ•áĞ°=]91=}!991}%¤(€€€€€€€€€€€€¹Í•ÑMµ…±±%½¸¡H¹‘É…İ…‰±”¹¥}ÍÑ…Ñ}¥±åÉ½}‘½İ¹±½…¤(€€€€€€€€€€€€¹Í•Ñ½¹Ñ•¹ÑQ¥Ñ±”¡™¥±•9…µ”¤(€€€€€€€€€€€€¹Í•Ñ½¹Ñ•¹ÑQ•áĞ ‰½İ¹±½…™…¥±•ˆ¤(€€€€€€€€€€€€¹Í•ÑÕÑ½…¹•°¡ÑÉÕ”¤(€€€€€€€€€€€€¹Í•Ñ=¹½¥¹œ¡™…±Í”¤(€€€€€€€±…Õ¹¡A•¹‘¥¹%¹Ñ•¹Ğ ¤ü¹±•Ğì‰Õ¥±‘•È¹Í•Ñ½¹Ñ•¹Ñ%¹Ñ•¹Ğ¡¥Ğ¤ô(€€€€€€€ÉÕ¹…Ñ¡¥¹œì¹½Ñ¥™¥…Ñ¥½¹5…¹…•È¹¹½Ñ¥™ä¡¹½Ñ¥™¥…Ñ¥½¹%¡¥¤°‰Õ¥±‘•È¹‰Õ¥± ¤¤ô(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸…¹•±½İ¹±½…‘9½Ñ¥™¥…Ñ¥½¸¡¥è1½¹œ¤ì(€€€€€€€ÉÕ¹…Ñ¡¥¹œì¹½Ñ¥™¥…Ñ¥½¹5…¹…•È¹…¹•°¡¹½Ñ¥™¥…Ñ¥½¹%¡¥¤¤ô(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸™½Éµ…Ñ	åÑ•Ì¡‰åÑ•Ìè1½¹œ¤èMÑÉ¥¹œì(€€€€€€€Ù…°Í…™”€ô‰åÑ•Ì¹½•É•Ñ1•…ÍĞ Á0¤(€€€€€€€É•ÑÕÉ¸İ¡•¸ì(€€€€€€€€€€€Í…™”€øô€ÄÀÈÑ0€¨€ÄÀÈÑ0€¨€ÄÀÈÑ0€´øMÑÉ¥¹œ¹™½Éµ…Ğ¡©…Ù„¹ÕÑ¥°¹1½…±”¹UL°€ˆ”¸Å˜ˆ°Í…™”€¼€ ÄÀÈĞ¸À€¨€ÄÀÈĞ¸À€¨€ÄÀÈĞ¸À¤¤(€€€€€€€€€€€Í…™”€øô€ÄÀÈÑ0€¨€ÄÀÈÑ0€´øMÑÉ¥¹œ¹™½Éµ…Ğ¡©…Ù„¹ÕÑ¥°¹1½…±”¹UL°€ˆ”¸Å˜5ˆ°Í…™”€¼€ ÄÀÈĞ¸À€¨€ÄÀÈĞ¸À¤¤(€€€€€€€€€€€Í…™”€øô€ÄÀÈÑ0€´øMÑÉ¥¹œ¹™½Éµ…Ğ¡©…Ù„¹ÕÑ¥°¹1½…±”¹UL°€ˆ”¸Å˜-ˆ°Í…™”€¼€ÄÀÈĞ¸À¤(€€€€€€€€€€€•±Í”€´ø€ˆ‘Í…™”ˆ(€€€€€€€ô(€€€ô((€€€™Õ¸É•ÑÉä¡¥Ñ•´è½İ¹±½…‘U¥%Ñ•´°…±±½İ5•Ñ•É•è	½½±•…¸¤è½İ¹±½…‘I•½Éüì(€€€€€€€Ù…°Í½ÕÉ”€ô¥Ñ•´¹É•½É(€€€€€€€¥˜€ …¹•Ñİ½É­±±½İ•¡…±±½İ5•Ñ•É•¤¤É•ÑÕÉ¸¹Õ±°(€€€€€€€É•µ½Ù”¡¥Ñ•´¤(€€€€€€€¥˜€¡Í½ÕÉ”¹¥Í!±Ì¤ì(€€€€€€€€€€€Ù…°ÍÑ…ÉÑ•€ô•¹ÅÕ•Õ•!±Í½İ¹±½… (€€€€€€€€€€€€€€€ÕÉ°€ôÍ½ÕÉ”¹Í½ÕÉ•UÉ°°(€€€€€€€€€€€€€€€ÍÕ•ÍÑ•‘Q¥Ñ±”€ôÍ½ÕÉ”¹™¥±•9…µ”¹ÍÕ‰ÍÑÉ¥¹	•™½É•1…ÍĞ œ¸œ°Í½ÕÉ”¹™¥±•9…µ”¤°(€€€€€€€€€€€€€€€É•™•ÉÉ•È€ôÍ½ÕÉ”¹É•™•ÉÉ•È°(€€€€€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ôÍ½ÕÉ”¹¥ÍAÉ¥Ù…Ñ”°(€€€€€€€€€€€€€€€…±±½İ5•Ñ•É•€ô…±±½İ5•Ñ•É•(€€€€€€€€€€€€¤(€€€€€€€€€€€É•ÑÕÉ¸¥˜€¡ÍÑ…ÉÑ•¤Í½ÕÉ”¹½Áä¡‘¥É•ÑMÑ…Ñ”€ô%IQ}IU99%9°…±±½İ5•Ñ•É•€ô…±±½İ5•Ñ•É•¤•±Í”¹Õ±°(€€€€€€€ô(€€€€€€€¥˜€¡	Õ¥±¹YIM%=8¹M-}%9P€øô	Õ¥±¹YIM%=9}=L¹D¤ì(€€€€€€€€€€€Ù…°•­½I•ÑÉä€ô•¹ÅÕ•Õ••­½•Ñ  (€€€€€€€€€€€€€€€ÕÉ°€ôÍ½ÕÉ”¹Í½ÕÉ•UÉ°°(€€€€€€€€€€€€€€€™¥±•9…µ”€ôÍ½ÕÉ”¹™¥±•9…µ”°(€€€€€€€€€€€€€€€µ¥µ•QåÁ”€ôÍ½ÕÉ”¹µ¥µ•QåÁ”°(€€€€€€€€€€€€€€€•áÁ•Ñ•‘	åÑ•Ì€ôÍ½ÕÉ”¹•áÁ•Ñ•‘	åÑ•Ì°(€€€€€€€€€€€€€€€…±±½İ5•Ñ•É•€ô…±±½İ5•Ñ•É•°(€€€€€€€€€€€€€€€É•™•ÉÉ•È€ôÍ½ÕÉ”¹É•™•ÉÉ•È°(€€€€€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ôÍ½ÕÉ”¹¥ÍAÉ¥Ù…Ñ”(€€€€€€€€€€€€¤(€€€€€€€€€€€¥˜€¡•­½I•ÑÉä€„ô¹Õ±°¤É•ÑÕÉ¸•­½I•ÑÉä(€€€€€€€ô(€€€€€€€É•ÑÕÉ¸•¹ÅÕ•Õ•UÉ° (€€€€€€€€€€€Í½ÕÉ”¹Í½ÕÉ•UÉ°°(€€€€€€€€€€€Í½ÕÉ”¹™¥±•9…µ”°(€€€€€€€€€€€Í½ÕÉ”¹µ¥µ•QåÁ”°(€€€€€€€€€€€…±±½İ5•Ñ•É•°(€€€€€€€€€€€Í½ÕÉ”¹É•™•ÉÉ•È°(€€€€€€€€€€€Í½ÕÉ”¹¥ÍAÉ¥Ù…Ñ—]4ÒÚ$z{-®éÜj×}
             }
             saveRecordsUnsafe(records)
         }
@@ -2046,6 +761,7 @@ internal class DownloadController(
         isPrivate: Boolean
     ): DownloadRecord? {
         return try {
+            if (!networkAllowed(allowMetered)) return null
             val uri = Uri.parse(url)
             if (uri.scheme != "http" && uri.scheme != "https") return null
             val request = DownloadManager.Request(uri)
@@ -2071,7 +787,8 @@ internal class DownloadController(
                 mimeType = mimeType,
                 createdAt = System.currentTimeMillis(),
                 referrer = referrer,
-                isPrivate = isPrivate
+                isPrivate = isPrivate,
+                allowMetered = allowMetered
             )
             addRecord(record)
             monitorManagerApkPromotion(record)
@@ -2088,8 +805,6 @@ internal class DownloadController(
 
         records.filter { it.localUri != null }.forEach { record ->
             val live = liveTransfers[record.id]
-            val mediaBytes = mediaSize(record.localUri).coerceAtLeast(0L)
-            val bytes = live?.downloadedBytes ?: mediaBytes
             val status = when (record.directState) {
                 DIRECT_RUNNING -> DownloadManager.STATUS_RUNNING
                 DIRECT_PAUSED -> DownloadManager.STATUS_PAUSED
@@ -2097,177 +812,12 @@ internal class DownloadController(
                 DIRECT_FAILED -> DownloadManager.STATUS_FAILED
                 else -> DownloadManager.STATUS_FAILED
             }
-            val liveTotal = live?.totalBytes ?: -1L
-            val total = when {
-                liveTotal > 0L -> liveTotal
-                record.expectedBytes > 0L -> record.expectedBytes
-                status == DownloadManager.STATUS_SUCCESSFUL -> bytes
-                else -> -1L
-            }
-            statusById[record.id] = DownloadUiItem(
-                record = record,
-                status = status,
-                downloadedBytes = bytes,
-                totalBytes = total,
-                speedBytesPerSecond = if (status == DownloadManager.STATUS_RUNNING) {
-                    live?.speedBytesPerSecond ?: 0L
-                } else {
-                    0L
-                }
-            )
-        }
-
-        val managerIds = records
-            .filter { it.localUri == null && it.id >= 0L }
-            .map { it.id }
-            .toLongArray()
-        if (managerIds.isNotEmpty()) {
-            manager.query(DownloadManager.Query().setFilterById(*managerIds))?.use { cursor ->
-                val idColumn = cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_ID)
-                val statusColumn = cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)
-                val downloadedColumn = cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
-                val totalColumn = cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
-                while (cursor.moveToNext()) {
-                    val id = cursor.getLong(idColumn)
-                    val record = records.firstOrNull { it.id == id } ?: continue
-                    val status = cursor.getInt(statusColumn)
-                    val downloaded = cursor.getLong(downloadedColumn).coerceAtLeast(0L)
-                    val total = cursor.getLong(totalColumn)
-                    statusById[id] = DownloadUiItem(
-                        record = record,
-                        status = status,
-                        downloadedBytes = downloaded,
-                        totalBytes = total,
-                        speedBytesPerSecond = sampleManagerSpeed(id, downloaded, status)
-                    )
-                }
-            }
-        }
-
-        records.forEach { record ->
-            val item = statusById[record.id] ?: return@forEach
-            if (item.status == DownloadManager.STATUS_SUCCESSFUL &&
-                record.localUri == null &&
-                downloadExtension(record.fileName) in setOf("", "bin", "dat")
-            ) {
-                monitorManagerApkPromotion(record)
-            }
-        }
-
-        return records.map { record ->
-            statusById[record.id]
-                ?: DownloadUiItem(record, DownloadManager.STATUS_FAILED, 0L, record.expectedBytes)
-        }
-    }
-
-    private fun launchDownloadedFile(uri: Uri, mimeType: String, fileName: String): Boolean {
-        val intent = Intent(Intent.ACTION_VIEW)
-            .setDataAndType(uri, mimeType)
-        intent.clipData = ClipData.newRawUri(fileName, uri)
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-        return try {
-            appContext.startActivity(intent)
-            true
-        } catch (_: ActivityNotFoundException) {
-            false
-        } catch (_: SecurityException) {
-            false
-        }
-    }
-
-    fun open(item: DownloadUiItem): Boolean {
-        val uri = item.record.localUri?.let(Uri::parse)
-            ?: manager.getUriForDownloadedFile(item.record.id)
-            ?: return false
-        val detectedMimeType = (item.record.mimeType
-            ?: if (item.record.localUri == null) {
-                manager.getMimeTypeForDownloadedFile(item.record.id)
-            } else {
-                resolver.getType(uri)
-            })?.substringBefore(';')?.trim()?.lowercase()
-
-        val extension = item.record.fileName.substringAfterLast('.', "").lowercase()
-        val videoExtensions = setOf(
-            "mp4", "m4v", "mkv", "webm", "avi", "mov", "ts", "m2ts", "mts",
-            "3gp", "3gpp", "flv", "mpeg", "mpg", "m3u8"
-        )
-        val isVideo = detectedMimeType?.startsWith("video/") == true || extension in videoExtensions
-        val isApk = extension == "apk" ||
-            detectedMimeType == "application/vnd.android.package-archive"
-        val genericMime = detectedMimeType.isNullOrBlank() || detectedMimeType in setOf(
-            "application/octet-stream", "binary/octet-stream", "application/binary", "*/*"
-        )
-        val inferredMime = when (extension) {
-            "mp4", "m4v" -> "video/mp4"
-            "mkv" -> "video/x-matroska"
-            "webm" -> "video/webm"
-            "avi" -> "video/x-msvideo"
-            "mov" -> "video/quicktime"
-            "ts", "m2ts", "mts" -> "video/mp2t"
-            "3gp", "3gpp" -> "video/3gpp"
-            "flv" -> "video/x-flv"
-            "mpeg", "mpg" -> "video/mpeg"
-            "m3u8" -> "application/vnd.apple.mpegurl"
-            "mp3" -> "audio/mpeg"
-            "m4a" -> "audio/mp4"
-            "aac" -> "audio/aac"
-            "ogg", "oga" -> "audio/ogg"
-            "wav" -> "audio/wav"
-            else -> MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension)
-        }
-        val mimeType = when {
-            isApk -> APK_MIME_TYPE
-            isVideo -> "video/*"
-            genericMime -> inferredMime ?: "*/*"
-            else -> detectedMimeType!!
-        }
-
-        if (isApk && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            !appContext.packageManager.canRequestPackageInstalls()
-        ) {
-            prefs.edit()
-                .putString(PREF_PENDING_APK_INSTALL_URI, uri.toString())
-                .apply()
-            val permissionIntent = Intent(
-                Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                Uri.parse("package:${appContext.packageName}")
-            ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            return try {
-                appContext.startActivity(permissionIntent)
-                true
-            } catch (_: ActivityNotFoundException) {
-                false
-            }
-        }
-
-        val candidates = buildList {
-            add(mimeType)
-            if (isVideo) {
-                inferredMime?.let(::add)
-                add("video/*")
-            }
-            if (mimeType != "*/*") add("*/*")
-        }.distinct()
-        return candidates.any { candidate -> launchDownloadedFile(uri, candidate, item.record.fileName) }
-    }
-
-
-    fun rename(item: DownloadUiItem, requestedName: String): Boolean {
-        if (item.status != DownloadManager.STATUS_SUCCESSFUL) return false
-        val currentName = item.record.fileName
-        val cleaned = cleanDownloadName(requestedName)?.take(180) ?: return false
-        if (cleaned == "." || cleaned == "..") return false
-        val currentExtension = downloadExtension(currentName)
-        val requestedExtension = downloadExtension(cleaned)
-        val finalName = if (requestedExtension.isBlank() && currentExtension.isNotBlank()) {
-            cleaned + "." + currentExtension
-        } else {
-            cleaned
-        }
-        if (finalName == currentName) return true
-
-        val uri = item.record.localUri?.let(Uri::parse)
-            ?: manager.getUriForDownloadedFile(item.record.id)
+            // Completed direct records persist their final byte count. Avoid a MediaStore query
+            // every 500 ms for files that can no longer change; query only active/paused files
+            // whose size may still be needed for progress or resume.
+            val storedOrMediaBytes = when {
+                live != null -> live.downloadedBytes
+                status == DownloadMaYªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Õ¹…•È¹MQQUM}MUMMU0€˜˜É•½É¹•áÁ•Ñ•‘	åÑ•Ì€øô€Á0€´ø(€€€€€€€€€€€€€€€€€€€É•½É¹•áÁ•Ñ•‘	åÑ•Ì(€€€€€€€€€€€€€€€•±Í”€´øµ•‘¥…M¥é”¡É•½É¹±½…±UÉ¤¤¹½•É•Ñ1•…ÍĞ Á0¤(€€€€€€€€€€€ô(€€€€€€€€€€€Ù…°‰åÑ•Ì€ô±¥Ù”ü¹‘½İ¹±½…‘•‘	åÑ•Ì€üèÍÑ½É•‘=É5•‘¥…	åÑ•Ì(€€€€€€€€€€€Ù…°±¥Ù•Q½Ñ…°€ô±¥Ù”ü¹Ñ½Ñ…±	åÑ•Ì€üè€´Å0(€€€€€€€€€€€Ù…°Ñ½Ñ…°€ôİ¡•¸ì(€€€€€€€€€€€€€€€±¥Ù•Q½Ñ…°€ø€Á0€´ø±¥Ù•Q½Ñ…°(€€€€€€€€€€€€€€€É•½É¹•áÁ•Ñ•‘	åÑ•Ì€ø€Á0€´øÉ•½É¹•áÁ•Ñ•‘	åÑ•Ì(€€€€€€€€€€€€€€€ÍÑ…ÑÕÌ€ôô½İ¹±½…‘5…¹…•È¹MQQUM}MUMMU0€´ø‰åÑ•Ì(€€€€€€€€€€€€€€€•±Í”€´ø€´Å0(€€€€€€€€€€€ô(€€€€€€€€€€€ÍÑ…ÑÕÍ	å%‘mÉ•½É¹¥‘t€ô½İ¹±½…‘U¥%Ñ•´ (€€€€€€€€€€€€€€€É•½É€ôÉ•½É°(€€€€€€€€€€€€€€€ÍÑ…ÑÕÌ€ôÍÑ…ÑÕÌ°(€€€€€€€€€€€€€€€‘½İ¹±½…‘•‘	åÑ•Ì€ô‰åÑ•Ì°(€€€€€€€€€€€€€€€Ñ½Ñ…±	åÑ•Ì€ôÑ½Ñ…°°(€€€€€€€€€€€€€€€ÍÁ••‘	åÑ•ÍA•ÉM•½¹€ô¥˜€¡ÍÑ…ÑÕÌ€ôô½İ¹±½…‘5…¹…•È¹MQQUM}IU99%9¤ì(€€€€€€€€€€€€€€€€€€€±¥Ù”ü¹ÍÁ••‘	åÑ•ÍA•ÉM•½¹€üè€Á0(€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€€Á0(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€¤(€€€€€€€ô((€€€€€€€Ù…°µ…¹…•É%‘Ì€ôÉ•½É‘Ì(€€€€€€€€€€€€¹™¥±Ñ•Èì¥Ğ¹±½…±UÉ¤€ôô¹Õ±°€˜˜¥Ğ¹¥€øô€Á0ô(€€€€€€€€€€€€¹µ…Àì¥Ğ¹¥ô(€€€€€€€€€€€€¹Ñ½1½¹ÉÉ…ä ¤(€€€€€€€¥˜€¡µ…¹…•É%‘Ì¹¥Í9½ÑµÁÑä ¤¤ì(€€€€€€€€€€€µ…¹…•È¹ÅÕ•Éä¡½İ¹±½…‘5…¹…•È¹EÕ•Éä ¤¹Í•Ñ¥±Ñ•É	å% ©µ…¹…•É%‘Ì¤¤ü¹ÕÍ”ìÕÉÍ½È€´ø(€€€€€€€€€€€€€€€Ù…°¥‘½±Õµ¸€ôÕÉÍ½È¹•Ñ½±Õµ¹%¹‘•á=ÉQ¡É½Ü¡½İ¹±½…‘5…¹…•È¹=1U59}%¤(€€€€€€€€€€€€€€€Ù…°ÍÑ…ÑÕÍ½±Õµ¸€ôÕÉÍ½È¹•Ñ½±Õµ¹%¹‘•á=ÉQ¡É½Ü¡½İ¹±½…‘5…¹…•È¹=1U59}MQQUL¤(€€€€€€€€€€€€€€€Ù…°‘½İ¹±½…‘•‘½±Õµ¸€ôÕÉÍ½È¹•Ñ½±Õµ¹%¹‘•á=ÉQ¡É½Ü¡½İ¹±½…‘5…¹…•È¹=1U59}	eQM}=]91=}M=}H¤(€€€€€€€€€€€€€€€Ù…°Ñ½Ñ…±½±Õµ¸€ôÕÉÍ½È¹•Ñ½±Õµ¹%¹‘•á=ÉQ¡É½Ü¡½İ¹±½…‘5…¹…•È¹=1U59}Q=Q1}M%i}	eQL¤(€€€€€€€€€€€€€€€İ¡¥±”€¡ÕÉÍ½È¹µ½Ù•Q½9•áĞ ¤¤ì(€€€€€€€€€€€€€€€€€€€Ù…°¥€ôÕÉÍ½È¹•Ñ1½¹œ¡¥‘½±Õµ¸¤(€€€€€€€€€€€€€€€€€€€Ù…°É•½É€ôÉ•½É‘Ì¹™¥ÉÍÑ=É9Õ±°ì¥Ğ¹¥€ôô¥ô€üè½¹Ñ¥¹Õ”(€€€€€€€€€€€€€€€€€€€Ù…°ÍÑ…ÑÕÌ€ôÕÉÍ½È¹•Ñ%¹Ğ¡ÍÑ…ÑÕÍ½±Õµ¸¤(€€€€€€€€€€€€€€€€€€€Ù…°‘½İ¹±½…‘•€ôÕÉÍ½È¹•Ñ1½¹œ¡‘½İ¹±½…‘•‘½±Õµ¸¤¹½•É•Ñ1•…ÍĞ Á0¤(€€€€€€€€€€€€€€€€€€€Ù…°Ñ½Ñ…°€ôÕÉÍ½È¹•Ñ1½¹œ¡Ñ½Ñ…±½±Õµ¸¤(€€€€€€€€€€€€€€€€€€€ÍÑ…ÑÕÍ	å%‘m¥‘t€ô½İ¹±½…‘U¥%Ñ•´ (€€€€€€€€€€€€€€€€€€€€€€€É•½É€ôÉ•½É°(€€€€€€€€€€€€€€€€€€€€€€€ÍÑ…ÑÕÌ€ôÍÑ…ÑÕÌ°(€€€€€€€€€€€€€€€€€€€€€€€‘½İ¹±½…‘•‘	åÑ•Ì€ô‘½İ¹±½…‘•°(€€€€€€€€€€€€€€€€€€€€€€€Ñ½Ñ…±	åÑ•Ì€ôÑ½Ñ…°°(€€€€€€€€€€€€€€€€€€€€€€€ÍÁ••‘	åÑ•ÍA•ÉM•½¹€ôÍ…µÁ±•5…¹…•ÉMÁ••¡¥°‘½İ¹±½…‘•°ÍÑ…ÑÕÌ¤(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô(€€€€€€€ô((€€€€€€€É•½É‘Ì¹™½É… ìÉ•½É€´ø(€€€€€€€€€€€Ù…°¥Ñ•´€ôÍÑ…ÑÕÍ	å%‘mÉ•½É¹¥‘t€üèÉ•ÑÕÉ¹™½É… (€€€€€€€€€€€¥˜€¡¥Ñ•´¹ÍÑ…ÑÕÌ€ôô½İ¹±½…‘5…¹…•È¹MQQUM}MUMMU0€˜˜(€€€€€€€€€€€€€€€É•½É¹±½…±UÉ¤€ôô¹Õ±°€˜˜(€€€€€€€€€€€€€€€‘½İ¹±½…‘áÑ•¹Í¥½¸¡É•½É¹™¥±•9…µ”¤¥¸Í•Ñ=˜ ˆˆ°€‰‰¥¸ˆ°€‰‘…Ğˆ¤(€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€µ½¹¥Ñ½É5…¹…•ÉÁ­AÉ½µ½Ñ¥½¸¡É•½É¤(€€€€€€€€€€€ô(€€€€€€€ô((€€€€€€€É•ÑÕÉ¸É•½É‘Ì¹µ…ÀìÉ•½É€´ø(€€€€€€€€€€€ÍÑ…ÑÕÍ	å%‘mÉ•½É¹¥‘t(€€€€€€€€€€€€€€€€üè½İ¹±½…‘U¥%Ñ•´¡É•½É°½İ¹±½…‘5…¹…•È¹MQQUM}%1°€Á0°É•½É¹•áÁ•Ñ•‘	åÑ•Ì¤(€€€€€€€ô(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸±…Õ¹¡½İ¹±½…‘•‘¥±”¡ÕÉ¤èUÉ¤°µ¥µ•QåÁ”èMÑÉ¥¹œ°™¥±•9…µ”èMÑÉ¥¹œ¤è	½½±•…¸ì(€€€€€€€Ù…°¥¹Ñ•¹Ğ€ô%¹Ñ•¹Ğ¡%¹Ñ•¹Ğ¹Q%=9}Y%\¤(€€€€€€€€€€€€¹Í•Ñ…Ñ…¹‘QåÁ”¡ÕÉ¤°µ¥µ•QåÁ”¤(€€€€€€€¥¹Ñ•¹Ğ¹±¥Á…Ñ„€ô±¥Á…Ñ„¹¹•İI…İUÉ¤¡™¥±•9…µ”°ÕÉ¤¤(€€€€€€€¥¹Ñ•¹Ğ¹…‘‘±…Ì¡%¹Ñ•¹Ğ¹1}I9Q}I}UI%}AI5%MM%=8½È%¹Ñ•¹Ğ¹1}Q%Y%Qe}9]}QM,¤(€€€€€€€É•ÑÕÉ¸ÑÉäì(€€€€€€€€€€€…ÁÁ½¹Ñ•áĞ¹ÍÑ…ÉÑÑ¥Ù¥Ñä¡¥¹Ñ•¹Ğ¤(€€€€€€€€€€€ÑÉÕ”(€€€€€€€ô…Ñ €¡|èÑ¥Ù¥Ñå9½Ñ½Õ¹‘á•ÁÑ¥½¸¤ì(€€€€€€€€€€€™…±Í”(€€€€€€€ô…Ñ €¡|èM•ÕÉ¥Ñåá•ÁÑ¥½¸¤ì(€€€€€€€€€€€™…±Í”(€€€€€€€ô(€€€ô((€€€™Õ¸½Á•¸¡¥Ñ•´è½İ¹±½…‘U¥%Ñ•´¤è	½½±•…¸ì(€€€€€€€Ù…°ÕÉ¤€ô¥Ñ•´¹É•½É¹±½…±UÉ¤ü¹±•Ğ¡UÉ¤èéÁ…ÉÍ”¤(€€€€€€€€€€€€üèµ…¹…•È¹•ÑUÉ¥½É½İ¹±½…‘•‘¥±”¡¥Ñ•´¹É•½É¹¥¤(€€€€€€€€€€€€üèÉ•ÑÕÉ¸™…±Í”(€€€€€€€Ù…°‘•Ñ•Ñ•‘5¥µ•QåÁ”€ô€¡¥Ñ•´¹É•½É¹µ¥µ•QåÁ”(€€€€€€€€€€€€üè¥˜€¡¥Ñ•´¹É•½É¹±½…±UÉ¤€ôô¹Õ±°¤ì(€€€€€€€€€€€€€€€µ…¹…•È¹•Ñ5¥µ•QåÁ•½É½İ¹±½…‘•‘¥±”¡¥Ñ•´¹É•½É¹¥¤(€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€É•Í½±Ù•È¹•ÑQåÁ”¡ÕÉ¤¤(€€€€€€€€€€€ô¤ü¹ÍÕ‰ÍÑÉ¥¹	•™½É” œìœ¤ü¹ÑÉ¥´ ¤ü¹±½İ•É…Í” ¤((€€€€€€€Ù…°•áÑ•¹Í¥½¸€ô¥Ñ•´¹É•½É¹™¥±•9…µ”¹ÍÕ‰ÍÑÉ¥¹™Ñ•É1…ÍĞ œ¸œ°€ˆˆ¤¹±½İ•É…Í” ¤(€€€€€€€Ù…°Ù¥‘•½áÑ•¹Í¥½¹Ì€ôÍ•Ñ=˜ (€€€€€€€€€€€€‰µÀĞˆ°€‰´ÑØˆ°€‰µ­Øˆ°€‰İ•‰´ˆ°€‰…Ù¤ˆ°€‰µ½Øˆ°€‰ÑÌˆ°€‰´ÉÑÌˆ°€‰µÑÌˆ°(€€€€€€€€€€€€ˆÍÀˆ°€ˆÍÁÀˆ°€‰™±Øˆ°€‰µÁ•œˆ°€‰µÁœˆ°€‰´ÍÔàˆ(€€€€€€€€¤(€€€€€€€Ù…°¥ÍY¥‘•¼€ô‘•Ñ•Ñ•‘5¥µ•QåÁ”ü¹ÍÑ…ÉÑÍ]¥Ñ  ‰Ù¥‘•¼¼ˆ¤€ôôÑÉÕ”ñğ•áÑ•¹Í¥½¸¥¸Ù¥‘•½áÑ•¹Í¥½¹Ì(€€€€€€€Ù…°¥ÍÁ¬€ô•áÑ•¹Í¥½¸€ôô€‰…Á¬ˆñğ(€€€€€€€€€€€‘•Ñ•Ñ•‘5¥µ•QåÁ”€ôô€‰…ÁÁ³]4ÒÚ$z{-®éÜj×(item.record.id)
             ?: return false
         val changed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             runCatching {
@@ -2322,14 +872,12 @@ internal class DownloadController(
         if (source == destination) return false
 
         val copied = runCatching {
-            val input = resolver.openInputStream(source) ?: return@runCatching false
-            val output = resolver.openOutputStream(destination, "w") ?: return@runCatching false
-            input.use { inputStream ->
-                output.use { outputStream ->
-                    inputStream.copyTo(outputStream)
-                }
-            }
-            true
+            resolver.openInputStream(source)?.use { input ->
+                resolver.openOutputStream(destination, "w")?.use { output ->
+                    input.copyTo(output)
+                    true
+                } ?: false
+            } ?: false
         }.getOrDefault(false)
         if (!copied) return false
 
@@ -2389,232 +937,4 @@ internal class DownloadController(
         synchronized(recordLock) { saveRecordsUnsafe(emptyList()) }
     }
 
-    private fun addRecord(record: DownloadRecord) {
-        synchronized(recordLock) {
-            val records = restoreRecordsUnsafe().filterNot { it.id == record.id }.toMutableList()
-            records.add(0, record)
-            saveRecordsUnsafe(records)
-        }
-    }
-
-    private fun updateDirectState(id: Long, state: Int) {
-        synchronized(recordLock) {
-            val records = restoreRecordsUnsafe().map { record ->
-                if (record.id == id) record.copy(directState = state) else record
-            }
-            saveRecordsUnsafe(records)
-        }
-    }
-
-    private fun markDirectSuccess(id: Long, actualBytes: Long) {
-        val finalBytes = actualBytes.coerceAtLeast(0L)
-        synchronized(recordLock) {
-            val records = restoreRecordsUnsafe().map { record ->
-                if (record.id == id) {
-                    record.copy(
-                        directState = DIRECT_SUCCESS,
-                        expectedBytes = finalBytes
-                    )
-                } else {
-                    record
-                }
-            }
-            saveRecordsUnsafe(records)
-        }
-    }
-
-    private fun updateExpectedBytes(id: Long, expectedBytes: Long) {
-        if (expectedBytes <= 0L) return
-        synchronized(recordLock) {
-            val records = restoreRecordsUnsafe().map { record ->
-                if (record.id == id) record.copy(expectedBytes = expectedBytes) else record
-            }
-            saveRecordsUnsafe(records)
-        }
-    }
-
-    private fun updateRecordMetadata(id: Long, fileName: String, mimeType: String?) {
-        synchronized(recordLock) {
-            val records = restoreRecordsUnsafe().map { record ->
-                if (record.id == id) {
-                    record.copy(fileName = fileName, mimeType = mimeType)
-                } else {
-                    record
-                }
-            }
-            saveRecordsUnsafe(records)
-        }
-    }
-
-    private fun retryAfterDirectFailure(
-        failedId: Long,
-        failedDestination: Uri,
-        url: String,
-        fileName: String,
-        mimeType: String?,
-        expectedBytes: Long,
-        allowMetered: Boolean,
-        referrer: String?,
-        isPrivate: Boolean,
-        retryWithGecko: Boolean
-    ) {
-        cleanupDirectRecord(failedId, failedDestination)
-
-        val scheme = runCatching { Uri.parse(url).scheme?.lowercase() }.getOrNull()
-        if (scheme != "http" && scheme != "https") {
-            addFailedRecord(
-                failedId, url, fileName, mimeType, expectedBytes, referrer, isPrivate
-            )
-            return
-        }
-
-        if (retryWithGecko) {
-            val retried = enqueueGeckoFetch(
-                url = url,
-                fileName = fileName,
-                mimeType = mimeType,
-                expectedBytes = expectedBytes,
-                allowMetered = allowMetered,
-                referrer = referrer,
-                isPrivate = isPrivate
-            )
-            if (retried != null) return
-        }
-
-        val system = enqueueUrl(
-            url = url,
-            fileName = fileName,
-            mimeType = mimeType,
-            allowMetered = allowMetered,
-            referrer = referrer,
-            isPrivate = isPrivate
-        )
-        if (system == null) {
-            addFailedRecord(
-                failedId, url, fileName, mimeType, expectedBytes, referrer, isPrivate
-            )
-        }
-    }
-
-    private fun cleanupDirectRecord(id: Long, destination: Uri) {
-        DownloadKeepAliveService.finish(appContext, id)
-        runCatching { resolver.delete(destination, null, null) }
-        synchronized(recordLock) {
-            saveRecordsUnsafe(restoreRecordsUnsafe().filterNot { it.id == id })
-        }
-    }
-
-    private fun addFailedRecord(
-        id: Long,
-        url: String,
-        fileName: String,
-        mimeType: String?,
-        expectedBytes: Long,
-        referrer: String?,
-        isPrivate: Boolean
-    ) {
-        addRecord(
-            DownloadRecord(
-                id = id,
-                sourceUrl = url,
-                fileName = fileName,
-                mimeType = mimeType,
-                createdAt = System.currentTimeMillis(),
-                expectedBytes = expectedBytes,
-                directState = DIRECT_FAILED,
-                referrer = referrer,
-                isPrivate = isPrivate
-            )
-        )
-    }
-
-    private fun markDirectFailed(id: Long, destination: Uri) {
-        runCatching { resolver.delete(destination, null, null) }
-        synchronized(recordLock) {
-            val records = restoreRecordsUnsafe().map { record ->
-                if (record.id == id) {
-                    record.copy(localUri = null, directState = DIRECT_FAILED)
-                } else record
-            }
-            saveRecordsUnsafe(records)
-        }
-    }
-
-    private fun mediaSize(uriText: String?): Long {
-        if (uriText.isNullOrBlank()) return -1L
-        return runCatching {
-            resolver.query(Uri.parse(uriText), arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) cursor.getLong(0) else -1L
-            } ?: -1L
-        }.getOrDefault(-1L)
-    }
-
-    private fun restoreRecordsUnsafe(): List<DownloadRecord> {
-        val raw = prefs.getString(KEY_DOWNLOADS, null) ?: return emptyList()
-        return runCatching {
-            val array = JSONArray(raw)
-            buildList {
-                for (index in 0 until array.length()) {
-                    val item = array.optJSONObject(index) ?: continue
-                    val id = item.optLong("id", Long.MIN_VALUE)
-                    val sourceUrl = item.optString("sourceUrl").trim()
-                    val fileName = item.optString("fileName").trim()
-                    if (id == Long.MIN_VALUE || sourceUrl.isBlank() || fileName.isBlank()) continue
-                    add(
-                        DownloadRecord(
-                            id = id,
-                            sourceUrl = sourceUrl,
-                            fileName = fileName,
-                            mimeType = item.optString("mimeType").takeIf { it.isNotBlank() && it != "null" },
-                            createdAt = item.optLong("createdAt", System.currentTimeMillis()),
-                            localUri = item.optString("localUri").takeIf { it.isNotBlank() && it != "null" },
-                            expectedBytes = item.optLong("expectedBytes", -1L),
-                            directState = item.optInt("directState", DIRECT_NONE),
-                            referrer = item.optString("referrer").takeIf { it.isNotBlank() && it != "null" },
-                            isPrivate = item.optBoolean("isPrivate", false)
-                        )
-                    )
-                }
-            }.sortedByDescending { it.createdAt }
-        }.getOrDefault(emptyList())
-    }
-
-    private fun saveRecordsUnsafe(records: List<DownloadRecord>) {
-        val array = JSONArray()
-        records.take(MAX_RECORDS).forEach { record ->
-            array.put(
-                JSONObject()
-                    .put("id", record.id)
-                    .put("sourceUrl", record.sourceUrl)
-                    .put("fileName", record.fileName)
-                    .put("mimeType", record.mimeType)
-                    .put("createdAt", record.createdAt)
-                    .put("localUri", record.localUri)
-                    .put("expectedBytes", record.expectedBytes)
-                    .put("directState", record.directState)
-                    .put("referrer", record.referrer)
-                    .put("isPrivate", record.isPrivate)
-            )
-        }
-        prefs.edit().putString(KEY_DOWNLOADS, array.toString()).apply()
-    }
-
-    private fun header(response: WebResponse, name: String): String? =
-        response.headers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
-
-    private companion object {
-        const val KEY_DOWNLOADS = "downloads_v1"
-        const val MAX_RECORDS = 250
-        const val DOWNLOAD_CHANNEL_ID = "ilyro_downloads"
-        const val DOWNLOAD_SESSION_RESPONSE_TIMEOUT_MS = 12_000L
-        const val DOWNLOAD_PAGE_SETTLE_GRACE_MS = 3_500L
-        const val NAVIGATION_DEDUPE_WINDOW_MS = 2_000L
-        const val NAVIGATION_DEDUPE_RETENTION_MS = 15_000L
-        const val HLS_FETCH_TIMEOUT_MS = 45_000L
-        const val HLS_MAX_PLAYLIST_BYTES = 2 * 1024 * 1024
-        const val HLS_PARALLEL_FETCHES = 4
-        const val DIRECT_COPY_BUFFER_BYTES = 1024 * 1024
-        const val HLS_COPY_BUFFER_BYTES = 512 * 1024
-        const val MAX_HLS_QUALITY_VARIANTS = 12
-    }
-}
+    privaYªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíßMvN‹Z–‹­¦ëeŠw¬ÕÑ”™Õ¸…‘‘I•½É¡É•½Éè½İ¹±½…‘I•½É¤ì(€€€€€€€Íå¹¡É½¹¥é•¡É•½É‘1½¬¤ì(€€€€€€€€€€€Ù…°É•½É‘Ì€ôÉ•ÍÑ½É•I•½É‘ÍU¹Í…™” ¤¹™¥±Ñ•É9½Ğì¥Ğ¹¥€ôôÉ•½É¹¥ô¹Ñ½5ÕÑ…‰±•1¥ÍĞ ¤(€€€€€€€€€€€É•½É‘Ì¹…‘ À°É•½É¤(€€€€€€€€€€€Í…Ù•I•½É‘ÍU¹Í…™”¡É•½É‘Ì¤(€€€€€€€ô(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸ÕÁ‘…Ñ•¥É•ÑMÑ…Ñ”¡¥è1½¹œ°ÍÑ…Ñ”è%¹Ğ¤ì(€€€€€€€Íå¹¡É½¹¥é•¡É•½É‘1½¬¤ì(€€€€€€€€€€€Ù…°É•½É‘Ì€ôÉ•ÍÑ½É•I•½É‘ÍU¹Í…™” ¤¹µ…ÀìÉ•½É€´ø(€€€€€€€€€€€€€€€¥˜€¡É•½É¹¥€ôô¥¤É•½É¹½Áä¡‘¥É•ÑMÑ…Ñ”€ôÍÑ…Ñ”¤•±Í”É•½É(€€€€€€€€€€€ô(€€€€€€€€€€€Í…Ù•I•½É‘ÍU¹Í…™”¡É•½É‘Ì¤(€€€€€€€ô(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸µ…É­¥É•ÑMÕ•ÍÌ¡¥è1½¹œ°…ÑÕ…±	åÑ•Ìè1½¹œ¤ì(€€€€€€€Ù…°™¥¹…±	åÑ•Ì€ô…ÑÕ…±	åÑ•Ì¹½•É•Ñ1•…ÍĞ Á0¤(€€€€€€€Íå¹¡É½¹¥é•¡É•½É‘1½¬¤ì(€€€€€€€€€€€Ù…°É•½É‘Ì€ôÉ•ÍÑ½É•I•½É‘ÍU¹Í…™” ¤¹µ…ÀìÉ•½É€´ø(€€€€€€€€€€€€€€€¥˜€¡É•½É¹¥€ôô¥¤ì(€€€€€€€€€€€€€€€€€€€É•½É¹½Áä (€€€€€€€€€€€€€€€€€€€€€€€‘¥É•ÑMÑ…Ñ”€ô%IQ}MUML°(€€€€€€€€€€€€€€€€€€€€€€€•áÁ•Ñ•‘	åÑ•Ì€ô™¥¹…±	åÑ•Ì(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€É•½É(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô(€€€€€€€€€€€Í…Ù•I•½É‘ÍU¹Í…™”¡É•½É‘Ì¤(€€€€€€€ô(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸ÕÁ‘…Ñ•áÁ•Ñ•‘	åÑ•Ì¡¥è1½¹œ°•áÁ•Ñ•‘	åÑ•Ìè1½¹œ¤ì(€€€€€€€¥˜€¡•áÁ•Ñ•‘	åÑ•Ì€ğô€Á0¤É•ÑÕÉ¸(€€€€€€€Íå¹¡É½¹¥é•¡É•½É‘1½¬¤ì(€€€€€€€€€€€Ù…°É•½É‘Ì€ôÉ•ÍÑ½É•I•½É‘ÍU¹Í…™” ¤¹µ…ÀìÉ•½É€´ø(€€€€€€€€€€€€€€€¥˜€¡É•½É¹¥€ôô¥¤É•½É¹½Áä¡•áÁ•Ñ•‘	åÑ•Ì€ô•áÁ•Ñ•‘	åÑ•Ì¤•±Í”É•½É(€€€€€€€€€€€ô(€€€€€€€€€€€Í…Ù•I•½É‘ÍU¹Í…™”¡É•½É‘Ì¤(€€€€€€€ô(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸ÕÁ‘…Ñ•I•½É‘5•Ñ…‘…Ñ„¡¥è1½¹œ°™¥±•9…µ”èMÑÉ¥¹œ°µ¥µ•QåÁ”èMÑÉ¥¹œü¤ì(€€€€€€€Íå¹¡É½¹¥é•¡É•½É‘1½¬¤ì(€€€€€€€€€€€Ù…°É•½É‘Ì€ôÉ•ÍÑ½É•I•½É‘ÍU¹Í…™” ¤¹µ…ÀìÉ•½É€´ø(€€€€€€€€€€€€€€€¥˜€¡É•½É¹¥€ôô¥¤ì(€€€€€€€€€€€€€€€€€€€É•½É¹½Áä¡™¥±•9…µ”€ô™¥±•9…µ”°µ¥µ•QåÁ”€ôµ¥µ•QåÁ”¤(€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€É•½É(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô(€€€€€€€€€€€Í…Ù•I•½É‘ÍU¹Í…™”¡É•½É‘Ì¤(€€€€€€€ô(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸É•ÑÉå™Ñ•É¥É•Ñ…¥±ÕÉ” (€€€€€€€™…¥±•‘%è1½¹œ°(€€€€€€€™…¥±•‘•ÍÑ¥¹…Ñ¥½¸èUÉ¤°(€€€€€€€ÕÉ°èMÑÉ¥¹œ°(€€€€€€€™¥±•9…µ”èMÑÉ¥¹œ°(€€€€€€€µ¥µ•QåÁ”èMÑÉ¥¹œü°(€€€€€€€•áÁ•Ñ•‘	åÑ•Ìè1½¹œ°(€€€€€€€…±±½İ5•Ñ•É•è	½½±•…¸°(€€€€€€€É•™•ÉÉ•ÈèMÑÉ¥¹œü°(€€€€€€€¥ÍAÉ¥Ù…Ñ”è	½½±•…¸°(€€€€€€€É•ÑÉå]¥Ñ¡•­¼è	½½±•…¸(€€€€¤ì(€€€€€€€±•…¹ÕÁ¥É•ÑI•½É¡™…¥±•‘%°™…¥±•‘•ÍÑ¥¹…Ñ¥½¸¤((€€€€€€€Ù…°Í¡•µ”€ôÉÕ¹…Ñ¡¥¹œìUÉ¤¹Á…ÉÍ”¡ÕÉ°¤¹Í¡•µ”ü¹±½İ•É…Í” ¤ô¹•Ñ=É9Õ±° ¤(€€€€€€€¥˜€¡Í¡•µ”€„ô€‰¡ÑÑÀˆ€˜˜Í¡•µ”€„ô€‰¡ÑÑÁÌˆ¤ì(€€€€€€€€€€€…‘‘…¥±•‘I•½É (€€€€€€€€€€€€€€€™…¥±•‘%°ÕÉ°°™¥±•9…µ”°µ¥µ•QåÁ”°•áÁ•Ñ•‘	åÑ•Ì°É•™•ÉÉ•È°¥ÍAÉ¥Ù…Ñ”°…±±½İ5•Ñ•É•(€€€€€€€€€€€€¤(€€€€€€€€€€€É•ÑÕÉ¸(€€€€€€€ô((€€€€€€€¥˜€¡É•ÑÉå]¥Ñ¡•­¼¤ì(€€€€€€€€€€€Ù…°É•ÑÉ¥•€ô•¹ÅÕ•Õ••­½•Ñ  (€€€€€€€€€€€€€€€ÕÉ°€ôÕÉ°°(€€€€€€€€€€€€€€€™¥±•9…µ”€ô™¥±•9…µ”°(€€€€€€€€€€€€€€€µ¥µ•QåÁ”€ôµ¥µ•QåÁ”°(€€€€€€€€€€€€€€€•áÁ•Ñ•‘	åÑ•Ì€ô•áÁ•Ñ•‘	åÑ•Ì°(€€€€€€€€€€€€€€€…±±½İ5•Ñ•É•€ô…±±½İ5•Ñ•É•°(€€€€€€€€€€€€€€€É•™•ÉÉ•È€ôÉ•™•ÉÉ•È°(€€€€€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ô¥ÍAÉ¥Ù…Ñ”(€€€€€€€€€€€€¤(€€€€€€€€€€€¥˜€¡É•ÑÉ¥•€„ô¹Õ±°¤É•ÑÕÉ¸(€€€€€€€ô((€€€€€€€Ù…°ÍåÍÑ•´€ô•¹ÅÕ•Õ•UÉ° (€€€€€€€€€€€ÕÉ°€ôÕÉ°°(€€€€€€€€€€€™¥±•9…µ”€ô™¥±•9…µ”°(€€€€€€€€€€€µ¥µ•QåÁ”€ôµ¥µ•QåÁ”°(€€€€€€€€€€€…±±½İ5•Ñ•É•€ô…±±½İ5•Ñ•É•°(€€€€€€€€€€€É•™•ÉÉ•È€ôÉ•™•ÉÉ•È°(€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ô¥ÍAÉ¥Ù…Ñ”(€€€€€€€€¤(€€€€€€€¥˜€¡ÍåÍÑ•´€ôô¹Õ±°¤ì(€€€€€€€€€€€…‘‘…¥±•‘I•½É (€€€€€€€€€€€€€€€™…¥±•‘%°ÕÉ°°™¥±•9…µ”°µ¥µ•QåÁ”°•áÁ•Ñ•‘	åÑ•Ì°É•™•ÉÉ•È°¥ÍAÉ¥Ù…Ñ”°…±±½İ5•Ñ•É•(€€€€€€€€€€€€¤(€€€€€€€ô(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸±•…¹ÕÁ¥É•ÑI•½É¡¥è1½¹œ°‘•ÍÑ¥¹…Ñ¥½¸èUÉ¤¤ì(€€€€€€€½İ¹±½…‘-••Á±¥Ù•M•ÉÙ¥”¹™¥¹¥Í ¡…ÁÁ½¹Ñ•áĞ°¥¤(€€€€€€€ÉÕ¹…Ñ¡¥¹œìÉ•Í½±Ù•È¹‘•±•Ñ”¡‘•ÍÑ¥¹…Ñ¥½¸°¹Õ±°°¹Õ±°¤ô(€€€€€€€Íå¹¡É½¹¥é•¡É•½É‘1½¬¤ì(€€€€€€€€€€€Í…Ù•I•½É‘ÍU¹Í…™”¡É•ÍÑ½É•I•½É‘ÍU¹Í…™” ¤¹™¥±Ñ•É9½Ğì¥Ğ¹¥€ôô¥ô¤(€€€€€€€ô(€€€ô((€€€ÁÉ¥Ù…Ñ”™Õ¸…‘‘…¥±•‘I•½É (€€€€€€€¥è1½¹œ°(€€€€€€€ÕÉ°èMÑÉ¥¹œ°(€€€€€€€™¥±•9…µ”èMÑÉ¥¹œ°(€€€€€€€µ¥µ•QåÁ”èMÑÉ¥¹œü°(€€€€€€€•áÁ•Ñ•‘	åÑ•Ìè1½¹œ°(€€€€€€€É•™•ÉÉ•ÈèMÑÉ¥¹œü°(€€€€€€€¥ÍAÉ¥Ù…Ñ”è	½½±•…¸°(€€€€€€€…±±½İ5•Ñ•É•è	½½±•…¸(€€€€¤ì(€€€€€€€…‘‘I•½É (€€€€€€€€€€€½İ¹±½…‘I•½É (€€€€€€€€€€€€€€€¥€ô¥°(€€€€€€€€€€€€€€€Í½ÕÉ•UÉ°€ôÕÉ°°(€€€€€€€€€€€€€€€™¥±•9…µ”€ô™¥±•9…µ”°(€€€€€€€€€€€€€€€µ¥µ•QåÁ”€ôµ¥µ•QåÁ”°(€€€€€€€€€€€€€€€É•…Ñ•‘Ğ€ôMåÍÑ•´¹ÕÉÉ•¹ÑQ¥µ•5¥±±¥Ì ¤°(€€€€€€€€€€€€€€€•áÁ•Ñ•‘	åÑ•Ì€ô•áÁ•Ñ•‘	åÑ•Ì°(€€€€€€€€€€€€€€€‘¥É•ÑMÑ…Ñ”€ô%IQ}%1°(€€€€€€€€€€€€€€€É•™•ÉÉ•È€ôÉ•™•ÉÉ•È°(€€€€€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€ô¥ÍAÉ¥Ù…Ñ”°(€€€€€€€€€€€€€€€…±±½İ5•Ñ•É•€ô…±±½İ5•Ñ•É•(€€€€€€€€ƒ]­¢G§²ÚîÆ­yÖâÖ&´F—&V7Df–ÆVB†–C¢ÆöærÂFW7F–æF–öã¢W&’’°¢'Vä6F6†–ær²&W6öÇfW"æFVÆWFR†FW7F–æF–öâÂçVÆÂÂçVÆÂ’Ğ¢7–æ6‡&öæ—¦VB‡&V6÷&DÆö6²’°¢fÂ&V6÷&G2Ò&W7F÷&U&V6÷&G5Vç6fR‚’æÖ²&V6÷&BÓà¢–b‡&V6÷&Bæ–BÓÒ–B’°¢&V6÷&Bæ6÷’†Æö6ÅW&’ÒçVÆÂÂF—&V7E7FFRÒD•$T5Eôd”ÄTB¢ÒVÇ6R&V6÷&@¢Ğ¢6fU&V6÷&G5Vç6fR‡&V6÷&G2¢Ğ¢Ğ ¢&—fFRgVâÖVF–6—¦R‡W&•FW‡C¢7G&–æsò“¢Æöær°¢–b‡W&•FW‡Bæ—4çVÆÄ÷$&Ææ²‚’’&WGW&âÓÀ¢&WGW&â'Vä6F6†–ær°¢&W6öÇfW"çVW'’…W&’ç'6R‡W&•FW‡B’Â'&”öb„÷Væ&ÆT6öÇVÖç2å4•¤R’ÂçVÆÂÂçVÆÂÂçVÆÂ“òçW6R²7W'6÷"Óà¢–b†7W'6÷"æÖ÷fUFôf—'7B‚’’7W'6÷"ævWDÆöærƒ’VÇ6RÓÀ¢Òó¢ÓÀ¢ÒævWD÷$FVfVÇB‚ÓÂ¢Ğ ¢&—fFRgVâ&W7F÷&U&V6÷&G5Vç6fR‚“¢Æ—7CÄF÷væÆöE&V6÷&Câ°¢fÂ&rÒ&Vg2ævWE7G&–ær„´U•ôDõtäÄôE2ÂçVÆÂ’ó¢&WGW&âV×G”Æ—7B‚¢&WGW&â'Vä6F6†–ær°¢fÂ'&’Ò¥4ôä'&’‡&r¢'V–ÆDÆ—7B°¢f÷"†–æFW‚–âVçF–Â'&’æÆVæwF‚‚’’°¢fÂ—FVÒÒ'&’æ÷D¥4ôäö&¦V7B†–æFW‚’ó¢6öçF–çVP¢fÂ–BÒ—FVÒæ÷DÆöær‚&–B"ÂÆöæräÔ”åõdÅTR¢fÂ6÷W&6UW&ÂÒ—FVÒæ÷E7G&–ær‚'6÷W&6UW&Â"’çG&–Ò‚¢fÂf–ÆTæÖRÒ—FVÒæ÷E7G&–ær‚&f–ÆTæÖR"’çG&–Ò‚¢–b†–BÓÒÆöæräÔ”åõdÅTRÇÂ6÷W&6UW&Âæ—4&Ææ²‚’ÇÂf–ÆTæÖRæ—4&Ææ²‚’’6öçF–çVP¢FB€¢F÷væÆöE&V6÷&B€¢–BÒ–BÀ¢6÷W&6UW&ÂÒ6÷W&6UW&ÂÀ¢f–ÆTæÖRÒf–ÆTæÖRÀ¢Ö–ÖUG—RÒ—FVÒæ÷E7G&–ær‚&Ö–ÖUG—R"’çF¶T–b²—Bæ—4æ÷D&Ææ²‚’bb—BÒ&çVÆÂ"ÒÀ¢7&VFVDBÒ—FVÒæ÷DÆöær‚&7&VFVDB"Â7—7FVÒæ7W'&VçEF–ÖTÖ–ÆÆ—2‚’’À¢Æö6ÅW&’Ò—FVÒæ÷E7G&–ær‚&Æö6ÅW&’"’çF¶T–b²—Bæ—4æ÷D&Ææ²‚’bb—BÒ&çVÆÂ"ÒÀ¢W‡V7FVD'—FW2Ò—FVÒæ÷DÆöær‚&W‡V7FVD'—FW2"ÂÓÂ’À¢F—&V7E7FFRÒ—FVÒæ÷D–çB‚&F—&V7E7FFR"ÂD•$T5EôäôäR’À¢&VfW'&W"Ò—FVÒæ÷E7G&–ær‚'&VfW'&W""’çF¶T–b²—Bæ—4æ÷D&Ææ²‚’bb—BÒ&çVÆÂ"ÒÀ¢—5&—fFRÒ—FVÒæ÷D&ööÆVâ‚&—5&—fFR"ÂfÇ6R’À¢ÆÆ÷tÖWFW&VBÒ—FVÒæ÷D&ööÆVâ‚&ÆÆ÷tÖWFW&VB"ÂG'VR’À¢—4†Ç2Ò—FVÒæ÷D&ööÆVâ‚&—4†Ç2"ÂfÇ6R¢¢¢Ğ¢Òç6÷'FVD'”FW66VæF–ær²—Bæ7&VFVDBĞ¢ÒævWD÷$FVfVÇB†V×G”Æ—7B‚’¢Ğ ¢&—fFRgVâ6fU&V6÷&G5Vç6fR‡&V6÷&G3¢Æ—7CÄF÷væÆöE&V6÷&Câ’°¢fÂ'&’Ò¥4ôä'&’‚¢&V6÷&G2çF¶R„Ô…õ$T4õ$E2’æf÷$V6‚²&V6÷&BÓà¢'&’çWB€¢¥4ôäö&¦V7B‚¢çWB‚&–B"Â&V6÷&Bæ–B¢çWB‚'6÷W&6UW&Â"Â&V6÷&Bç6÷W&6UW&Â¢çWB‚&f–ÆTæÖR"Â&V6÷&Bæf–ÆTæÖR¢çWB‚&Ö–ÖUG—R"Â&V6÷&BæÖ–ÖUG—R¢çWB‚&7&VFVDB"Â&V6÷&Bæ7&VFVDB¢çWB‚&Æö6ÅW&’"Â&V6÷&BæÆö6ÅW&’¢çWB‚&W‡V7FVD'—FW2"Â&V6÷&BæW‡V7FVD'—FW2¢çWB‚&F—&V7E7FFR"Â&V6÷&BæF—&V7E7FFR¢çWB‚'&VfW'&W""Â&V6÷&Bç&VfW'&W"¢çWB‚&—5&—fFR"Â&V6÷&Bæ—5&—fFR¢çWB‚&ÆÆ÷tÖWFW&VB"Â&V6÷&BæÆÆ÷tÖWFW&VB¢çWB‚&—4†Ç2"Â&V6÷&Bæ—4†Ç2¢¢Ğ¢&Vg2æVF—B‚’çWE7G&–ær„´U•ôDõtäÄôE2Â'&’çFõ7G&–ær‚’’æÇ’‚¢Ğ ¢&—fFRgVâ†VFW"‡&W7öç6S¢vV%&W7öç6RÂæÖS¢7G&–ær“¢7G&–æsòĞ¢&W7öç6Ræ†VFW'2æVçG&–W2æf—'7D÷$çVÆÂ²—Bæ¶W’æWVÇ2†æÖRÂ–væ÷&T66RÒG'VR’ÓòçfÇVP ¢&—fFR6ö×æ–öâö&¦V7B°¢6öç7BfÂ´U•ôDõtäÄôE2Ò&F÷væÆöG5÷c ¢6öç7BfÂÔ…õ$T4õ$E2Ò#S ¢6öç7BfÂDõtäÄôEô4„ääTÅô”BÒ&–Ç—&õöF÷væÆöG2 ¢6öç7BfÂDõtäÄôEõ4U54”ôåõ$U5ôå4UõD”ÔTõUEôÕ2Ò%óÀ¢6öç7BfÂDõtäÄôEõtUõ4UEDÄUôu$4UôÕ2Ò5óSÀ¢6öç7BfÂäd”tD”ôåôDTEUUõt”äDõuôÕ2Ò%óÀ¢6öç7BfÂäd”tD”ôåôDTEUUõ$UDTåD”ôåôÕ2ÒUóÀ¢6öç7BfÂ„Å5ôdUD4…õD”ÔTõUEôÕ2ÒCUóÀ¢6öç7BfÂ„Å5ôÔ…õÄ”Ä•5Eô%•DU2Ò"¢#B¢#@¢6öç7BfÂ„Å5õ$ÄÄTÅôdUD4„U2Ò@¢6öç7BfÂD•$T5Eô4õ•ô%TddU%ô%•DU2Ò#B¢#@¢6öç7BfÂ„Å5ô4õ•ô%TddU%ô%•DU2ÒS"¢#@¢6öç7BfÂÔ…ô„Å5õTÄ•E•õd$”åE2Ò ¢Ğ§Ğ 

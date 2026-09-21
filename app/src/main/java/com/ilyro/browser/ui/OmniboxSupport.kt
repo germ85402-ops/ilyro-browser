@@ -1,206 +1,4 @@
-package com.ilyro.browser.ui
-
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.net.Uri
-import androidx.compose.foundation.Image as ComposeImage
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.ime
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.History
-import androidx.compose.material.icons.rounded.Lock
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntRect
-import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.LayoutDirection
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupPositionProvider
-import androidx.compose.ui.window.PopupProperties
-import androidx.compose.ui.zIndex
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import java.net.HttpURLConnection
-import java.net.URL
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
-
-private enum class OmniboxSuggestionKind { HISTORY, SEARCH }
-
-private data class OmniboxSuggestion(
-    val kind: OmniboxSuggestionKind,
-    val value: String,
-    val title: String,
-    val subtitle: String
-)
-
-/**
- * Activity-level touch routing for the focused home omnibox.
- *
- * Compose's AndroidComposeView owns touch dispatch, so attaching an Android OnTouchListener to
- * LocalView is not reliable for taps that are handled inside Compose. MainActivity forwards the
- * initial window ACTION_DOWN here instead. We keep the two interactive rectangles separate so a
- * tap on the empty home area dismisses search, while the field and suggestion list remain
- * fully interactive.
- */
-internal object HomeOmniboxTouchCoordinator {
-    private var owner: Any? = null
-    private var active = false
-    private var fieldBounds = Rect.Zero
-    private var suggestionBounds = Rect.Zero
-    private var dismissAction: (() -> Unit)? = null
-
-    fun bind(ownerToken: Any, onDismiss: () -> Unit) {
-        owner = ownerToken
-        dismissAction = onDismiss
-    }
-
-    fun unbind(ownerToken: Any) {
-        if (owner !== ownerToken) return
-        owner = null
-        active = false
-        fieldBounds = Rect.Zero
-        suggestionBounds = Rect.Zero
-        dismissAction = null
-    }
-
-    fun setActive(ownerToken: Any, value: Boolean) {
-        if (owner !== ownerToken) return
-        active = value
-        if (!value) suggestionBounds = Rect.Zero
-    }
-
-    fun setFieldBounds(ownerToken: Any, bounds: Rect) {
-        if (owner === ownerToken) fieldBounds = bounds
-    }
-
-    fun setSuggestionBounds(ownerToken: Any, bounds: Rect) {
-        if (owner === ownerToken) suggestionBounds = bounds
-    }
-
-    fun onWindowTouchDown(x: Float, y: Float) {
-        if (!active || owner == null) return
-        val point = Offset(x, y)
-        val insideField = fieldBounds != Rect.Zero && fieldBounds.contains(point)
-        val insideSuggestions = suggestionBounds != Rect.Zero && suggestionBounds.contains(point)
-        if (!insideField && !insideSuggestions) {
-            dismissAction?.invoke()
-        }
-    }
-}
-
-internal object AddressOmniboxTouchCoordinator {
-    private var owner: Any? = null
-    private var active = false
-    private var fieldBounds = Rect.Zero
-    private var dismissAction: (() -> Unit)? = null
-
-    fun bind(ownerToken: Any, onDismiss: () -> Unit) {
-        owner = ownerToken
-        dismissAction = onDismiss
-    }
-
-    fun unbind(ownerToken: Any) {
-        if (owner !== ownerToken) return
-        owner = null
-        active = false
-        fieldBounds = Rect.Zero
-        dismissAction = null
-    }
-
-    fun setActive(ownerToken: Any, value: Boolean) {
-        if (owner !== ownerToken) return
-        active = value
-    }
-
-    fun setFieldBounds(ownerToken: Any, bounds: Rect) {
-        if (owner === ownerToken) fieldBounds = bounds
-    }
-
-    fun onWindowTouchDown(x: Float, y: Float) {
-        if (!active || owner == null) return
-        val point = Offset(x, y)
-        val insideField = fieldBounds != Rect.Zero && fieldBounds.contains(point)
-        if (!insideField) dismissAction?.invoke()
-    }
-}
-
-@Composable
-internal fun IlyroHomeOmnibox(
-    value: String,
-    onValueChange: (String) -> Unit,
-    searchEngine: SearchEngine,
-    history: List<HistoryItem>,
-    isPrivate: Boolean,
-    onSearchEngineChange: (SearchEngine) -> Unit,
-    onNavigate: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    var focused by remember { mutableStateOf(false) }
-    val ownerToken = remember { Any() }
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬ÕÁ…­…”½´¹¥±åÉ¼¹‰É½İÍ•È¹Õ¤()¥µÁ½ÉĞ…¹‘É½¥¹É…Á¡¥Ì¹	¥Ñµ…À)¥µÁ½ÉĞ…¹‘É½¥¹É…Á¡¥Ì¹	¥Ñµ…Á…Ñ½Éä)¥µÁ½ÉĞ…¹‘É½¥¹¹•Ğ¹UÉ¤)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹%µ…”…Ì½µÁ½Í•%µ…”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±¥­…‰±”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹•ÍÑÕÉ•Ì¹‘•Ñ•ÑQ…Á•ÍÑÕÉ•Ì)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹ÉÉ…¹•µ•¹Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹	½à)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹½±Õµ¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹I½Ü)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹]¥¹‘½İ%¹Í•ÑÌ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹™¥±±5…á]¥‘Ñ )¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹¡•¥¡Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹¡•¥¡Ñ%¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹¥µ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹Á…‘‘¥¹œ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹Í¥é”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹±…å½ÕĞ¹İ¥‘Ñ¡%¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹É•µ•µ‰•ÉMÉ½±±MÑ…Ñ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹Í¡…Á”¹I½Õ¹‘•‘½É¹•ÉM¡…Á”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹Ñ•áĞ¹-•å‰½…É‘Ñ¥½¹Ì)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹Ñ•áĞ¹-•å‰½…É‘=ÁÑ¥½¹Ì)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹Ù•ÉÑ¥…±MÉ½±°)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹%½¹Ì)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹¡•¬)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹!¥ÍÑ½Éä)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹1½¬)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°¹¥½¹Ì¹É½Õ¹‘•¹M•…É )¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹É½Á‘½İ¹5•¹Ô)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹É½Á‘½İ¹5•¹Õ%Ñ•´)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹%½¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹5…Ñ•É¥…±Q¡•µ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹=ÕÑ±¥¹•‘Q•áÑ¥•±)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹=ÕÑ±¥¹•‘Q•áÑ¥•±‘•™…Õ±ÑÌ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹MÕÉ™…”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹µ…Ñ•É¥…°Ì¹Q•áĞ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹½µÁ½Í…‰±”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹¥ÍÁ½Í…‰±•™™•Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹1…Õ¹¡•‘™™•Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹•ÑY…±Õ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹µÕÑ…‰±•MÑ…Ñ•=˜)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹É•µ•µ‰•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹ÉÕ¹Ñ¥µ”¹Í•ÑY…±Õ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹±¥¹µ•¹Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹5½‘¥™¥•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹‘É…Ü¹±¥À)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹™½ÕÌ¹½¹½ÕÍ¡…¹•)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹•½µ•ÑÉä¹=™™Í•Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹•½µ•ÑÉä¹I•Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹É…Á¡¥Ì¹½±½È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹É…Á¡¥Ì¹…Í%µ…•	¥Ñµ…À)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹¥¹ÁÕĞ¹Á½¥¹Ñ•È¹Á½¥¹Ñ•É%¹ÁÕĞ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹±…å½ÕĞ¹½¹Ñ•¹ÑM…±”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹±…å½ÕĞ¹‰½Õ¹‘Í%¹]¥¹‘½Ü)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹±…å½ÕĞ¹½¹±½‰…±±åA½Í¥Ñ¥½¹•)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Á±…Ñ™½É´¹1½…±½¹™¥ÕÉ…Ñ¥½¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Á±…Ñ™½É´¹1½…±•¹Í¥Ñä)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Á±…Ñ™½É´¹1½…±½ÕÍ5…¹…•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Á±…Ñ™½É´¹1½…±M½™Ñİ…É•-•å‰½…É‘½¹ÑÉ½±±•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Ñ•áĞ¹™½¹Ğ¹½¹Ñ]•¥¡Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Ñ•áĞ¹¥¹ÁÕĞ¹%µ•Ñ¥½¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Ñ•áĞ¹¥¹ÁÕĞ¹Q•áÑ¥•±‘Y…±Õ”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Ñ•áĞ¹ÍÑå±”¹Q•áÑ=Ù•É™±½Ü)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Õ¹¥Ğ¹À)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Õ¹¥Ğ¹%¹Ñ=™™Í•Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Õ¹¥Ğ¹%¹ÑI•Ğ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Õ¹¥Ğ¹%¹ÑM¥é”)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Õ¹¥Ğ¹1…å½ÕÑ¥É•Ñ¥½¸)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹Õ¹¥Ğ¹‘À)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹İ¥¹‘½Ü¹A½ÁÕÀ)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹İ¥¹‘½Ü¹A½ÁÕÁA½Í¥Ñ¥½¹AÉ½Ù¥‘•È)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹İ¥¹‘½Ü¹A½ÁÕÁAÉ½Á•ÉÑ¥•Ì)¥µÁ½ÉĞ…¹‘É½¥‘à¹½µÁ½Í”¹Õ¤¹é%¹‘•à)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹½É½ÕÑ¥¹•M½Á”)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹•™•ÉÉ•)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹¥ÍÁ…Ñ¡•ÉÌ)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹MÕÁ•ÉÙ¥Í½É)½ˆ)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹…Íå¹Œ)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹‘•±…ä)¥µÁ½ÉĞ­½Ñ±¥¹à¹½É½ÕÑ¥¹•Ì¹İ¥Ñ¡½¹Ñ•áĞ)¥µÁ½ÉĞ½Éœ¹©Í½¸¹)M=9ÉÉ…ä)¥µÁ½ÉĞ©…Ù„¹¹•Ğ¹!ÑÑÁUI1½¹¹•Ñ¥½¸)¥µÁ½ÉĞ©…Ù„¹¹•Ğ¹UI0)¥µÁ½ÉĞ©…Ù„¹¹•Ğ¹UI1¹½‘•È)¥µÁ½ÉĞ©…Ù„¹¹¥¼¹¡…ÉÍ•Ğ¹MÑ…¹‘…É‘¡…ÉÍ•ÑÌ()ÁÉ¥Ù…Ñ”•¹Õ´±…ÍÌ=µ¹¥‰½áMÕ•ÍÑ¥½¹-¥¹ì!%MQ=Id°MI ô()ÁÉ¥Ù…Ñ”‘…Ñ„±…ÍÌ=µ¹¥‰½áMÕ•ÍÑ¥½¸ (€€€Ù…°­¥¹è=µ¹¥‰½áMÕ•ÍÑ¥½¹-¥¹°(€€€Ù…°Ù…±Õ”èMÑÉ¥¹œ°(€€€Ù…°Ñ¥Ñ±”èMÑÉ¥¹œ°(€€€Ù…°ÍÕ‰Ñ¥Ñ±”èMÑÉ¥¹œ(¤((¼¨¨(€¨Ñ¥Ù¥Ñäµ±•Ù•°Ñ½Õ É½ÕÑ¥¹œ™½ÈÑ¡”™½ÕÍ•¡½µ”½µ¹¥‰½à¸(€¨(€¨½µÁ½Í”Ì¹‘É½¥‘½µÁ½Í•Y¥•Ü½İ¹ÌÑ½Õ ‘¥ÍÁ…Ñ °Í¼…ÑÑ…¡¥¹œ…¸¹‘É½¥=¹Q½Õ¡1¥ÍÑ•¹•ÈÑ¼(€¨1½…±Y¥•Ü¥Ì¹½ĞÉ•±¥…‰±”™½ÈÑ…ÁÌÑ¡…Ğ…É”¡…¹‘±•¥¹Í¥‘”½µÁ½Í”¸5…¥¹Ñ¥Ù¥Ñä™½Éİ…É‘ÌÑ¡”(€¨¥¹¥Ñ¥…°İ¥¹‘½ÜQ%=9}=]8¡•É”¥¹ÍÑ•…¸]”­••ÀÑ¡”Ñİ¼¥¹Ñ•É…Ñ¥Ù”É•Ñ…¹±•ÌÍ•Á…É…Ñ”Í¼„(€¨Ñ…À½¸Ñ¡”•µÁÑä¡½µ”…É•„‘¥Ï]4ÒÚ$z{-®éÜj×yboardController = LocalSoftwareKeyboardController.current
     DisposableEffect(ownerToken, focusManager, keyboardController) {
         HomeOmniboxTouchCoordinator.bind(ownerToken) {
             focusManager.clearFocus(force = true)
@@ -311,197 +109,7 @@ internal fun IlyroAddressOmnibox(
 ) {
     var focused by remember { mutableStateOf(false) }
     val ownerToken = remember { Any() }
-    val focusManager = LocalFocusManager.current
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val secure = value.text.startsWith("https://", ignoreCase = true)
-
-    val dismissEditing: () -> Unit = {
-        focused = false
-        onFocusChanged(false)
-        focusManager.clearFocus(force = true)
-        keyboardController?.hide()
-    }
-
-    DisposableEffect(ownerToken, focusManager, keyboardController, onFocusChanged) {
-        AddressOmniboxTouchCoordinator.bind(ownerToken, dismissEditing)
-        onDispose {
-            AddressOmniboxTouchCoordinator.unbind(ownerToken)
-        }
-    }
-
-    Box(modifier = modifier) {
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(fieldHeight)
-                .clip(RoundedCornerShape(IlyroVisualTokens.PillRadius))
-                .onGloballyPositioned {
-                    AddressOmniboxTouchCoordinator.setFieldBounds(ownerToken, it.boundsInWindow())
-                }
-                .onFocusChanged { state ->
-                    focused = state.isFocused
-                    AddressOmniboxTouchCoordinator.setActive(ownerToken, state.isFocused)
-                    onFocusChanged(state.isFocused)
-                },
-            singleLine = true,
-            textStyle = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
-            placeholder = {
-                Text(
-                    if (compact) tr("Search or URL", "ĞŸĞ¾Ğ¸ÑĞº Ğ¸Ğ»Ğ¸ URL")
-                    else tr("Search or enter address", "ĞŸĞ¾Ğ¸ÑĞº Ğ¸Ğ»Ğ¸ Ğ°Ğ´Ñ€ĞµÑ"),
-                    maxLines = 1,
-                    style = if (compact) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f)
-                )
-            },
-            leadingIcon = {
-                Surface(
-                    modifier = Modifier.size(if (compact) 30.dp else 32.dp),
-                    shape = RoundedCornerShape(50),
-                    color = when {
-                        isPrivate -> Color(0xFF8B5CF6).copy(alpha = 0.12f)
-                        secure -> MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-                        else -> Color.Transparent
-                    }
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            imageVector = if (secure) Icons.Rounded.Lock else Icons.Rounded.Search,
-                            contentDescription = null,
-                            modifier = Modifier.size(if (compact) 17.dp else 18.dp),
-                            tint = when {
-                                isPrivate -> Color(0xFFC4B5FD)
-                                secure -> MaterialTheme.colorScheme.primary
-                                else -> MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
-                    }
-                }
-            },
-            trailingIcon = trailingIcon,
-            shape = RoundedCornerShape(IlyroVisualTokens.PillRadius),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
-            keyboardActions = KeyboardActions(
-                onGo = {
-                    val target = value.text
-                    dismissEditing()
-                    if (target.isNotBlank()) onNavigate(target)
-                }
-            ),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surface,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f),
-                focusedBorderColor = if (isPrivate) Color(0xFF8B5CF6) else MaterialTheme.colorScheme.primary,
-                unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)
-            )
-        )
-
-        OmniboxSuggestionsMenu(
-            expanded = focused,
-            query = value.text,
-            searchEngine = searchEngine,
-            history = history,
-            allowRemote = !isPrivate,
-            placeAbove = suggestionsAbove,
-            onDismiss = dismissEditing,
-            onSelect = { selected ->
-                dismissEditing()
-                onNavigate(selected)
-            }
-        )
-    }
-}
-
-@Composable
-private fun SearchEngineSelector(
-    engine: SearchEngine,
-    onEngineSelected: (SearchEngine) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    Box {
-        SearchEngineBadge(
-            engine = engine,
-            modifier = Modifier
-                .size(28.dp)
-                .pointerInput(engine) {
-                    detectTapGestures(
-                        onTap = { expanded = true },
-                        onLongPress = { expanded = true }
-                    )
-                }
-        )
-
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            SearchEngine.entries.forEach { candidate ->
-                DropdownMenuItem(
-                    text = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            SearchEngineBadge(candidate, Modifier.size(26.dp))
-                            Text(
-                                text = candidate.displayName,
-                                modifier = Modifier.padding(start = 10.dp),
-                                fontWeight = if (candidate == engine) FontWeight.SemiBold else FontWeight.Normal
-                            )
-                        }
-                    },
-                    trailingIcon = if (candidate == engine) {
-                        { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
-                    } else null,
-                    onClick = {
-                        expanded = false
-                        onEngineSelected(candidate)
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SearchEngineBadge(engine: SearchEngine, modifier: Modifier = Modifier) {
-    var bitmap by remember(engine) { mutableStateOf(SearchEngineIconCache.peek(engine)) }
-
-    LaunchedEffect(engine) {
-        if (bitmap == null) bitmap = SearchEngineIconCache.loadOnce(engine)
-    }
-
-    val loaded = bitmap
-    if (loaded != null) {
-        ComposeImage(
-            bitmap = loaded.asImageBitmap(),
-            contentDescription = engine.displayName,
-            modifier = modifier.padding(1.dp),
-            contentScale = ContentScale.Fit
-        )
-    } else {
-        SearchEngineFallbackBadge(engine, modifier)
-    }
-}
-
-@Composable
-private fun SearchEngineFallbackBadge(engine: SearchEngine, modifier: Modifier = Modifier) {
-    val (mark, background) = when (engine) {
-        SearchEngine.GOOGLE -> "G" to Color(0xFF4285F4)
-        SearchEngine.YANDEX -> "Y" to Color(0xFFFC3F1D)
-        SearchEngine.DUCKDUCKGO -> "D" to Color(0xFFDE5833)
-        SearchEngine.BRAVE -> "B" to Color(0xFFFB542B)
-        SearchEngine.BING -> "b" to Color(0xFF008373)
-    }
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(50),
-        color = background
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text(
-                text = mark,
-                color = Color.White,
+ YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Ô€€Ù…°™½ÕÍ5…¹…•È€ô1½…±½ÕÍ5…¹…•È¹ÕÉÉ•¹Ğ(€€€Ù…°­•å‰½…É‘½¹ÑÉ½±±•È€ô1½…±M½™Ñİ…É•-•å‰½…É‘½¹ÑÉ½±±•È¹ÕÉÉ•¹Ğ(€€€Ù…°Í•ÕÉ”€ôÙ…±Õ”¹Ñ•áĞ¹ÍÑ…ÉÑÍ]¥Ñ  ‰¡ÑÑÁÌè¼¼ˆ°¥¹½É•…Í”€ôÑÉÕ”¤((€€€Ù…°‘¥Íµ¥ÍÍ‘¥Ñ¥¹œè€ ¤€´øU¹¥Ğ€ôì(€€€€€€€™½ÕÍ•€ô™…±Í”(€€€€€€€½¹½ÕÍ¡…¹•¡™…±Í”¤(€€€€€€€™½ÕÍ5…¹…•È¹±•…É½ÕÌ¡™½É”€ôÑÉÕ”¤(€€€€€€€­•å‰½…É‘½¹ÑÉ½±±•Èü¹¡¥‘” ¤(€€€ô((€€€¥ÍÁ½Í…‰±•™™•Ğ¡½İ¹•ÉQ½­•¸°™½ÕÍ5…¹…•È°­•å‰½…É‘½¹ÑÉ½±±•È°½¹½ÕÍ¡…¹•¤ì(€€€€€€€‘‘É•ÍÍ=µ¹¥‰½áQ½Õ¡½½É‘¥¹…Ñ½È¹‰¥¹¡½İ¹•ÉQ½­•¸°‘¥Íµ¥ÍÍ‘¥Ñ¥¹œ¤(€€€€€€€½¹¥ÍÁ½Í”ì(€€€€€€€€€€€‘‘É•ÍÍ=µ¹¥‰½áQ½Õ¡½½É‘¥¹…Ñ½È¹Õ¹‰¥¹¡½İ¹•ÉQ½­•¸¤(€€€€€€€ô(€€€ô((€€€	½à¡µ½‘¥™¥•È€ôµ½‘¥™¥•È¤ì(€€€€€€€=ÕÑ±¥¹•‘Q•áÑ¥•± (€€€€€€€€€€€Ù…±Õ”€ôÙ…±Õ”°(€€€€€€€€€€€½¹Y…±Õ•¡…¹”€ô½¹Y…±Õ•¡…¹”°(€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€¹™¥±±5…á]¥‘Ñ  ¤(€€€€€€€€€€€€€€€€¹¡•¥¡Ğ¡™¥•±‘!•¥¡Ğ¤(€€€€€€€€€€€€€€€€¹±¥À¡I½Õ¹‘•‘½É¹•ÉM¡…Á”¡%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹A¥±±I…‘¥ÕÌ¤¤(€€€€€€€€€€€€€€€€¹½¹±½‰…±±åA½Í¥Ñ¥½¹•ì(€€€€€€€€€€€€€€€€€€€‘‘É•ÍÍ=µ¹¥‰½áQ½Õ¡½½É‘¥¹…Ñ½È¹Í•Ñ¥•±‘	½Õ¹‘Ì¡½İ¹•ÉQ½­•¸°¥Ğ¹‰½Õ¹‘Í%¹]¥¹‘½Ü ¤¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€¹½¹½ÕÍ¡…¹•ìÍÑ…Ñ”€´ø(€€€€€€€€€€€€€€€€€€€™½ÕÍ•€ôÍÑ…Ñ”¹¥Í½ÕÍ•(€€€€€€€€€€€€€€€€€€€‘‘É•ÍÍ=µ¹¥‰½áQ½Õ¡½½É‘¥¹…Ñ½È¹Í•ÑÑ¥Ù”¡½İ¹•ÉQ½­•¸°ÍÑ…Ñ”¹¥Í½ÕÍ•¤(€€€€€€€€€€€€€€€€€€€½¹½ÕÍ¡…¹•¡ÍÑ…Ñ”¹¥Í½ÕÍ•¤(€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€Í¥¹±•1¥¹”€ôÑÉÕ”°(€€€€€€€€€€€Ñ•áÑMÑå±”€ô¥˜€¡½µÁ…Ğ¤5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹‰½‘åMµ…±°•±Í”5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹‰½‘å5•‘¥Õ´°(€€€€€€€€€€€Á±…•¡½±‘•È€ôì(€€€€€€€€€€€€€€€Q•áĞ (€€€€€€€€€€€€€€€€€€€¥˜€¡½µÁ…Ğ¤ÑÈ ‰M•…É ½ÈUI0ˆ°€‹BBûBãFBèƒBãBïBàUI0ˆ¤(€€€€€€€€€€€€€€€€€€€•±Í”ÑÈ ‰M•…É ½È•¹Ñ•È…‘‘É•ÍÌˆ°€‹BBûBãFBèƒBãBïBàƒBÃBÓFB×Fˆ¤°(€€€€€€€€€€€€€€€€€€€µ…á1¥¹•Ì€ô€Ä°(€€€€€€€€€€€€€€€€€€€ÍÑå±”€ô¥˜€¡½µÁ…Ğ¤5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹‰½‘åMµ…±°•±Í”5…Ñ•É¥…±Q¡•µ”¹ÑåÁ½É…Á¡ä¹‰½‘å5•‘¥Õ´°(€€€€€€€€€€€€€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½¹MÕÉ™…•Y…É¥…¹Ğ¹½Áä¡…±Á¡„€ô€À¸Üá˜¤(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€ô°(€€€€€€€€€€€±•…‘¥¹%½¸€ôì(€€€€€€€€€€€€€€€MÕÉ™…” (€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Í¥é”¡¥˜€¡½µÁ…Ğ¤€ÌÀ¹‘À•±Í”€ÌÈ¹‘À¤°(€€€€€€€€€€€€€€€€€€€Í¡…Á”€ôI½Õ¹‘•‘½É¹•ÉM¡…Á” ÔÀ¤°(€€€€€€€€€€€€€€€€€€€½±½È€ôİ¡•¸ì(€€€€€€€€€€€€€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€´ø½±½È ÁááÕØ¤¹½Áä¡…±Á¡„€ô€À¸ÄÉ˜¤(€€€€€€€€€€€€€€€€€€€€€€€Í•ÕÉ”€´ø5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÁÉ¥µ…Éä¹½Áä¡…±Á¡„€ô€À¸ÄÁ˜¤(€€€€€€€€€€€€€€€€€€€€€€€•±Í”€´ø½±½È¹QÉ…¹ÍÁ…É•¹Ğ(€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€€€€€	½à¡½¹Ñ•¹Ñ±¥¹µ•¹Ğ€ô±¥¹µ•¹Ğ¹•¹Ñ•È¤ì(€€€€€€€€€€€€€€€€€€€€€€€%½¸ (€€€€€€€€€€€€€€€€€€€€€€€€€€€¥µ…•Y•Ñ½È€ô¥˜€¡Í•ÕÉ”¤%½¹Ì¹I½Õ¹‘•¹1½¬•±Í”%½¹Ì¹I½Õ¹‘•¹M•…É °(€€€€€€€€€€€€€€€€€€€€€€€€€€€½¹Ñ•¹Ñ•ÍÉ¥ÁÑ¥½¸€ô¹Õ±°°(€€€€€€€€€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Í¥é”¡¥˜€¡½µÁ…Ğ¤€ÄÜ¹‘À•±Í”€Äà¹‘À¤°(€€€€€€€€€€€€€€€€€€€€€€€€€€€Ñ¥¹Ğ€ôİ¡•¸ì(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€¥ÍAÉ¥Ù…Ñ”€´ø½±½È ÁáÑÕ¤(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€Í•ÕÉ”€´ø5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÁÉ¥µ…Éä(€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€€•±Í”€´ø5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½¹MÕÉ™…•Y…É¥…¹Ğ(€€€€€€€€€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô°(€€€€€€€€€€€ÑÉ…¥±¥¹%½¸€ôÑÉ…¥±¥¹%½¸°(€€€€€€€€€€€Í¡…Á”€ôI½Õ¹‘•‘½É¹•ÉM¡…Á”¡%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹A¥±±I…‘¥ÕÌ¤°(€€€€€€€€€€€­•å‰½…É‘=ÁÑ¥½¹Ì€ô-•å‰½…É‘=ÁÑ¥½¹Ì¡¥µ•Ñ¥½¸€ô%µ•Ñ¥½¸¹¼¤°(€€€€€€€€€€€­•å‰½…É‘Ñ¥½¹Ì€ô-•å‰½…É‘Ñ¥½¹Ì (€€€€€€€€€€€€€€€½¹¼€ôì(€€€€€€€€€€€€€€€€€€€Ù…°Ñ…É•Ğ€ôÙ…±Õ”¹Ñ•áĞ(€€€€€€€€€€€€€€€€€€€‘¥Íµ¥ÍÍ‘¥Ñ¥¹œ ¤(€€€€€€€€€€€€€€€€€€€¥˜€¡Ñ…É•Ğ¹¥Í9½Ñ	±…¹¬ ¤¤½¹9…Ù¥…Ñ”¡Ñ…É•Ğ¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€€¤°(€€€€€€€€€€€½±½ÉÌ€ô=ÕÑ±¥¹•‘Q•áÑ¥•±‘•™…Õ±ÑÌ¹½±½ÉÌ (€€€€€€€€€€€€€€€™½ÕÍ•‘½¹Ñ…¥¹•É½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÍÕÉ™…”°(€€€€€€€€€€€€€€€Õ¹™½ÕÍ•‘½¹Ñ…¥¹•É½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÍÕÉ™…•Y…É¥…¹Ğ¹½Áä¡…±Á¡„€ô€À¸ĞÙ˜¤°(€€€€€€€€€€€€€€€™½ÕÍ•‘	½É‘•É½±½È€ô¥˜€¡¥ÍAÉ¥Ù…Ñ”¤½±½È ÁááÕØ¤•±Í”5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÁÉ¥µ…Éä°(€€€€€€€€€€€€€€€Õ¹™½ÕÍ•‘	½É‘•É½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½ÕÑ±¥¹•Y…É¥…¹Ğ¹½Áä¡…±Á¡„€ô€À¸ÔÉ˜¤(€€€€€€€€€€€€¤(€€€€€€€€¤((€€€€€€€=µ¹¥‰½áMÕ•ÍÑ¥½¹Í5•¹Ô (€€€€€€€€€€€•áÁ…¹‘•€ô™½ÕÍ•°(€€€€€€€€€€€ÅÕ•Éä€ôÙ…±Õ”¹Ñ•áĞ°(€€€€€€€€€€€Í•…É¡¹¥¹”€ôÍ•…É¡¹¥¹”°(€€€€€€€€€€€¡¥ÍÑ½Éä€ô¡¥ÍÑ½Éä°(€€€€€€€€€€€…±±½İI•µ½Ñ”€ô€…¥ÍAÉ¥Ù…Ñ”°(€€€€€€€€€€€Á±…•‰½Ù”€ôÍÕ•ÍÑ¥½¹Í‰½Ù”°(€€€€€€€€€€€½¹¥Íµ¥ÍÌ€ô‘¥Íµ¥ÍÍ‘¥Ñ¥¹œ°(€€€€€€€€€€€½¹M•±•Ğ€ôìÍ•±•Ñ•€´ø(€€€€€€€€€€€€€€€‘¥Íµ¥ÍÍ‘¥Ñ¥¹œ ¤(€€€€€€€€€€€€€€€½¹9…Ù¥…Ñ”¡Í•±•Ñ•¤(€€€€€€€€€€€ô(€€€€€€€€¤(€€€ô)ô()½µÁ½Í…‰±”)ÁÉ¥Ù…Ó]4ÒÚ$z{-®éÜj×      color = Color.White,
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -512,7 +120,6 @@ private fun SearchEngineFallbackBadge(engine: SearchEngine, modifier: Modifier =
 private object SearchEngineIconCache {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val bitmaps = mutableMapOf<SearchEngine, Bitmap>()
-    private val attempted = mutableSetOf<SearchEngine>()
     private val inFlight = mutableMapOf<SearchEngine, Deferred<Bitmap?>>()
 
     @Synchronized
@@ -526,9 +133,6 @@ private object SearchEngineIconCache {
                 return it
             }
             inFlight[engine]?.let { return@synchronized it }
-            if (engine in attempted) return null
-
-            attempted.add(engine)
             scope.async {
                 val loaded = BrowserIconCache.loadOnce(engine)
                 synchronized(this@SearchEngineIconCache) {
@@ -634,217 +238,7 @@ private class OmniboxPopupPositionProvider(
         anchorBounds: IntRect,
         windowSize: IntSize,
         layoutDirection: LayoutDirection,
-        popupContentSize: IntSize
-    ): IntOffset {
-        val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
-        val x = anchorBounds.left.coerceIn(0, maxX)
-        val y = calculateOmniboxPopupY(
-            placeAbove = placeAbove,
-            anchorTop = anchorBounds.top,
-            anchorBottom = anchorBounds.bottom,
-            popupHeight = popupContentSize.height,
-            windowHeight = windowSize.height,
-            imeBottom = imeBottomPx,
-            verticalGap = verticalGapPx
-        )
-        return IntOffset(x, y)
-    }
-}
-
-@Composable
-private fun OmniboxSuggestionsMenu(
-    expanded: Boolean,
-    query: String,
-    searchEngine: SearchEngine,
-    history: List<HistoryItem>,
-    allowRemote: Boolean,
-    placeAbove: Boolean,
-    onBoundsChanged: (Rect) -> Unit = { },
-    onDismiss: () -> Unit,
-    onSelect: (String) -> Unit
-) {
-    val suggestions = rememberOmniboxSuggestions(
-        expanded = expanded,
-        query = query,
-        searchEngine = searchEngine,
-        history = history,
-        allowRemote = allowRemote
-    )
-    LaunchedEffect(expanded, suggestions.isEmpty()) {
-        if (!expanded || suggestions.isEmpty()) onBoundsChanged(Rect.Zero)
-    }
-    if (!expanded || suggestions.isEmpty()) return
-
-    val density = LocalDensity.current
-    val configuration = LocalConfiguration.current
-    val imeBottomPx = WindowInsets.ime.getBottom(density)
-    val imeBottom = with(density) { imeBottomPx.toDp() }
-    val availableListHeight = (configuration.screenHeightDp.dp - imeBottom - 16.dp)
-        .coerceAtLeast(1.dp)
-    val maxListHeight = minOf(availableListHeight, 220.dp)
-    val popupWidth = (configuration.screenWidthDp.dp * 0.72f)
-        .coerceIn(260.dp, 560.dp)
-    val gapPx = with(density) { 8.dp.roundToPx() }
-    val positionProvider = remember(placeAbove, gapPx, imeBottomPx) {
-        OmniboxPopupPositionProvider(placeAbove, gapPx, imeBottomPx)
-    }
-
-    Popup(
-        popupPositionProvider = positionProvider,
-        // The IME is a separate Android window. Do not treat keyboard taps as
-        // outside-popup dismissals, otherwise every key press clears focus.
-        onDismissRequest = { },
-        properties = PopupProperties(
-            focusable = false,
-            dismissOnBackPress = false,
-            dismissOnClickOutside = false
-        )
-    ) {
-        Surface(
-            modifier = Modifier
-                .widthIn(min = popupWidth, max = popupWidth)
-                .heightIn(max = maxListHeight)
-                .onGloballyPositioned { onBoundsChanged(it.boundsInWindow()) },
-            shape = RoundedCornerShape(IlyroVisualTokens.CardRadius),
-            color = MaterialTheme.colorScheme.surface,
-            border = androidx.compose.foundation.BorderStroke(
-                1.dp,
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f)
-            ),
-            tonalElevation = 0.dp,
-            shadowElevation = 3.dp
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(vertical = 4.dp)
-            ) {
-                suggestions.take(8).forEach { suggestion ->
-                    OmniboxSuggestionRow(
-                        suggestion = suggestion,
-                        onClick = { onSelect(suggestion.value) }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun OmniboxSuggestionRow(
-    suggestion: OmniboxSuggestion,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Surface(
-            modifier = Modifier.size(26.dp),
-            shape = RoundedCornerShape(9.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.62f)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = if (suggestion.kind == OmniboxSuggestionKind.HISTORY) {
-                        Icons.Rounded.History
-                    } else {
-                        Icons.Rounded.Search
-                    },
-                    contentDescription = null,
-                    modifier = Modifier.size(15.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-        Column(modifier = Modifier.padding(start = 10.dp)) {
-            Text(
-                text = suggestion.title,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
-            )
-            if (suggestion.subtitle.isNotBlank()) {
-                Text(
-                    text = suggestion.subtitle,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun rememberOmniboxSuggestions(
-    expanded: Boolean,
-    query: String,
-    searchEngine: SearchEngine,
-    history: List<HistoryItem>,
-    allowRemote: Boolean
-): List<OmniboxSuggestion> {
-    var remoteSuggestions by remember(searchEngine) { mutableStateOf<List<String>>(emptyList()) }
-    val trimmed = query.trim()
-
-    LaunchedEffect(expanded, trimmed, searchEngine, allowRemote) {
-        remoteSuggestions = emptyList()
-        if (!expanded || !allowRemote || trimmed.length < 2 || looksLikeNavigation(trimmed)) {
-            return@LaunchedEffect
-        }
-        delay(180L)
-        remoteSuggestions = fetchRemoteSuggestions(searchEngine, trimmed)
-    }
-
-    return buildOmniboxSuggestions(
-        query = trimmed,
-        engine = searchEngine,
-        history = history,
-        remote = remoteSuggestions
-    )
-}
-
-private fun buildOmniboxSuggestions(
-    query: String,
-    engine: SearchEngine,
-    history: List<HistoryItem>,
-    remote: List<String>
-): List<OmniboxSuggestion> {
-    val normalized = query.lowercase()
-    val uniqueHistory = history.distinctBy { it.url }.take(300)
-    val historyMatches = if (query.isBlank()) {
-        uniqueHistory.take(6)
-    } else {
-        uniqueHistory
-            .mapNotNull { item ->
-                val host = runCatching { Uri.parse(item.url).host.orEmpty().removePrefix("www.") }
-                    .getOrDefault("")
-                val title = item.title.lowercase()
-                val url = item.url.lowercase()
-                val hostLower = host.lowercase()
-                if (normalized !in title && normalized !in url && normalized !in hostLower) return@mapNotNull null
-                val score = when {
-                    hostLower.startsWith(normalized) -> 400
-                    title.startsWith(normalized) -> 300
-                    url.startsWith(normalized) -> 250
-                    normalized in hostLower -> 180
-                    normalized in title -> 140
-                    else -> 100
-                } + (100 - uniqueHistory.indexOf(item).coerceAtMost(100))
-                item to score
-            }
-            .sortedByDescending { it.second }
-            .take(5)
-            .map { it.first }
-    }
-
-    val result = mutableListOf<OmniboxSuggestion>()
+        popupContentSize: IYªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬Õ¹ÑM¥é”(€€€€¤è%¹Ñ=™™Í•Ğì(€€€€€€€Ù…°µ…á`€ô€¡İ¥¹‘½İM¥é”¹İ¥‘Ñ €´Á½ÁÕÁ½¹Ñ•¹ÑM¥é”¹İ¥‘Ñ ¤¹½•É•Ñ1•…ÍĞ À¤(€€€€€€€Ù…°à€ô…¹¡½É	½Õ¹‘Ì¹±•™Ğ¹½•É•%¸ À°µ…á`¤(€€€€€€€Ù…°ä€ô…±Õ±…Ñ•=µ¹¥‰½áA½ÁÕÁd (€€€€€€€€€€€Á±…•‰½Ù”€ôÁ±…•‰½Ù”°(€€€€€€€€€€€…¹¡½ÉQ½À€ô…¹¡½É	½Õ¹‘Ì¹Ñ½À°(€€€€€€€€€€€…¹¡½É	½ÑÑ½´€ô…¹¡½É	½Õ¹‘Ì¹‰½ÑÑ½´°(€€€€€€€€€€€Á½ÁÕÁ!•¥¡Ğ€ôÁ½ÁÕÁ½¹Ñ•¹ÑM¥é”¹¡•¥¡Ğ°(€€€€€€€€€€€İ¥¹‘½İ!•¥¡Ğ€ôİ¥¹‘½İM¥é”¹¡•¥¡Ğ°(€€€€€€€€€€€¥µ•	½ÑÑ½´€ô¥µ•	½ÑÑ½µAà°(€€€€€€€€€€€Ù•ÉÑ¥…±…À€ôÙ•ÉÑ¥…±…ÁAà(€€€€€€€€¤(€€€€€€€É•ÑÕÉ¸%¹Ñ=™™Í•Ğ¡à°ä¤(€€€ô)ô()½µÁ½Í…‰±”)ÁÉ¥Ù…Ñ”™Õ¸=µ¹¥‰½áMÕ•ÍÑ¥½¹Í5•¹Ô (€€€•áÁ…¹‘•è	½½±•…¸°(€€€ÅÕ•ÉäèMÑÉ¥¹œ°(€€€Í•…É¡¹¥¹”èM•…É¡¹¥¹”°(€€€¡¥ÍÑ½Éäè1¥ÍĞñ!¥ÍÑ½Éå%Ñ•´ø°(€€€…±±½İI•µ½Ñ”è	½½±•…¸°(€€€Á±…•‰½Ù”è	½½±•…¸°(€€€½¹	½Õ¹‘Í¡…¹•è€¡I•Ğ¤€´øU¹¥Ğ€ôìô°(€€€½¹¥Íµ¥ÍÌè€ ¤€´øU¹¥Ğ°(€€€½¹M•±•Ğè€¡MÑÉ¥¹œ¤€´øU¹¥Ğ(¤ì(€€€Ù…°ÍÕ•ÍÑ¥½¹Ì€ôÉ•µ•µ‰•É=µ¹¥‰½áMÕ•ÍÑ¥½¹Ì (€€€€€€€•áÁ…¹‘•€ô•áÁ…¹‘•°(€€€€€€€ÅÕ•Éä€ôÅÕ•Éä°(€€€€€€€Í•…É¡¹¥¹”€ôÍ•…É¡¹¥¹”°(€€€€€€€¡¥ÍÑ½Éä€ô¡¥ÍÑ½Éä°(€€€€€€€…±±½İI•µ½Ñ”€ô…±±½İI•µ½Ñ”(€€€€¤(€€€1…Õ¹¡•‘™™•Ğ¡•áÁ…¹‘•°ÍÕ•ÍÑ¥½¹Ì¹¥ÍµÁÑä ¤¤ì(€€€€€€€¥˜€ …•áÁ…¹‘•ñğÍÕ•ÍÑ¥½¹Ì¹¥ÍµÁÑä ¤¤½¹	½Õ¹‘Í¡…¹•¡I•Ğ¹i•É¼¤(€€€ô(€€€¥˜€ …•áÁ…¹‘•ñğÍÕ•ÍÑ¥½¹Ì¹¥ÍµÁÑä ¤¤É•ÑÕÉ¸((€€€Ù…°‘•¹Í¥Ñä€ô1½…±•¹Í¥Ñä¹ÕÉÉ•¹Ğ(€€€Ù…°½¹™¥ÕÉ…Ñ¥½¸€ô1½…±½¹™¥ÕÉ…Ñ¥½¸¹ÕÉÉ•¹Ğ(€€€Ù…°¥µ•	½ÑÑ½µAà€ô]¥¹‘½İ%¹Í•ÑÌ¹¥µ”¹•Ñ	½ÑÑ½´¡‘•¹Í¥Ñä¤(€€€Ù…°¥µ•	½ÑÑ½´€ôİ¥Ñ ¡‘•¹Í¥Ñä¤ì¥µ•	½ÑÑ½µAà¹Ñ½À ¤ô(€€€Ù…°…Ù…¥±…‰±•1¥ÍÑ!•¥¡Ğ€ô€¡½¹™¥ÕÉ…Ñ¥½¸¹ÍÉ••¹!•¥¡ÑÀ¹‘À€´¥µ•	½ÑÑ½´€´€ÄØ¹‘À¤(€€€€€€€€¹½•É•Ñ1•…ÍĞ Ä¹‘À¤(€€€Ù…°µ…á1¥ÍÑ!•¥¡Ğ€ôµ¥¹=˜¡…Ù…¥±…‰±•1¥ÍÑ!•¥¡Ğ°€ÈÈÀ¹‘À¤(€€€Ù…°Á½ÁÕÁ]¥‘Ñ €ô€¡½¹™¥ÕÉ…Ñ¥½¸¹ÍÉ••¹]¥‘Ñ¡À¹‘À€¨€À¸ÜÉ˜¤(€€€€€€€€¹½•É•%¸ ÈØÀ¹‘À°€ÔØÀ¹‘À¤(€€€Ù…°…ÁAà€ôİ¥Ñ ¡‘•¹Í¥Ñä¤ì€à¹‘À¹É½Õ¹‘Q½Aà ¤ô(€€€Ù…°Á½Í¥Ñ¥½¹AÉ½Ù¥‘•È€ôÉ•µ•µ‰•È¡Á±…•‰½Ù”°…ÁAà°¥µ•	½ÑÑ½µAà¤ì(€€€€€€€=µ¹¥‰½áA½ÁÕÁA½Í¥Ñ¥½¹AÉ½Ù¥‘•È¡Á±…•‰½Ù”°…ÁAà°¥µ•	½ÑÑ½µAà¤(€€€ô((€€€A½ÁÕÀ (€€€€€€€Á½ÁÕÁA½Í¥Ñ¥½¹AÉ½Ù¥‘•È€ôÁ½Í¥Ñ¥½¹AÉ½Ù¥‘•È°(€€€€€€€€¼¼Q¡”%5¥Ì„Í•Á…É…Ñ”¹‘É½¥İ¥¹‘½Ü¸¼¹½ĞÑÉ•…Ğ­•å‰½…ÉÑ…ÁÌ…Ì(€€€€€€€€¼¼½ÕÑÍ¥‘”µÁ½ÁÕÀ‘¥Íµ¥ÍÍ…±Ì°½Ñ¡•Éİ¥Í”•Ù•Éä­•äÁÉ•ÍÌ±•…ÉÌ™½ÕÌ¸(€€€€€€€½¹¥Íµ¥ÍÍI•ÅÕ•ÍĞ€ôìô°(€€€€€€€ÁÉ½Á•ÉÑ¥•Ì€ôA½ÁÕÁAÉ½Á•ÉÑ¥•Ì (€€€€€€€€€€€™½ÕÍ…‰±”€ô™…±Í”°(€€€€€€€€€€€‘¥Íµ¥ÍÍ=¹	…­AÉ•ÍÌ€ô™…±Í”°(€€€€€€€€€€€‘¥Íµ¥ÍÍ=¹±¥­=ÕÑÍ¥‘”€ô™…±Í”(€€€€€€€€¤(€€€€¤ì(€€€€€€€MÕÉ™…” (€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€¹İ¥‘Ñ¡%¸¡µ¥¸€ôÁ½ÁÕÁ]¥‘Ñ °µ…à€ôÁ½ÁÕÁ]¥‘Ñ ¤(€€€€€€€€€€€€€€€€¹¡•¥¡Ñ%¸¡µ…à€ôµ…á1¥ÍÑ!•¥¡Ğ¤(€€€€€€€€€€€€€€€€¹½¹±½‰…±±åA½Í¥Ñ¥½¹•ì½¹	½Õ¹‘Í¡…¹•¡¥Ğ¹‰½Õ¹‘Í%¹]¥¹‘½Ü ¤¤ô°(€€€€€€€€€€€Í¡…Á”€ôI½Õ¹‘•‘½É¹•ÉM¡…Á”¡%±åÉ½Y¥ÍÕ…±Q½­•¹Ì¹…É‘I…‘¥ÕÌ¤°(€€€€€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÍÕÉ™…”°(€€€€€€€€€€€‰½É‘•È€ô…¹‘É½¥‘à¹½µÁ½Í”¹™½Õ¹‘…Ñ¥½¸¹	½É‘•ÉMÑÉ½­” (€€€€€€€€€€€€€€€€Ä¹‘À°(€€€€€€€€€€€€€€€5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½ÕÑ±¥¹•Y…É¥…¹Ğ¹½Áä¡…±Á¡„€ô€À¸Èá˜¤(€€€€€€€€€€€€¤°(€€€€€€€€€€€Ñ½¹…±±•Ù…Ñ¥½¸€ô€À¹‘À°(€€€€€€€€€€€Í¡…‘½İ±•Ù…Ñ¥½¸€ô€Ì¹‘À(€€€€€€€€¤ì(€€€€€€€€€€€½±Õµ¸ (€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€€€€€€€€€¹™¥±±5…á]¥‘Ñ  ¤(€€€€€€€€€€€€€€€€€€€€¹Ù•ÉÑ¥…±MÉ½±°¡É•µ•µ‰•ÉMÉ½±±MÑ…Ñ” ¤¤(€€€€€€€€€€€€€€€€€€€€¹Á…‘‘¥¹œ¡Ù•ÉÑ¥…°€ô€Ğ¹‘À¤(€€€€€€€€€€€€¤ì(€€€€€€€€€€€€€€€ÍÕ•ÍÑ¥½¹Ì¹Ñ…­” à¤¹™½É… ìÍÕ•ÍÑ¥½¸€´ø(€€€€€€€€€€€€€€€€€€€=µ¹¥‰½áMÕ•ÍÑ¥½¹I½Ü (€€€€€€€€€€€€€€€€€€€€€€€ÍÕ•ÍÑ¥½¸€ôÍÕ•ÍÑ¥½¸°(€€€€€€€€€€€€€€€€€€€€€€€½¹±¥¬€ôì½¹M•±•Ğ¡ÍÕ•ÍÑ¥½¸¹Ù…±Õ”¤ô(€€€€€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€€€€€ô(€€€€€€€€€€€ô(€€€€€€€ô(€€€ô)ô()½µÁ½Í…‰±”)ÁÉ¥Ù…Ñ”™Õ¸=µ¹¥‰½áMÕ•ÍÑ¥½¹I½Ü (€€€ÍÕ•ÍÑ¥½¸è=µ¹¥‰½áMÕ•ÍÑ¥½¸°(€€€½¹±¥¬è€ ¤€´øU¹¥Ğ(¤ì(€€€I½Ü (€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È(€€€€€€€€€€€€¹™¥±±5…á]¥‘Ñ  ¤(€€€€€€€€€€€€¹±¥­…‰±”¡½¹±¥¬€ô½¹±¥¬¤(€€€€€€€€€€€€¹Á…‘‘¥¹œ¡¡½É¥é½¹Ñ…°€ô€ÄÈ¹‘À°Ù•ÉÑ¥…°€ô€Ø¹‘À¤°(€€€€€€€Ù•ÉÑ¥…±±¥¹µ•¹Ğ€ô±¥¹µ•¹Ğ¹•¹Ñ•ÉY•ÉÑ¥…±±ä(€€€€¤ì(€€€€€€€MÕÉ™…” (€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Í¥é” ÈØ¹‘À¤°(€€€€€€€€€€€Í¡…Á”€ôI½Õ¹‘•‘½É¹•ÉM¡…Á” ä¹‘À¤°(€€€€€€€€€€€½±½È€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹ÍÕÉ™…•Y…É¥…¹Ğ¹½Áä¡…±Á¡„€ô€À¸ØÉ˜¤(€€€€€€€€¤ì(€€€€€€€€€€€	½à¡½¹Ñ•¹Ñ±¥¹µ•¹Ğ€ô±¥¹µ•¹Ğ¹•¹Ñ•È¤ì(€€€€€€€€€€€€€€€%½¸ (€€€€€€€€€€€€€€€€€€€¥µ…•Y•Ñ½È€ô¥˜€¡ÍÕ•ÍÑ¥½¸¹­¥¹€ôô=µ¹¥‰½áMÕ•ÍÑ¥½¹-¥¹¹!%MQ=Id¤ì(€€€€€€€€€€€€€€€€€€€€€€€%½¹Ì¹I½Õ¹‘•¹!¥ÍÑ½Éä(€€€€€€€€€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€€€€€€€€€%½¹Ì¹I½Õ¹‘•¹M•…É (€€€€€€€€€€€€€€€€€€€ô°(€€€€€€€€€€€€€€€€€€€½¹Ñ•¹Ñ•ÍÉ¥ÁÑ¥½¸€ô¹Õ±°°(€€€€€€€€€€€€€€€€€€€µ½‘¥™¥•È€ô5½‘¥™¥•È¹Í¥é” ÄÔ¹‘À¤°(€€€€€€€€€€€€€€€€€€€Ñ¥¹Ğ€ô5…Ñ•É¥…±Q¡•µ”¹½±½ÉM¡•µ”¹½¹MÕÉ™…•Y…É¥…¹Ğ(€€€€€€€€€€€€€€€€¤+]4ÒÚ$z{-®éÜj×mniboxSuggestion>()
     historyMatches.forEach { item ->
         val host = runCatching { Uri.parse(item.url).host.orEmpty().removePrefix("www.") }
             .getOrDefault("")

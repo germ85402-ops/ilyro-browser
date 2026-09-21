@@ -116,28 +116,45 @@ private class PasswordAutocompleteStorageDelegate(
 }
 
 internal fun passwordDomainMatches(origin: String, requestedDomain: String): Boolean {
-    val originHost = hostFromOrigin(origin) ?: return false
-    val requestedHost = hostFromDomain(requestedDomain) ?: return false
-    return originHost == requestedHost
+    val originUri = parsePasswordOrigin(origin) ?: return false
+    val requestedText = requestedDomain.trim()
+    if (requestedText.isBlank()) return false
+    val hasExplicitScheme = requestedText.contains("://")
+    val requestedUri = parsePasswordOrigin(
+        if (hasExplicitScheme) requestedText else "https://$requestedText"
+    ) ?: return false
+
+    if (originUri.host != requestedUri.host) return false
+    if (hasExplicitScheme && originUri.scheme != requestedUri.scheme) return false
+
+    // Gecko sometimes supplies only a hostname, so keep that legacy-compatible path. When the
+    // API gives us a scheme or port, require the full origin instead of offering a credential to
+    // an HTTP endpoint or a different service on the same host.
+    if (hasExplicitScheme || requestedUri.port != -1) {
+        return effectivePort(originUri) == effectivePort(requestedUri)
+    }
+    return true
 }
 
-private fun hostFromOrigin(origin: String): String? = runCatching {
-    URI(origin.trim()).host
-        ?.trimEnd('.')
-        ?.lowercase(Locale.ROOT)
-        ?.takeIf { it.isNotBlank() }
+private data class ParsedPasswordOrigin(
+    val scheme: String,
+    val host: String,
+    val port: Int
+)
+
+private fun parsePasswordOrigin(raw: String): ParsedPasswordOrigin? = runCatching {
+    val uri = URI(raw.trim())
+    val scheme = uri.scheme?.lowercase(Locale.ROOT).orEmpty()
+    val host = uri.host?.trimEnd('.')?.lowercase(Locale.ROOT).orEmpty()
+    if (scheme.isBlank() || host.isBlank()) return@runCatching null
+    ParsedPasswordOrigin(scheme, host, uri.port)
 }.getOrNull()
 
-private fun hostFromDomain(domain: String): String? {
-    val trimmed = domain.trim()
-    if (trimmed.isBlank()) return null
-    val candidate = if (trimmed.contains("://")) trimmed else "https://$trimmed"
-    return runCatching {
-        URI(candidate).host
-            ?.trimEnd('.')
-            ?.lowercase(Locale.ROOT)
-            ?.takeIf { it.isNotBlank() }
-    }.getOrNull()
+private fun effectivePort(origin: ParsedPasswordOrigin): Int = when {
+    origin.port != -1 -> origin.port
+    origin.scheme == "http" -> 80
+    origin.scheme == "https" -> 443
+    else -> -1
 }
 
 private fun PasswordCredential.toAutocompleteLogin(): Autocomplete.LoginEntry =

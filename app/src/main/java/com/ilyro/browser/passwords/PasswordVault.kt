@@ -1,143 +1,43 @@
-package com.ilyro.browser.passwords
-
-import android.content.Context
-import android.security.keystore.KeyGenParameterSpec
-import android.security.keystore.KeyProperties
-import android.util.AtomicFile
-import android.util.Log
-import org.json.JSONArray
-import org.json.JSONObject
-import java.io.File
-import java.nio.charset.StandardCharsets
-import java.security.KeyStore
-import java.util.UUID
-import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
-import javax.crypto.spec.GCMParameterSpec
-
-internal data class PasswordCredential(
-    val guid: String,
-    val origin: String,
-    val formActionOrigin: String?,
-    val httpRealm: String?,
-    val username: String,
-    val password: String,
-    val timesUsed: Int = 0,
-    val lastUsedAt: Long = 0L
-)
-
-/**
- * Application-private password storage encrypted with an AES key that never leaves Android
- * Keystore. The encrypted vault file itself is also excluded from Android backup because ILYRO's
- * application has allowBackup=false.
- *
- * This is deliberately separate from browser settings / Drive sync. Password sync will only be
- * added later together with an explicit end-to-end-encryption design.
- */
-internal class PasswordVault(context: Context) {
-    private val appContext = context.applicationContext
-    private val vaultFile = AtomicFile(
-        File(appContext.filesDir, "passwords/ilyro-passwords.v1").also { file ->
-            file.parentFile?.mkdirs()
-        }
-    )
-    private val lock = Any()
-
-    fun snapshot(): List<PasswordCredential> = synchronized(lock) {
-        readCredentialsLocked()
-    }
-
-    fun upsert(entry: PasswordCredential): PasswordCredential = synchronized(lock) {
-        require(entry.origin.isNotBlank()) { "Password origin must not be blank." }
-        val existing = readCredentialsLocked().toMutableList()
-        val index = existing.indexOfFirst { current ->
-            current.guid == entry.guid || sameLoginIdentity(current, entry)
-        }
-        val normalized = entry.copy(
-            guid = entry.guid.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString(),
-            origin = entry.origin.trim()
-        )
-        if (index >= 0) {
-            val previous = existing[index]
-            existing[index] = normalized.copy(
-                timesUsed = maxOf(previous.timesUsed, normalized.timesUsed),
-                lastUsedAt = maxOf(previous.lastUsedAt, normalized.lastUsedAt)
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éíãM4N‹Z–‹­¦ëeŠw¬ÕÁ…­…”½´¹¥±åÉ¼¹‰É½İÍ•È¹Á…ÍÍİ½É‘Ì()¥µÁ½ÉĞ…¹‘É½¥¹½¹Ñ•¹Ğ¹½¹Ñ•áĞ)¥µÁ½ÉĞ…¹‘É½¥¹Í•ÕÉ¥Ñä¹­•åÍÑ½É”¹-•å•¹A…É…µ•Ñ•ÉMÁ•Œ)¥µÁ½ÉĞ…¹‘É½¥¹Í•ÕÉ¥Ñä¹­•åÍÑ½É”¹-•åAÉ½Á•ÉÑ¥•Ì)¥µÁ½ÉĞ…¹‘É½¥¹ÕÑ¥°¹Ñ½µ¥¥±”)¥µÁ½ÉĞ…¹‘É½¥¹ÕÑ¥°¹1½œ)¥µÁ½ÉĞ½Éœ¹©Í½¸¹)M=9ÉÉ…ä)¥µÁ½ÉĞ½Éœ¹©Í½¸¹)M=9á•ÁÑ¥½¸)¥µÁ½ÉĞ½Éœ¹©Í½¸¹)M=9=‰©•Ğ)¥µÁ½ÉĞ©…Ù„¹¥¼¹%=á•ÁÑ¥½¸)¥µÁ½ÉĞ©…Ù„¹¥¼¹¥±”)¥µÁ½ÉĞ©…Ù„¹¹¥¼¹¡…ÉÍ•Ğ¹MÑ…¹‘…É‘¡…ÉÍ•ÑÌ)¥µÁ½ÉĞ©…Ù„¹Í•ÕÉ¥Ñä¹-•åMÑ½É”)¥µÁ½ÉĞ©…Ù„¹ÕÑ¥°¹UU%)¥µÁ½ÉĞ©…Ù…à¹ÉåÁÑ¼¹	…‘Q…á•ÁÑ¥½¸)¥µÁ½ÉĞ©…Ù…à¹ÉåÁÑ¼¹¥Á¡•È)¥µÁ½ÉĞ©…Ù…à¹ÉåÁÑ¼¹-•å•¹•É…Ñ½È)¥µÁ½ÉĞ©…Ù…à¹ÉåÁÑ¼¹M•É•Ñ-•ä)¥µÁ½ÉĞ©…Ù…à¹ÉåÁÑ¼¹ÍÁ•Œ¹5A…É…µ•Ñ•ÉMÁ•Œ()¥¹Ñ•É¹…°‘…Ñ„±…ÍÌA…ÍÍİ½É‘É•‘•¹Ñ¥…° (€€€Ù…°Õ¥èMÑÉ¥¹œ°(€€€Ù…°½É¥¥¸èMÑÉ¥¹œ°(€€€Ù…°™½ÉµÑ¥½¹=É¥¥¸èMÑÉ¥¹œü°(€€€Ù…°¡ÑÑÁI•…±´èMÑÉ¥¹œü°(€€€Ù…°ÕÍ•É¹…µ”èMÑÉ¥¹œ°(€€€Ù…°Á…ÍÍİ½ÉèMÑÉ¥¹œ°(€€€Ù…°Ñ¥µ•ÍUÍ•è%¹Ğ€ô€À°(€€€Ù…°±…ÍÑUÍ•‘Ğè1½¹œ€ô€Á0(¤((¼¨¨(€¨Á…ÍÍİ½ÉÙ…Õ±ĞÉ•…™…¥±•¸Q¡”…±±•ÈµÕÍĞ¹½ĞÑÉ•…ĞÑ¡¥Ì…Ì…¸•µÁÑäÙ…Õ±Ğè„™…¥±•(€¨-•åÍÑ½É”É•…½È„‘…µ…•™¥±”µÕÍĞ¹•Ù•ÈÍ¥±•¹Ñ±äÉ•Á±…”Í…Ù•É•‘•¹Ñ¥…±Ìİ¥Ñ „¹•ÜÍÑ½É”¸(€¨¼)¥¹Ñ•É¹…°±…ÍÌA…ÍÍİ½É‘Y…Õ±ÑI•…‘á•ÁÑ¥½¸ (€€€Ù…°‘…Ñ…5…å	•½ÉÉÕÁĞè	½½±•…¸°(€€€µ•ÍÍ…”èMÑÉ¥¹œ°(€€€…ÕÍ”èQ¡É½İ…‰±”ü€ô¹Õ±°(¤€è%±±•…±MÑ…Ñ•á•ÁÑ¥½¸¡µ•ÍÍ…”°…ÕÍ”¤()ÁÉ¥Ù…Ñ”±…ÍÌA…ÍÍİ½É‘Y…Õ±Ñ½ÉÉÕÁÑ¥½¹á•ÁÑ¥½¸ (€€€µ•ÍÍ…”èMÑÉ¥¹œ°(€€€…ÕÍ”èQ¡É½İ…‰±”ü€ô¹Õ±°(¤€èá•ÁÑ¥½¸¡µ•ÍÍ…”°…ÕÍ”¤((¼¨¨(€¨ÁÁ±¥…Ñ¥½¸µÁÉ¥Ù…Ñ”Á…ÍÍİ½ÉÍÑ½É…”•¹ÉåÁÑ•İ¥Ñ …¸L­•äÑ¡…Ğ¹•Ù•È±•…Ù•Ì¹‘É½¥(€¨-•åÍÑ½É”¸Q¡”•¹ÉåÁÑ•Ù…Õ±Ğ™¥±”¥ÑÍ•±˜¥Ì…±Í¼•á±Õ‘•™É½´¹‘É½¥‰…­ÕÀ‰•…ÕÍ”%1eI<Ì(€¨…ÁÁ±¥…Ñ¥½¸¡…Ì…±±½İ	…­ÕÀõ™…±Í”¸(€¨(€¨Q¡¥Ì¥Ì‘•±¥‰•É…Ñ•±äÍ•Á…É…Ñ”™É½´‰É½İÍ•ÈÍ•ÑÑ¥¹Ì€¼É¥Ù”Íå¹Œ¸A…ÍÍİ½ÉÍå¹Œİ¥±°½¹±ä‰”(€¨…‘‘•±…Ñ•ÈÑ½•Ñ¡•Èİ¥Ñ …¸•áÁ±¥¥Ğ•¹µÑ¼µ•¹µ•¹ÉåÁÑ¥½¸‘•Í¥¸¸(€¨¼)¥¹Ñ•É¹…°±…ÍÌA…ÍÍİ½É‘Y…Õ±Ğ¡½¹Ñ•áĞè½¹Ñ•áĞ¤ì(€€€ÁÉ¥Ù…Ñ”Ù…°…ÁÁ½¹Ñ•áĞ€ô½¹Ñ•áĞ¹…ÁÁ±¥…Ñ¥½¹½¹Ñ•áĞ(€€€ÁÉ¥Ù…Ñ”Ù…°Ù…Õ±Ñ¥±”€ôÑ½µ¥¥±” (€€€€€€€¥±”¡…ÁÁ½¹Ñ•áĞ¹™¥±•Í¥È°€‰Á…ÍÍİ½É‘Ì½¥±åÉ¼µÁ…ÍÍİ½É‘Ì¹ØÄˆ¤¹…±Í¼ì™¥±”€´ø(€€€€€€€€€€€™¥±”¹Á…É•¹Ñ¥±”ü¹µ­‘¥ÉÌ ¤(€€€€€€€ô(€€€€¤(€€€ÁÉ¥Ù…Ñ”Ù…°±½¬€ô¹ä ¤((€€€™Õ¸Í¹…ÁÍ¡½Ğ ¤è1¥ÍĞñA…ÍÍİ½É‘É•‘•¹Ñ¥…°ø€ôÍå¹¡É½¹¥é•¡±½¬¤ì(€€€€€€€É•…‘É•‘•¹Ñ¥…±Í1½­• ¤(€€€ô((€€€™Õ¸ÕÁÍ•ÉĞ¡•¹ÑÉäèA…ÍÍİ½É‘É•‘•¹Ñ¥…°¤èA…ÍÍİ½É‘É•‘•¹Ñ¥…°€ôÍå¹¡É½¹¥é•¡±½¬¤ì(€€€€€€€É•ÅÕ¥É”¡•¹ÑÉä¹½É¥¥¸¹¥Í9½Ñ	±…¹¬ ¤¤ì€‰A…ÍÍİ½É½É¥¥¸µÕÍĞ¹½Ğ‰”‰±…¹¬¸ˆô(€€€€€€€Ù…°•á¥ÍÑ¥¹œ€ôÉ•…‘É•‘•¹Ñ¥…±Í1½­• ¤¹Ñ½5ÕÑ…‰±•1¥ÍĞ ¤(€€€€€€€Ù…°¥¹‘•à€ô•á¥ÍÑ¥¹œ¹¥¹‘•á=™¥ÉÍĞìÕÉÉ•¹Ğ€´ø(€€€€€€€€€€€ÕÉÉ•¹Ğ¹Õ¥€ôô•¹ÑÉä¹Õ¥ñğÍ…µ•1½¥¹%‘•¹Ñ¥Ñä¡ÕÉÉ•¹Ğ°•¹ÑÉä¤(€€€€€€€ô(€€€€€€€Ù…°¹½Éµ…±¥é•€ô•¹ÑÉä¹½Áä (€€€€€€€€€€€Õ¥€ô•¹ÑÉä¹Õ¥¹Ñ…­•%˜ì¥Ğ¹¥Í9½Ñ	±…¹¬ ¤ô€üèUU%¹É…¹‘½µUU% ¤¹Ñ½MÑÉ¥¹œ ¤°(€€€€€€€€€€€½É¥¥¸€ô•¹ÑÉä¹½É¥¥¸¹ÑÉ¥´ ¤(€€€€€€€€¤(€€€€€€€¥˜€¡¥¹‘•à€øô€À¤ì(€€€€€€€€€€€Ù…°ÁÉ•Ù¥½ÕÌ€ô•á¥ÍÑ¥¹m¥¹‘•át(€€€€€€€€€€€•á¥ÍÑ¥¹m¥¹‘•át€ô¹½Éµ…±¥é•¹½Áä (€€€€€€€€€€€€€€€Ñ¥µ•ÍUÍ•€ôµ…á=˜¡ÁÉ•Ù¥½ÕÌ¹Ñ¥µ•ÍUÍ•°¹½Éµ…±¥é•¹Ñ¥µ•ÍUÍ•¤°(€€€€€€€€€€€€€€€±…ÍÑUÍ•‘Ğ€ôµ…á=˜¡ÁÉ•Ù¥½ÕÌ¹±…ÍÑUÍ•‘Ğ°¹½Éµ…±¥é•¹±…ÍÑUÍ•‘Ğ¤(€€€€€€€€€€€€¤(€€€€€€€ô•±Í”ì(€€€€€€€€€€€•á¥ÍÑ¥¹œ€¬ô¹½Éµ…±¥é•(€€€€€€€ô(€€€€€€€İÉ¥Ñ•É•‘•¹Ñ¥…±Í1½­•¡•á¥ÍÑ¥¹œ¤(€€€€€€€¹½Éµ…±¥é•(€€€ô((€€€™Õ¸É•Á±…•±°¡•¹ÑÉ¥•Ìè½±±•Ñ¥½¸ñA…ÍÍİ½É‘É•‘•¹Ñ¥…°ø¤€ôÍå¹¡É½¹¥é•¡±½¬¤ì(€€€€€€€Ù…°‘•‘ÕÁ±¥…Ñ•€ô1¥¹­•‘!…Í¡5…ÀñMÑÉ¥¹œ°A…ÍÍİ½É‘É•‘•¹Ñ¥…°ø ¤(€€€€€€€•¹ÑÉ¥•Ì¹™½É… ì•¹ÑÉä€´ø(€€€€€€€€€€€¥˜€¡•¹ÑÉä¹½É¥¥¸¹¥Í	±…¹¬ ¤¤É•ÑÕÉ¹™½É… (€€€€€€€€€€€Ù…°¹½Éµ…±¥é•€ô•¹ÑÉä¹½Áä (€€€€€€€€€€€€€€€Õ¥€ô•¹ÑÉä¹Õ¥¹Ñ…­•%˜ì¥Ğ¹¥Í9½Ñ	±…¹¬ ¤ô€üèUU%¹É…¹‘½µUU% ¤¹Ñ½MÑÉ¥¹œ ¤°(€€€€€€€€€€€€€€€½É¥¥¸€ô•¹ÑÉä¹½É¥¥¸¹ÑÉ¥´ ¤(€€€€€€€€€€€€¤(€€€€€€€€€€€Ù…°¥‘•¹Ñ¥Ñä€ô±½¥¹%‘•¹Ñ¥Ñä¡¹½Éµ…±¥é•¤(€€€€€€€€€€€Ù…°ÁÉ•Ù¥½ÕÌ€ô‘•‘ÕÁ±¥…Ñ•‘m¥‘•¹Ñ¥Ñåt(€€€€€€€€€€€‘•‘ÕÁ±¥…Ñ•‘m¥‘•¹Ñ¥Ñåt€ô¥˜€¡ÁÉ•Ù¥½ÕÌ€ôô¹Õ±°¤ì(€€€€€€€€€€€€€€€¹½Éµ…±¥é•(€€€€€€€€€€€ô•±Í”ì(€€€€€€€€€€€€€€€¹½Éµ…±¥é•¹½Áä (€€€€€€€€€€€€€€€€€€€Ñ¥µ•ÍUÍ•€ôµ…á=˜¡ÁÉ•Ù¥½ÕÌ¹Ñ¥µ•ÍUÍ•°¹½Éµ…±¥é•¹Ñ¥µ•ÍUÍ•¤°(€€€€€€€€€€€€€€€€€€€±…ÍÑUÍ•‘Ğ€ôµ…á=˜¡ÁÉ•Ù¥½ÕÌ¹±…ÍÑUÍ•‘Ğ°¹½Éµ…±¥é•¹±…ÍÑUÍ•‘Ğ¤(€€€€€€€€€€€€€€€€¤(€€€€€€€€€€€ô(€€€€€€€ô(€€€€€€€İÉ¥Ñ•É•‘•¹Ñ¥…±Í1½­•¡‘•‘ÕÁ±¥…Ñ•¹Ù…±Õ•Ì¹Ñ½1¥ÍĞ ¤¤(€€€ô((€€€™Õ¸µ…É­UÍ•¡Õ¥èMÑÉ¥¹œü°½É¥¥¸èMÑÉ¥¹œ°ÕÍ•É¹…µ”èMÑÉ¥¹œ¤€ôÍå¹¡É½¹¥é•¡±½¬¤ì(€€€€€€€Ù…°•á¥ÍÑ¥¹œ€ôÉ•…‘É•‘•¹Ñ¥…±Í1½­• ¤¹Ñ½5ÕÑ…‰±•1¥ÍĞ ¤(€€€€€€€Ù…°¥¹‘•à€ô•á¥ÍÑ¥¹œ¹¥¹‘•á=™¥ÉÍĞì•¹ÑÉä€´ø(€€€€€€€€€€€€ …Õ¥¹¥Í9Õ±±=É	±…¹¬ ¤€˜˜•¹ÑÉä¹Õ¥€ôôÕ¥¤ñğ(€€€€€€€€€€€€€€€€¡•¹ÑÉä¹½É¥¥¸€ôô½É¥¥¸€˜˜•¹ÑÉä¹ÕÍ•É¹…µ”€ôôÕÍ•É¹…µ”¤(€€€€€€€ô(€€€€€€€¥˜€¡¥¹‘•à€ğ€À¤É•Ñ×]4ÒÚ$z{-®éÜj×Log.e(TAG, "Encrypted password vault could not be opened; data was preserved.", error)
+            throw PasswordVaultReadException(
+                dataMayBeCorrupt = false,
+                message = "Saved password storage is temporarily unavailable. Existing data was preserved.",
+                cause = error
             )
-        } else {
-            existing += normalized
-        }
-        writeCredentialsLocked(existing)
-        normalized
-    }
-
-    fun replaceAll(entries: Collection<PasswordCredential>) = synchronized(lock) {
-        val deduplicated = LinkedHashMap<String, PasswordCredential>()
-        entries.forEach { entry ->
-            if (entry.origin.isBlank()) return@forEach
-            val normalized = entry.copy(
-                guid = entry.guid.takeIf { it.isNotBlank() } ?: UUID.randomUUID().toString(),
-                origin = entry.origin.trim()
-            )
-            val identity = loginIdentity(normalized)
-            val previous = deduplicated[identity]
-            deduplicated[identity] = if (previous == null) {
-                normalized
-            } else {
-                normalized.copy(
-                    timesUsed = maxOf(previous.timesUsed, normalized.timesUsed),
-                    lastUsedAt = maxOf(previous.lastUsedAt, normalized.lastUsedAt)
-                )
-            }
-        }
-        writeCredentialsLocked(deduplicated.values.toList())
-    }
-
-    fun markUsed(guid: String?, origin: String, username: String) = synchronized(lock) {
-        val existing = readCredentialsLocked().toMutableList()
-        val index = existing.indexOfFirst { entry ->
-            (!guid.isNullOrBlank() && entry.guid == guid) ||
-                (entry.origin == origin && entry.username == username)
-        }
-        if (index < 0) return@synchronized
-        val current = existing[index]
-        existing[index] = current.copy(
-            timesUsed = current.timesUsed + 1,
-            lastUsedAt = System.currentTimeMillis()
-        )
-        writeCredentialsLocked(existing)
-    }
-
-    fun clear() = synchronized(lock) {
-        vaultFile.delete()
-    }
-
-    private fun readCredentialsLocked(): List<PasswordCredential> {
-        if (!vaultFile.baseFile.exists()) return emptyList()
-        val encrypted = vaultFile.openRead().use { input -> input.readBytes() }
-        if (encrypted.isEmpty()) return emptyList()
-
-        return try {
-            val plain = decrypt(encrypted)
-            PasswordVaultCodec.decode(String(plain, StandardCharsets.UTF_8))
-        } catch (error: Exception) {
-            quarantineUnreadableVaultLocked()
-            Log.e(TAG, "Encrypted password vault was unreadable and has been quarantined.")
-            emptyList()
         }
     }
 
-    private fun quarantineUnreadableVaultLocked() {
+    private fun preserveUnreadableVaultLocked(): File? {
         val source = vaultFile.baseFile
-        if (!source.exists()) return
+        if (!source.exists()) return null
+
+        val parent = source.parentFile ?: return null
+        val existing = parent.listFiles()
+            .orEmpty()
+            .firstOrNull { file ->
+                file.name.startsWith("${source.name}.corrupt-") &&
+                    file.length() == source.length()
+            }
+        if (existing != null) return existing
+
         val quarantine = File(
-            source.parentFile,
+            parent,
             "${source.name}.corrupt-${System.currentTimeMillis()}"
         )
-        val moved = runCatching { source.renameTo(quarantine) }.getOrDefault(false)
-        if (!moved) {
-            vaultFile.delete()
+        return runCatching {
+            source.copyTo(quarantine, overwrite = false)
+            quarantine
+        }.getOrNull().also { backup ->
+            if (backup == null) {
+                Log.w(TAG, "Could not preserve a copy of the unreadable password vault.")
+            }
         }
+    }
+
+    private fun unreadableMessage(backup: File?): String = if (backup != null) {
+        "Saved passwords could not be opened. The original encrypted vault was preserved."
+    } else {
+        "Saved passwords could not be opened. The original encrypted vault was preserved, but a recovery copy could not be created."
     }
 
     private fun writeCredentialsLocked(entries: List<PasswordCredential>) {
@@ -169,20 +69,28 @@ internal class PasswordVault(context: Context) {
     }
 
     private fun decrypt(encrypted: ByteArray): ByteArray {
-        require(encrypted.size > MAGIC.size + 1) { "Encrypted password vault is truncated." }
-        require(MAGIC.indices.all { encrypted[it] == MAGIC[it] }) {
-            "Unsupported password vault format."
+        try {
+            require(encrypted.size > MAGIC.size + 1) { "Encrypted password vault is truncated." }
+            require(MAGIC.indices.all { encrypted[it] == MAGIC[it] }) {
+                "Unsupported password vault format."
+            }
+            val ivLength = encrypted[MAGIC.size].toInt() and 0xff
+            val ciphertextOffset = MAGIC.size + 1 + ivLength
+            require(ivLength > 0 && ciphertextOffset < encrypted.size) {
+                "Encrypted password vault has an invalid IV."
+            }
+            val iv = encrypted.copyOfRange(MAGIC.size + 1, ciphertextOffset)
+            val ciphertext = encrypted.copyOfRange(ciphertextOffset, encrypted.size)
+            val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
+            cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(128, iv))
+            return cipher.doFinal(ciphertext)
+        } catch (error: AEADBadTagException) {
+            throw PasswordVaultCorruptionException("Encrypted password vault authentication failed.", error)
+        } catch (error: javax.crypto.BadPaddingException) {
+            throw PasswordVaultCorruptionException("Encrypted password vault authentication failed.", error)
+        } catch (error: IllegalArgumentException) {
+            throw PasswordVaultCorruptionException(error.message ?: "Invalid password vault format.", error)
         }
-        val ivLength = encrypted[MAGIC.size].toInt() and 0xff
-        val ciphertextOffset = MAGIC.size + 1 + ivLength
-        require(ivLength > 0 && ciphertextOffset < encrypted.size) {
-            "Encrypted password vault has an invalid IV."
-        }
-        val iv = encrypted.copyOfRange(MAGIC.size + 1, ciphertextOffset)
-        val ciphertext = encrypted.copyOfRange(ciphertextOffset, encrypted.size)
-        val cipher = Cipher.getInstance(CIPHER_TRANSFORMATION)
-        cipher.init(Cipher.DECRYPT_MODE, getOrCreateKey(), GCMParameterSpec(128, iv))
-        return cipher.doFinal(ciphertext)
     }
 
     private fun getOrCreateKey(): SecretKey {

@@ -9,7 +9,9 @@ internal data class HlsByteRange(
 
 internal data class HlsResource(
     val url: String,
-    val byteRange: HlsByteRange? = null
+    val byteRange: HlsByteRange? = null,
+    /** Whether the resource is covered by an unsupported EXT-X-KEY at its position. */
+    val encrypted: Boolean = false
 )
 
 internal data class HlsMediaPlaylist(
@@ -105,7 +107,7 @@ internal fun parseHlsMediaPlaylist(text: String, baseUrl: String): HlsMediaPlayl
     val lines = text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
     var initSegment: HlsResource? = null
     var pendingRange: HlsByteRange? = null
-    var unsupportedEncryption = false
+    var encryptionActive = false
     var endList = false
     val segments = mutableListOf<HlsResource>()
 
@@ -115,7 +117,7 @@ internal fun parseHlsMediaPlaylist(text: String, baseUrl: String): HlsMediaPlayl
             line.startsWith("#EXT-X-KEY:", ignoreCase = true) -> {
                 val attrs = parseHlsAttributes(line.substringAfter(':'))
                 val method = attrs["METHOD"].orEmpty().uppercase()
-                if (method.isNotBlank() && method != "NONE") unsupportedEncryption = true
+                encryptionActive = method.isNotBlank() && method != "NONE"
             }
             line.startsWith("#EXT-X-MAP:", ignoreCase = true) -> {
                 val attrs = parseHlsAttributes(line.substringAfter(':'))
@@ -123,7 +125,8 @@ internal fun parseHlsMediaPlaylist(text: String, baseUrl: String): HlsMediaPlayl
                 if (uri != null) {
                     initSegment = HlsResource(
                         url = uri,
-                        byteRange = attrs["BYTERANGE"]?.let(::parseHlsByteRange)
+                        byteRange = attrs["BYTERANGE"]?.let(::parseHlsByteRange),
+                        encrypted = encryptionActive
                     )
                 }
             }
@@ -132,7 +135,7 @@ internal fun parseHlsMediaPlaylist(text: String, baseUrl: String): HlsMediaPlayl
             }
             !line.startsWith('#') -> {
                 val resolved = resolveHlsUrl(baseUrl, line) ?: continue
-                segments += HlsResource(resolved, pendingRange)
+                segments += HlsResource(resolved, pendingRange, encrypted = encryptionActive)
                 pendingRange = null
             }
         }
@@ -147,7 +150,9 @@ internal fun parseHlsMediaPlaylist(text: String, baseUrl: String): HlsMediaPlayl
         initSegment = initSegment,
         segments = segments,
         isVod = endList,
-        hasUnsupportedEncryption = unsupportedEncryption,
+        // Do not clear a playlist-wide flag when METHOD=NONE appears later. Earlier encrypted
+        // resources remain unsafe to concatenate without a decrypt/mux pipeline.
+        hasUnsupportedEncryption = initSegment?.encrypted == true || segments.any { it.encrypted },
         prefersMp4Container = mp4
     )
 }

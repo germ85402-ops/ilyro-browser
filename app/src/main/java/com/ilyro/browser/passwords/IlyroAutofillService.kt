@@ -96,9 +96,8 @@ class IlyroAutofillService : AutofillService() {
             ?.trim()
             .orEmpty()
         val password = passwordField?.node?.autofillValue?.textValue?.toString()
-            ?.trim()
             .orEmpty()
-        if (domain.isNullOrBlank() || password.isBlank()) {
+        if (domain.isNullOrBlank() || password.isEmpty()) {
             callback.onSuccess()
             return
         }
