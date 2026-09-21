@@ -3802,6 +3802,24 @@ button {
     background: rgba(235, 247, 245, 0.8);
   }
 
+  :root:not([data-theme]) .home-page .brand {
+    color: #102321;
+  }
+
+  :root:not([data-theme]) .home-page .main-nav {
+    color: #557172;
+  }
+
+  :root:not([data-theme]) .home-page .header-cta {
+    border-color: rgba(18, 142, 108, 0.48);
+    background: rgba(219, 243, 237, 0.72);
+    color: #087d63;
+  }
+
+  :root:not([data-theme]) .home-page .menu-toggle {
+    border-color: rgba(28, 113, 112, 0.28);
+  }
+
   :root:not([data-theme]) .home-page .reference-hero::before {
     background:
       linear-gradient(90deg, rgba(235, 247, 245, 0.94) 0%, rgba(235, 247, 245, 0.64) 42%, rgba(235, 247, 245, 0.78) 100%),
@@ -3815,6 +3833,21 @@ button {
   :root:not([data-theme]) .home-page .screenshots-heading p,
   :root:not([data-theme]) .home-page .download-copy > p:not(.reference-kicker) {
     color: #557172;
+  }
+
+  :root:not([data-theme]) .home-page .reference-overline,
+  :root:not([data-theme]) .home-page .reference-kicker {
+    color: #4d807f;
+  }
+
+  :root:not([data-theme]) .home-page .hero-note,
+  :root:not([data-theme]) .home-page .download-note {
+    color: #247d6a;
+  }
+
+  :root:not([data-theme]) .home-page .hero-note span,
+  :root:not([data-theme]) .home-page .download-note span {
+    color: #0d9f78;
   }
 
   :root:not([data-theme]) .home-page .hero-tags span,
@@ -3831,6 +3864,10 @@ button {
   :root:not([data-theme]) .home-page .download-copy h2,
   :root:not([data-theme]) .home-page .reference-heading h2 {
     color: #102321;
+  }
+
+  :root:not([data-theme]) .home-page .hero-tags span {
+    color: #557172;
   }
 
   :root:not([data-theme]) .home-page .benefit-card small,
