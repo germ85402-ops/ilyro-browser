@@ -1563,8 +1563,7 @@ private fun BrowserScreen(
 
     LaunchedEffect(restorableTabUrls, restorableTabStates, restorableTabMetadata, activeTabId) {
         delay(250L)
-        val activeIndex = restorableTabs
-            .indexOf(activeTabId)
+        val activeIndex = restorableTabIds.indexOf(activeTabId)
             .coerceAtLeast(0)
         TabSessionStore.save(
             prefs = prefs,
