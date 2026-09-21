@@ -8,7 +8,7 @@
   const style = document.createElement('style');
   style.textContent = `
     :fullscreen {
-      background: #000 !important;
+      background-color: #000 !important;
     }
 
     video:fullscreen,
@@ -16,6 +16,14 @@
       object-fit: contain !important;
       object-position: center center !important;
       background: #000 !important;
+    }
+
+    /*
+     * YouTube Ambient Mode is painted behind the media layer. Keep the fullscreen
+     * surface transparent so that glow remains visible around the centered video.
+     */
+    html.ilyro-youtube-fullscreen :fullscreen {
+      background-color: transparent !important;
     }
 
     html.ilyro-youtube-fullscreen :fullscreen .html5-video-container {
@@ -28,7 +36,7 @@
       display: flex !important;
       align-items: center !important;
       justify-content: center !important;
-      background: #000 !important;
+      background-color: transparent !important;
     }
 
     html.ilyro-youtube-fullscreen :fullscreen .html5-video-container video.html5-main-video,
