@@ -53,9 +53,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.consume
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -66,6 +67,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -621,9 +623,8 @@ internal fun BrowserTopNoticeCard(
     allowSwipeDown: Boolean = true
 ) {
     val metrics = rememberIlyroLayoutMetrics()
-    val dragOffset = remember(notice.id) {
-        Animatable(Offset.Zero, Offset.VectorConverter)
-    }
+    val dragOffsetX = remember(notice.id) { Animatable(0f) }
+    val dragOffsetY = remember(notice.id) { Animatable(0f) }
     var dismissing by remember(notice.id) { mutableStateOf(false) }
     val dismissScope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -643,10 +644,10 @@ internal fun BrowserTopNoticeCard(
             .fillMaxWidth(if (metrics.isNarrowPhone) 0.90f else 0.52f)
             .widthIn(min = 180.dp, max = 420.dp)
             .graphicsLayer {
-                translationX = dragOffset.value.x
-                translationY = dragOffset.value.y
+                translationX = dragOffsetX.value
+                translationY = dragOffsetY.value
                 alpha = 1f - (
-                    (abs(dragOffset.value.x) + abs(dragOffset.value.y)) /
+                    (abs(dragOffsetX.value) + abs(dragOffsetY.value)) /
                         (maxDismissOffset * 1.5f)
                     ).coerceIn(0f, 0.38f)
             }
@@ -654,54 +655,65 @@ internal fun BrowserTopNoticeCard(
                 detectDragGestures(
                     onDragEnd = {
                         if (dismissing) return@detectDragGestures
-                        val current = dragOffset.value
-                        val horizontalDismiss = abs(current.x) >= dismissThreshold
+                        val currentX = dragOffsetX.value
+                        val currentY = dragOffsetY.value
+                        val horizontalDismiss = abs(currentX) >= dismissThreshold
                         val verticalDismiss =
-                            (allowSwipeUp && current.y <= -dismissThreshold) ||
-                                (allowSwipeDown && current.y >= dismissThreshold)
+                            (allowSwipeUp && currentY <= -dismissThreshold) ||
+                                (allowSwipeDown && currentY >= dismissThreshold)
 
                         if (!horizontalDismiss && !verticalDismiss) {
                             dismissScope.launch {
-                                dragOffset.animateTo(Offset.Zero, spring())
+                                coroutineScope {
+                                    launch { dragOffsetX.animateTo(0f, spring()) }
+                                    launch { dragOffsetY.animateTo(0f, spring()) }
+                                }
                             }
                             return@detectDragGestures
                         }
 
                         dismissing = true
-                        val target = when {
-                            horizontalDismiss && abs(current.x) >= abs(current.y) -> {
-                                Offset(
-                                    x = if (current.x >= 0f) maxDismissOffset else -maxDismissOffset,
-                                    y = current.y
-                                )
-                            }
-                            current.y < 0f -> Offset(current.x, -maxDismissOffset)
-                            else -> Offset(current.x, maxDismissOffset)
+                        val targetX: Float
+                        val targetY: Float
+                        if (horizontalDismiss && abs(currentX) >= abs(currentY)) {
+                            targetX = if (currentX >= 0f) maxDismissOffset else -maxDismissOffset
+                            targetY = currentY
+                        } else {
+                            targetX = currentX
+                            targetY = if (currentY < 0f) -maxDismissOffset else maxDismissOffset
                         }
                         dismissScope.launch {
-                            dragOffset.animateTo(target, tween(170))
+                            coroutineScope {
+                                launch { dragOffsetX.animateTo(targetX, tween(170)) }
+                                launch { dragOffsetY.animateTo(targetY, tween(170)) }
+                            }
                             onDismiss()
                         }
                     },
                     onDragCancel = {
                         if (!dismissing) {
                             dismissScope.launch {
-                                dragOffset.animateTo(Offset.Zero, spring())
+                                coroutineScope {
+                                    launch { dragOffsetX.animateTo(0f, spring()) }
+                                    launch { dragOffsetY.animateTo(0f, spring()) }
+                                }
                             }
                         }
                     }
                 ) { change, dragAmount ->
                     change.consume()
-                    val current = dragOffset.value
+                    val currentX = dragOffsetX.value
+                    val currentY = dragOffsetY.value
                     val minY = if (allowSwipeUp) -maxDismissOffset else 0f
                     val maxY = if (allowSwipeDown) maxDismissOffset else 0f
-                    dragOffset.snapTo(
-                        Offset(
-                            x = (current.x + dragAmount.x)
-                                .coerceIn(-maxDismissOffset, maxDismissOffset),
-                            y = (current.y + dragAmount.y)
-                                .coerceIn(minY, maxY)
+                    dragOffsetX.snapTo(
+                        (currentX + dragAmount.x).coerceIn(
+                            -maxDismissOffset,
+                            maxDismissOffset
                         )
+                    )
+                    dragOffsetY.snapTo(
+                        (currentY + dragAmount.y).coerceIn(minY, maxY)
                     )
                 }
             },
