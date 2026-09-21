@@ -5,9 +5,12 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,10 +52,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
@@ -63,9 +69,11 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
+import kotlin.math.abs
 import java.net.HttpURLConnection
 import java.net.URL
 
@@ -610,15 +618,90 @@ internal fun BrowserBottomBar(
 internal fun BrowserTopNoticeCard(
     notice: BrowserTopNotice,
     onClick: () -> Unit,
-    onActionClick: () -> Unit = onClick
+    onActionClick: () -> Unit = onClick,
+    onDismiss: () -> Unit = {},
+    allowSwipeUp: Boolean = true,
+    allowSwipeDown: Boolean = true
 ) {
     val metrics = rememberIlyroLayoutMetrics()
     val isDownload = notice.kind == BrowserTopNoticeKind.DOWNLOAD
+    val dragOffset = remember(notice.id) {
+        Animatable(Offset.Zero, Offset.VectorConverter)
+    }
+    var dismissing by remember(notice.id) { mutableStateOf(false) }
+    val dismissScope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    val dismissThreshold = with(density) { 64.dp.toPx() }
+    val maxDismissOffset = with(density) { 240.dp.toPx() }
+
     Surface(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth(if (metrics.isNarrowPhone) 0.88f else 0.62f)
-            .widthIn(max = 300.dp),
+            .widthIn(max = 300.dp)
+            .graphicsLayer {
+                translationX = dragOffset.value.x
+                translationY = dragOffset.value.y
+                alpha = 1f - (
+                    (abs(dragOffset.value.x) + abs(dragOffset.value.y)) /
+                        (maxDismissOffset * 1.5f)
+                    ).coerceIn(0f, 0.38f)
+            }
+            .pointerInput(notice.id, allowSwipeUp, allowSwipeDown) {
+                detectDragGestures(
+                    onDragEnd = {
+                        if (dismissing) return@detectDragGestures
+                        val current = dragOffset.value
+                        val horizontalDismiss = abs(current.x) >= dismissThreshold
+                        val verticalDismiss =
+                            (allowSwipeUp && current.y <= -dismissThreshold) ||
+                                (allowSwipeDown && current.y >= dismissThreshold)
+
+                        if (!horizontalDismiss && !verticalDismiss) {
+                            dismissScope.launch {
+                                dragOffset.animateTo(Offset.Zero, spring())
+                            }
+                            return@detectDragGestures
+                        }
+
+                        dismissing = true
+                        val target = when {
+                            horizontalDismiss && abs(current.x) >= abs(current.y) -> {
+                                Offset(
+                                    x = if (current.x >= 0f) maxDismissOffset else -maxDismissOffset,
+                                    y = current.y
+                                )
+                            }
+                            current.y < 0f -> Offset(current.x, -maxDismissOffset)
+                            else -> Offset(current.x, maxDismissOffset)
+                        }
+                        dismissScope.launch {
+                            dragOffset.animateTo(target, tween(170))
+                            onDismiss()
+                        }
+                    },
+                    onDragCancel = {
+                        if (!dismissing) {
+                            dismissScope.launch {
+                                dragOffset.animateTo(Offset.Zero, spring())
+                            }
+                        }
+                    }
+                ) { change, dragAmount ->
+                    change.consume()
+                    val current = dragOffset.value
+                    val minY = if (allowSwipeUp) -maxDismissOffset else 0f
+                    val maxY = if (allowSwipeDown) maxDismissOffset else 0f
+                    dragOffset.snapTo(
+                        Offset(
+                            x = (current.x + dragAmount.x)
+                                .coerceIn(-maxDismissOffset, maxDismissOffset),
+                            y = (current.y + dragAmount.y)
+                                .coerceIn(minY, maxY)
+                        )
+                    )
+                }
+            },
         shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(
