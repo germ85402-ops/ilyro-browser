@@ -41,6 +41,7 @@ import com.ilyro.browser.passwords.PasswordCsvExporter
 import com.ilyro.browser.passwords.PasswordCsvImportPreview
 import com.ilyro.browser.passwords.PasswordCsvImporter
 import com.ilyro.browser.passwords.PasswordManagerService
+import com.ilyro.browser.passwords.PasswordVaultReadException
 
 private const val PASSWORD_EXPORT_AUTH_WINDOW_MS = 2 * 60 * 1000L
 
@@ -105,6 +106,10 @@ internal fun BookmarkImportControl(
     val noPasswordsMessage = tr(
         "There are no saved passwords to export.",
         "Нет сохранённых паролей для экспорта."
+    )
+    val passwordVaultReadFailedMessage = tr(
+        "Saved passwords are temporarily unavailable. Please try again.",
+        "Сохранённые пароли временно недоступны. Повторите попытку."
     )
     val deviceLockRequiredMessage = tr(
         "Set a device screen lock before exporting passwords.",
@@ -227,8 +232,14 @@ internal fun BookmarkImportControl(
                 ?: error("Unable to create password export")
         }.onSuccess {
             onStatusMessage(exportSuccessMessage)
-        }.onFailure {
-            onStatusMessage(exportFailedMessage)
+        }.onFailure { error ->
+            onStatusMessage(
+                if (error is PasswordVaultReadException) {
+                    passwordVaultReadFailedMessage
+                } else {
+                    exportFailedMessage
+                }
+            )
         }
     }
 
@@ -289,7 +300,18 @@ internal fun BookmarkImportControl(
                 }
                 OutlinedButton(
                     onClick = {
-                        val hasPasswords = runCatching { vault.snapshot().isNotEmpty() }.getOrDefault(false)
+                        val hasPasswords = try {
+                            vault.snapshot().isNotEmpty()
+                        } catch (error: Exception) {
+                            onStatusMessage(
+                                if (error is PasswordVaultReadException) {
+                                    passwordVaultReadFailedMessage
+                                } else {
+                                    exportFailedMessage
+                                }
+                            )
+                            return@OutlinedButton
+                        }
                         if (!hasPasswords) {
                             onStatusMessage(noPasswordsMessage)
                         } else {

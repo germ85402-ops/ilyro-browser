@@ -66,7 +66,7 @@ private class PasswordAutocompleteStorageDelegate(
             }.onSuccess(result::complete)
                 .onFailure { error ->
                     Log.w(TAG, "Unable to read saved passwords for $domain", error)
-                    result.complete(emptyArray())
+                    result.completeExceptionally(error)
                 }
         }
         return result
@@ -80,7 +80,7 @@ private class PasswordAutocompleteStorageDelegate(
             }.onSuccess(result::complete)
                 .onFailure { error ->
                     Log.w(TAG, "Unable to read saved passwords", error)
-                    result.complete(emptyArray())
+                    result.completeExceptionally(error)
                 }
         }
         return result

@@ -43,6 +43,7 @@ import java.lang.ref.WeakReference
 import java.util.zip.ZipInputStream
 import java.util.ArrayDeque
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -61,6 +62,9 @@ private class InvalidDownloadPayloadException(message: String) : Exception(messa
 private class MeteredNetworkBlockedException : java.io.IOException(
     "Download paused because downloads over metered networks are disabled"
 )
+
+internal fun shouldBlockMeteredDownload(allowMetered: Boolean, isMetered: Boolean): Boolean =
+    !allowMetered && isMetered
 
 private val DIRECT_DOWNLOAD_EXTENSIONS = setOf(
     "apk", "xapk", "apks", "aab",
@@ -310,6 +314,9 @@ internal class DownloadController(
     private val pauseLocks = ConcurrentHashMap<Long, java.lang.Object>()
     private val managerSpeedSamples = ConcurrentHashMap<Long, SpeedSample>()
     private val managerPromotionInFlight = ConcurrentHashMap.newKeySet<Long>()
+    private val managerMonitors = ConcurrentHashMap.newKeySet<Long>()
+    private val mediaSizeCache = ConcurrentHashMap<Long, Long>()
+    private val recordsChangedListeners = CopyOnWriteArraySet<() -> Unit>()
     private val recentNavigationStarts = ConcurrentHashMap<String, Long>()
     private val nextExtensionDownloadId = AtomicInteger(
         ((System.currentTimeMillis() and 0x3fffffffL).toInt()).coerceAtLeast(1)
@@ -327,13 +334,94 @@ internal class DownloadController(
     }
 
     private fun requireNetworkAllowed(allowMetered: Boolean) {
-        if (!allowMetered && isMeteredNetwork()) {
+        if (shouldBlockMeteredDownload(allowMetered, isMeteredNetwork())) {
             throw MeteredNetworkBlockedException()
         }
     }
 
     private fun networkAllowed(allowMetered: Boolean): Boolean =
         runCatching { requireNetworkAllowed(allowMetered) }.isSuccess
+
+    private fun registerNetworkCallback() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+        val connectivity = appContext.getSystemService(ConnectivityManager::class.java)
+        val controllerRef = WeakReference(this)
+        runCatching {
+            connectivity.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
+                override fun onCapabilitiesChanged(
+                    network: android.net.Network,
+                    capabilities: NetworkCapabilities
+                ) {
+                    if (!capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_METERED)) {
+                        controllerRef.get()?.pauseDisallowedMeteredDownloads()
+                    }
+                }
+            })
+        }.onFailure { error ->
+            android.util.Log.w(TAG, "Could not observe network policy changes", error)
+        }
+    }
+
+    /**
+     * Closing the active body makes a blocked read return promptly after Wi-Fi changes to a
+     * metered network. The worker's catch path then persists the partial transfer as paused.
+     */
+    private fun pauseDisallowedMeteredDownloads() {
+        val records = synchronized(recordLock) { restoreRecordsUnsafe() }
+        records.filter { record ->
+            record.localUri != null &&
+                !record.allowMetered &&
+                record.directState == DIRECT_RUNNING
+        }.forEach { record ->
+            pausedIds.add(record.id)
+            activeBodies[record.id]?.let { body -> runCatching { body.close() } }
+            activeHlsBodies[record.id]
+                ?.forEach { body -> runCatching { body.close() } }
+            activeHlsPools[record.id]?.shutdownNow()
+            updateDirectState(record.id, DIRECT_PAUSED)
+            liveTransfers.computeIfPresent(record.id) { _, live ->
+                live.copy(speedBytesPerSecond = 0L)
+            }
+            DownloadKeepAliveService.setPaused(record.id, true)
+        }
+    }
+
+    private fun restoreManagerDownloadMonitors() {
+        synchronized(recordLock) {
+            restoreRecordsUnsafe()
+                .filter { it.localUri == null && it.id >= 0L }
+                .forEach { monitorManagerDownload(it.id) }
+        }
+    }
+
+    private fun monitorManagerDownload(id: Long) {
+        if (id < 0L || !managerMonitors.add(id)) return
+        Thread({
+            try {
+                repeat(MAX_MANAGER_MONITOR_POLLS) {
+                    val status = managerStatus(id)
+                    if (status == null) {
+                        notifyRecordsChanged()
+                        return@Thread
+                    }
+                    notifyRecordsChanged()
+                    if (status == DownloadManager.STATUS_SUCCESSFUL ||
+                        status == DownloadManager.STATUS_FAILED
+                    ) {
+                        return@Thread
+                    }
+                    try {
+                        Thread.sleep(DOWNLOAD_PROGRESS_UPDATE_MS)
+                    } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        return@Thread
+                    }
+                }
+            } finally {
+                managerMonitors.remove(id)
+            }
+        }, "ILYRO-manager-download-$id").start()
+    }
 
     init {
         // minSdk is 26, so the downloads notification channel is always available.
@@ -370,6 +458,25 @@ internal class DownloadController(
                 }
             } ?: false
         }
+
+        restoreManagerDownloadMonitors()
+        registerNetworkCallback()
+    }
+
+    /**
+     * Subscribes to download state/progress changes. The returned callback removes the listener
+     * and is safe to call more than once, which keeps Compose lifecycle teardown idempotent.
+     */
+    fun addRecordsChangedListener(listener: () -> Unit): () -> Unit {
+        recordsChangedListeners += listener
+        return { recordsChangedListeners -= listener }
+    }
+
+    private fun notifyRecordsChanged(callback: (() -> Unit)? = null) {
+        recordsChangedListeners.forEach { listener ->
+            runCatching { listener() }
+        }
+        runCatching { callback?.invoke() }
     }
 
 
@@ -418,7 +525,7 @@ internal class DownloadController(
                         )
                     )
                 }
-                onRecordsChanged?.invoke()
+                notifyRecordsChanged(onRecordsChanged)
             }
 
             if (!networkAllowed(allowMetered)) {
@@ -456,7 +563,7 @@ internal class DownloadController(
                             fail(WebExtension.Download.INTERRUPT_REASON_FILE_FAILED)
                             return@accept
                         }
-                        onRecordsChanged?.invoke()
+                        notifyRecordsChanged(onRecordsChanged)
                         monitorExtensionDownload(extensionDownload, record.id, startedAt, initial)
                     },
                     { _ -> fail() }
@@ -515,13 +622,11 @@ internal class DownloadController(
                     exists = state != WebExtension.Download.STATE_INTERRUPTED
                 )
                 mainHandler.post { extensionDownload.update(info) }
-                onRecordsChangedFromMonitor()
+                notifyRecordsChanged()
                 if (state != WebExtension.Download.STATE_IN_PROGRESS) return@Thread
             }
         }, "ILYRO-extension-download-${extensionDownload.id}").start()
     }
-
-    private fun onRecordsChangedFromMonitor() = Unit
 
     fun enqueue(
         response: WebResponse,
@@ -683,7 +788,7 @@ internal class DownloadController(
             } else {
                 DownloadKeepAliveService.finish(appContext, provisionalId)
             }
-            onRecordsChanged?.invoke()
+            notifyRecordsChanged(onRecordsChanged)
         }
 
         downloadSession.setContentDelegate(object : GeckoSession.ContentDelegate {
@@ -698,7 +803,7 @@ internal class DownloadController(
                     suggestedName = downloadNameHint,
                     onFinished = { closeDownloadSession() }
                 )
-                onRecordsChanged?.invoke()
+                notifyRecordsChanged(onRecordsChanged)
                 if (record != null) {
                     DownloadKeepAliveService.replace(appContext, provisionalId, record.id, record.fileName)
                 } else {
@@ -720,7 +825,7 @@ internal class DownloadController(
                     } else {
                         DownloadKeepAliveService.finish(appContext, provisionalId)
                     }
-                    onRecordsChanged?.invoke()
+                    notifyRecordsChanged(onRecordsChanged)
                 }
             }
         })
@@ -947,7 +1052,7 @@ internal class DownloadController(
 
             fun reportError(message: String) {
                 mainHandler.post {
-                    onRecordsChanged?.invoke()
+                    notifyRecordsChanged(onRecordsChanged)
                     onError?.invoke(message)
                 }
             }
@@ -998,7 +1103,7 @@ internal class DownloadController(
                 // Switch the foreground-service token to the real record id so progress
                 // updates and completion all refer to the same single system notification.
                 DownloadKeepAliveService.replace(appContext, keepAliveToken, record.id, fileName)
-                mainHandler.post { onRecordsChanged?.invoke() }
+                mainHandler.post { notifyRecordsChanged(onRecordsChanged) }
 
                 val nextRangeOffset = mutableMapOf<String, Long>()
                 fun prepare(resource: HlsResource): PreparedHlsResource {
@@ -1070,8 +1175,9 @@ internal class DownloadController(
                         }
                         val total = currentTotalBytes(downloaded)
                         liveTransfers[record.id] = LiveTransfer(downloaded, total, speedBytesPerSecond)
-                        if (now - lastNotificationAt >= 500L) {
+                        if (now - lastNotificationAt >= DOWNLOAD_PROGRESS_UPDATE_MS) {
                             notifyDownloadProgress(record.id, fileName, downloaded, total)
+                            notifyRecordsChanged()
                             lastNotificationAt = now
                         }
                     }
@@ -1209,13 +1315,14 @@ internal class DownloadController(
                 liveTransfers[record.id] = LiveTransfer(copied, copied, 0L)
                 notifyDownloadComplete(record.id, fileName, copied)
                 cancelledIds.remove(record.id)
-                mainHandler.post { onRecordsChanged?.invoke() }
+                mainHandler.post { notifyRecordsChanged(onRecordsChanged) }
             } catch (error: Throwable) {
                 workerPool?.shutdownNow()
                 createdRecord?.let { record -> activeHlsPools.remove(record.id)?.shutdownNow() }
                 workerPool = null
                 val root = (error as? java.util.concurrent.ExecutionException)?.cause ?: error
-                val networkBlocked = root is MeteredNetworkBlockedException
+                val networkBlocked = root is MeteredNetworkBlockedException ||
+                    (createdRecord?.let { !it.allowMetered && isMeteredNetwork() } == true)
                 val record = createdRecord
                 if (record != null) {
                     activeHlsBodies.remove(record.id)?.forEach { stream -> runCatching { stream.close() } }
@@ -1232,12 +1339,12 @@ internal class DownloadController(
                     }
                     val wasCancelled = cancelledIds.remove(record.id)
                     if (wasCancelled) {
-                        mainHandler.post { onRecordsChanged?.invoke() }
+                        mainHandler.post { notifyRecordsChanged(onRecordsChanged) }
                         return@Thread
                     }
                 }
                 if (networkBlocked) {
-                    mainHandler.post { onRecordsChanged?.invoke() }
+                    mainHandler.post { notifyRecordsChanged(onRecordsChanged) }
                     return@Thread
                 }
                 reportError(root.message?.takeIf { it.isNotBlank() } ?: "HLS video download failed")
@@ -1705,8 +1812,9 @@ internal class DownloadController(
                             }
                             liveTransfers[id] = LiveTransfer(copied, totalBytes, speedBytesPerSecond)
 
-                            if (now - lastNotificationAt >= 500L) {
+                            if (now - lastNotificationAt >= DOWNLOAD_PROGRESS_UPDATE_MS) {
                                 notifyDownloadProgress(id, fileName, copied, totalBytes)
+                                notifyRecordsChanged()
                                 lastNotificationAt = now
                             }
                         }
@@ -1737,7 +1845,10 @@ internal class DownloadController(
                 if (cancelled) {
                     pausedIds.remove(id)
                     runCatching { resolver.delete(destination, null, null) }
-                } else if (error is MeteredNetworkBlockedException) {
+                } else if (
+                    error is MeteredNetworkBlockedException ||
+                    (!allowMetered && isMeteredNetwork())
+                ) {
                     // Preserve the partial MediaStore file. Resume will issue a range request
                     // after the user returns to an unmetered network or enables mobile-data
                     // downloads.
@@ -1816,6 +1927,7 @@ internal class DownloadController(
         } ?: return false
         if (record.localUri == null || record.directState != DIRECT_PAUSED) return false
         if (!networkAllowed(record.allowMetered)) return false
+        mediaSizeCache.remove(record.id)
 
         if (record.isHls &&
             !activeHlsPools.containsKey(record.id) &&
@@ -2134,6 +2246,7 @@ internal class DownloadController(
         runCatching { manager.remove(record.id) }
         managerSpeedSamples.remove(record.id)
         notifyDownloadComplete(record.id, apkName, copied)
+        notifyRecordsChanged()
         return true
     }
 
@@ -2205,6 +2318,7 @@ internal class DownloadController(
                 allowMetered = allowMetered
             )
             addRecord(record)
+            monitorManagerDownload(record.id)
             monitorManagerApkPromotion(record)
             record
         } catch (_: Exception) {
@@ -2226,14 +2340,14 @@ internal class DownloadController(
                 DIRECT_FAILED -> DownloadManager.STATUS_FAILED
                 else -> DownloadManager.STATUS_FAILED
             }
-            // Completed direct records persist their final byte count. Avoid a MediaStore query
-            // every 500 ms for files that can no longer change; query only active/paused files
-            // whose size may still be needed for progress or resume.
+            // Completed direct records persist their final byte count. Active transfers use the
+            // in-memory progress state, while a paused/recovered record queries MediaStore once
+            // and keeps that value until the next actual transfer mutation.
             val storedOrMediaBytes = when {
                 live != null -> live.downloadedBytes
                 status == DownloadManager.STATUS_SUCCESSFUL && record.expectedBytes >= 0L ->
                     record.expectedBytes
-                else -> mediaSize(record.localUri).coerceAtLeast(0L)
+                else -> cachedMediaSize(record)
             }
             val bytes = live?.downloadedBytes ?: storedOrMediaBytes
             val liveTotal = live?.totalBytes ?: -1L
@@ -2484,6 +2598,7 @@ internal class DownloadController(
             activeHlsPools.remove(record.id)?.shutdownNow()
             activeHlsBodies.remove(record.id)?.forEach { stream -> runCatching { stream.close() } }
             liveTransfers.remove(record.id)
+            mediaSizeCache.remove(record.id)
             pauseLocks.remove(record.id)
             cancelDownloadNotification(record.id)
             DownloadKeepAliveService.finish(appContext, record.id)
@@ -2495,6 +2610,8 @@ internal class DownloadController(
         synchronized(recordLock) {
             saveRecordsUnsafe(restoreRecordsUnsafe().filterNot { it.id == record.id })
         }
+        managerMonitors.remove(record.id)
+        notifyRecordsChanged()
     }
 
     fun remove(item: DownloadUiItem) {
@@ -2507,6 +2624,7 @@ internal class DownloadController(
         }
         if (item.record.localUri != null) {
             liveTransfers.remove(item.record.id)
+            mediaSizeCache.remove(item.record.id)
             cancelledIds.remove(item.record.id)
             cancelDownloadNotification(item.record.id)
             runCatching { resolver.delete(Uri.parse(item.record.localUri), null, null) }
@@ -2517,6 +2635,8 @@ internal class DownloadController(
         synchronized(recordLock) {
             saveRecordsUnsafe(restoreRecordsUnsafe().filterNot { it.id == item.record.id })
         }
+        managerMonitors.remove(item.record.id)
+        notifyRecordsChanged()
     }
 
     fun clearAll() {
@@ -2524,6 +2644,9 @@ internal class DownloadController(
         pausedIds.clear()
         pauseLocks.clear()
         synchronized(recordLock) { saveRecordsUnsafe(emptyList()) }
+        mediaSizeCache.clear()
+        managerMonitors.clear()
+        notifyRecordsChanged()
     }
 
     private fun addRecord(record: DownloadRecord) {
@@ -2532,6 +2655,7 @@ internal class DownloadController(
             records.add(0, record)
             saveRecordsUnsafe(records)
         }
+        notifyRecordsChanged()
     }
 
     private fun updateDirectState(id: Long, state: Int) {
@@ -2541,6 +2665,7 @@ internal class DownloadController(
             }
             saveRecordsUnsafe(records)
         }
+        notifyRecordsChanged()
     }
 
     private fun markDirectSuccess(id: Long, actualBytes: Long) {
@@ -2558,6 +2683,8 @@ internal class DownloadController(
             }
             saveRecordsUnsafe(records)
         }
+        mediaSizeCache[id] = finalBytes
+        notifyRecordsChanged()
     }
 
     private fun updateExpectedBytes(id: Long, expectedBytes: Long) {
@@ -2568,6 +2695,7 @@ internal class DownloadController(
             }
             saveRecordsUnsafe(records)
         }
+        notifyRecordsChanged()
     }
 
     private fun updateRecordMetadata(id: Long, fileName: String, mimeType: String?) {
@@ -2581,6 +2709,7 @@ internal class DownloadController(
             }
             saveRecordsUnsafe(records)
         }
+        notifyRecordsChanged()
     }
 
     private fun retryAfterDirectFailure(
@@ -2669,6 +2798,7 @@ internal class DownloadController(
 
     private fun markDirectFailed(id: Long, destination: Uri) {
         runCatching { resolver.delete(destination, null, null) }
+        mediaSizeCache.remove(id)
         synchronized(recordLock) {
             val records = restoreRecordsUnsafe().map { record ->
                 if (record.id == id) {
@@ -2677,6 +2807,7 @@ internal class DownloadController(
             }
             saveRecordsUnsafe(records)
         }
+        notifyRecordsChanged()
     }
 
     private fun mediaSize(uriText: String?): Long {
@@ -2687,6 +2818,11 @@ internal class DownloadController(
             } ?: -1L
         }.getOrDefault(-1L)
     }
+
+    private fun cachedMediaSize(record: DownloadRecord): Long =
+        mediaSizeCache[record.id] ?: mediaSize(record.localUri)
+            .coerceAtLeast(0L)
+            .also { mediaSizeCache[record.id] = it }
 
     private fun restoreRecordsUnsafe(): List<DownloadRecord> {
         val raw = prefs.getString(KEY_DOWNLOADS, null) ?: return emptyList()
@@ -2746,6 +2882,7 @@ internal class DownloadController(
         response.headers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
 
     private companion object {
+        const val TAG = "ILYRO.Downloads"
         const val KEY_DOWNLOADS = "downloads_v1"
         const val MAX_RECORDS = 250
         const val DOWNLOAD_CHANNEL_ID = "ilyro_downloads"
@@ -2759,5 +2896,7 @@ internal class DownloadController(
         const val DIRECT_COPY_BUFFER_BYTES = 1024 * 1024
         const val HLS_COPY_BUFFER_BYTES = 512 * 1024
         const val MAX_HLS_QUALITY_VARIANTS = 12
+        const val DOWNLOAD_PROGRESS_UPDATE_MS = 500L
+        const val MAX_MANAGER_MONITOR_POLLS = 7_200
     }
 }

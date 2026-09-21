@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.26.0-rc7 — release candidate
+
+- Report password-vault read and save failures to Autofill and Gecko instead of treating them as an empty vault or a successful save.
+- Replace the fixed download-screen polling loop with download progress events and cache recovered MediaStore sizes between real state changes.
+- Pause disallowed downloads promptly when the active network becomes metered, including closing a currently blocked stream read.
+- Protect Google Drive sync uploads with conditional `If-Match` updates and retryable remote-conflict handling.
+
 ## 0.26.0-rc6 — release candidate
 
 - Fix YouTube fullscreen sizing so the video uses the available surface while staying centered, uncropped, and aspect-preserving.

@@ -12,7 +12,8 @@ import org.json.JSONObject
 
 /**
  * Stores one versioned ILYRO settings snapshot in Google Drive's hidden appDataFolder.
- * Only the narrow drive.appdata scope is required.
+ * Existing files are updated with a conditional If-Match request so two devices cannot silently
+ * overwrite the same remote version. Only the narrow drive.appdata scope is required.
  */
 class GoogleDriveSyncProvider(
     private val accessToken: String
@@ -52,18 +53,56 @@ class GoogleDriveSyncProvider(
                 .toString()
 
             val body = buildMultipartBody(boundary, metadata, payload)
-            val response = request(
-                method = "POST",
-                url = "$DRIVE_UPLOAD_API/files?uploadType=multipart&fields=id",
-                body = body,
-                contentType = "multipart/related; boundary=$boundary"
-            )
+            val target = previousFiles.firstOrNull()
+            val response = if (target == null) {
+                request(
+                    method = "POST",
+                    url = "$DRIVE_UPLOAD_API/files?uploadType=multipart&fields=id",
+                    body = body,
+                    contentType = "multipart/related; boundary=$boundary"
+                )
+            } else {
+                val current = request(
+                    method = "GET",
+                    url = "$DRIVE_API/files/${target.id}?fields=id"
+                )
+                if (!current.isSuccessful) {
+                    return@withContext current.asSyncResult()
+                }
+                val etag = current.etag
+                    ?: return@withContext SyncResult.Failure(
+                        message = "Google Drive did not provide a sync version token; upload was not attempted.",
+                        recoverable = true
+                    )
+                val updateMetadata = JSONObject()
+                    .put("name", FILE_NAME)
+                    .put("mimeType", JSON_MIME)
+                    .toString()
+                val updateBoundary = "ilyro-${UUID.randomUUID()}"
+                val updateBody = buildMultipartBody(updateBoundary, updateMetadata, payload)
+                request(
+                    method = "PATCH",
+                    url = "$DRIVE_UPLOAD_API/files/${target.id}?uploadType=multipart&fields=id",
+                    body = updateBody,
+                    contentType = "multipart/related; boundary=$updateBoundary",
+                    headers = mapOf("If-Match" to etag)
+                )
+            }
             if (!response.isSuccessful) {
+                if (response.code == HttpURLConnection.HTTP_PRECON_FAILED) {
+                    return@withContext SyncResult.Failure(
+                        message = "Google Drive data changed on another device; sync will retry.",
+                        recoverable = true
+                    )
+                }
                 return@withContext response.asSyncResult()
             }
 
-            // The new snapshot is already safely stored. Old duplicates can now be removed.
-            previousFiles.forEach { oldFile ->
+            // The conditional update is safely stored. Remove only older duplicate files left by
+            // versions of ILYRO that created a new Drive file for every backup.
+            previousFiles
+                .filter { oldFile -> target == null || oldFile.id != target.id }
+                .forEach { oldFile ->
                 request(
                     method = "DELETE",
                     url = "$DRIVE_API/files/${oldFile.id}"
@@ -143,14 +182,16 @@ class GoogleDriveSyncProvider(
         method: String,
         url: String,
         body: ByteArray? = null,
-        contentType: String? = null
-    ): HttpResponse = requestBlocking(method, url, body, contentType)
+        contentType: String? = null,
+        headers: Map<String, String> = emptyMap()
+    ): HttpResponse = requestBlocking(method, url, body, contentType, headers)
 
     private fun requestBlocking(
         method: String,
         url: String,
         body: ByteArray? = null,
-        contentType: String? = null
+        contentType: String? = null,
+        headers: Map<String, String> = emptyMap()
     ): HttpResponse {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = method
@@ -161,6 +202,7 @@ class GoogleDriveSyncProvider(
             if (contentType != null) {
                 setRequestProperty("Content-Type", contentType)
             }
+            headers.forEach { (name, value) -> setRequestProperty(name, value) }
             if (body != null) {
                 doOutput = true
                 setFixedLengthStreamingMode(body.size)
@@ -172,9 +214,11 @@ class GoogleDriveSyncProvider(
                 connection.outputStream.use { it.write(body) }
             }
             val code = connection.responseCode
+            val etag = connection.getHeaderField("ETag")
+                ?: connection.getHeaderField("etag")
             val stream = if (code in 200..299) connection.inputStream else connection.errorStream
             val responseBody = stream?.bufferedReader(StandardCharsets.UTF_8)?.use { it.readText() }.orEmpty()
-            HttpResponse(code, responseBody)
+            HttpResponse(code, responseBody, etag)
         } finally {
             connection.disconnect()
         }
@@ -196,12 +240,17 @@ class GoogleDriveSyncProvider(
 
     private data class RemoteFile(val id: String)
 
-    private data class HttpResponse(val code: Int, val body: String) {
+    private data class HttpResponse(
+        val code: Int,
+        val body: String,
+        val etag: String? = null
+    ) {
         val isSuccessful: Boolean get() = code in 200..299
 
         fun asFailure(): SyncResult.Failure = SyncResult.Failure(
             message = "Google Drive API error $code${body.takeIf { it.isNotBlank() }?.let { ": $it" }.orEmpty()}",
-            recoverable = code == 401 || code == 403 || code == 429 || code >= 500
+            recoverable = code == 401 || code == 403 || code == 409 ||
+                code == 412 || code == 429 || code >= 500
         )
 
         fun asSyncResult(): SyncResult<Nothing> =
@@ -221,7 +270,8 @@ class GoogleDriveSyncProvider(
             } else {
                 SyncResult.Failure(
                     message = message,
-                    recoverable = code == 403 || code == 429 || code >= 500
+                    recoverable = code == 403 || code == 409 || code == 412 ||
+                        code == 429 || code >= 500
                 )
             }
         }

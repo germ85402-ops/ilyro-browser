@@ -11,6 +11,7 @@ import android.service.autofill.FillResponse
 import android.service.autofill.SaveCallback
 import android.service.autofill.SaveInfo
 import android.service.autofill.SaveRequest
+import android.util.Log
 import android.view.autofill.AutofillValue
 import android.widget.RemoteViews
 import java.util.UUID
@@ -34,11 +35,18 @@ class IlyroAutofillService : AutofillService() {
             return
         }
 
-        val credentials = runCatching {
+        val credentials = try {
             PasswordManagerService.vault(this)
                 .snapshot()
                 .filter { passwordDomainMatches(it.origin, domain) }
-        }.getOrDefault(emptyList())
+        } catch (error: Exception) {
+            Log.e(TAG, "Unable to read saved passwords for Autofill", error)
+            callback.onFailure(
+                error.message?.takeIf { it.isNotBlank() }
+                    ?: "Saved passwords are temporarily unavailable. Please try again."
+            )
+            return
+        }
         if (credentials.isEmpty()) {
             callback.onSuccess(null)
             return
@@ -107,7 +115,7 @@ class IlyroAutofillService : AutofillService() {
         } else {
             "https://" + domain
         }
-        runCatching {
+        try {
             PasswordManagerService.vault(this).upsert(
                 PasswordCredential(
                     guid = UUID.randomUUID().toString(),
@@ -118,6 +126,13 @@ class IlyroAutofillService : AutofillService() {
                     password = password
                 )
             )
+        } catch (error: Exception) {
+            Log.e(TAG, "Unable to save an Autofill password", error)
+            callback.onFailure(
+                error.message?.takeIf { it.isNotBlank() }
+                    ?: "This password could not be saved. Please try again."
+            )
+            return
         }
         callback.onSuccess()
     }
@@ -174,6 +189,7 @@ class IlyroAutofillService : AutofillService() {
     }
 
     private companion object {
+        const val TAG = "ILYRO.Autofill"
         const val MAX_DATASETS = 10
     }
 }

@@ -30,6 +30,11 @@ interface SyncProvider {
 
     suspend fun downloadLatest(): SyncResult<SyncSnapshot?>
 
+    /**
+     * Uploads a snapshot without silently overwriting a newer remote version. Providers that
+     * support conditional writes should return a recoverable failure on a remote conflict so the
+     * caller can download, merge and retry.
+     */
     suspend fun upload(snapshot: SyncSnapshot): SyncResult<Unit>
 
     suspend fun deleteRemoteData(): SyncResult<Unit>

@@ -526,20 +526,16 @@ private fun BrowserScreen(
     }
 
     DisposableEffect(downloadController) {
+        val removeDownloadListener = downloadController.addRecordsChangedListener {
+            refreshDownloads()
+        }
         val unbind = BrowserUiCommandCoordinator.bindDownloads {
             refreshDownloads()
             showDownloads = true
         }
-        onDispose { unbind() }
-    }
-
-    LaunchedEffect(downloadsActive, showDownloads) {
-        while (downloadsActive || showDownloads) {
-            delay(if (showDownloads) 500L else 650L)
-            val latest = withContext(Dispatchers.IO) {
-                runCatching { downloadController.snapshot() }.getOrDefault(emptyList())
-            }
-            applyDownloadsSnapshot(latest)
+        onDispose {
+            removeDownloadListener()
+            unbind()
         }
     }
 
