@@ -625,12 +625,13 @@ internal fun BrowserTopNoticeCard(
     val dismissThreshold = with(density) { 64.dp.toPx() }
     val maxDismissOffset = with(density) { 240.dp.toPx() }
 
-    // Keep browser notices visually close to a Chrome-style snackbar: compact,
-    // text-first, and quiet enough not to compete with the page.
-    val snackbarColor = Color(0xFF2A292D).copy(alpha = 0.96f)
-    val snackbarTextColor = Color.White.copy(alpha = 0.94f)
-    val snackbarSecondaryColor = Color.White.copy(alpha = 0.72f)
-    val snackbarActionColor = Color(0xFFB9C7FF)
+    // Reuse the active browser palette so notices follow light/dark mode,
+    // wallpaper-derived accents, and the selected browser style.
+    val themeColors = MaterialTheme.colorScheme
+    val snackbarColor = themeColors.surfaceVariant.copy(alpha = 0.96f)
+    val snackbarTextColor = themeColors.onSurface
+    val snackbarSecondaryColor = themeColors.onSurfaceVariant.copy(alpha = 0.78f)
+    val snackbarActionColor = themeColors.primary
 
     Surface(
         onClick = onClick,
