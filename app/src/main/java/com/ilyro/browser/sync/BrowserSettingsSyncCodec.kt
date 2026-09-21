@@ -5,6 +5,9 @@ import com.ilyro.browser.ui.AppLanguage
 import com.ilyro.browser.ui.BrowserAccent
 import com.ilyro.browser.ui.BrowserSettings
 import com.ilyro.browser.ui.BrowserTheme
+import com.ilyro.browser.ui.CustomSearchEngine
+import com.ilyro.browser.ui.MAX_CUSTOM_SEARCH_ENGINES
+import com.ilyro.browser.ui.normalizeCustomSearchEngine
 import com.ilyro.browser.ui.HomeBackground
 import com.ilyro.browser.ui.HomeShortcutSize
 import com.ilyro.browser.ui.SearchEngine
@@ -16,6 +19,7 @@ import com.ilyro.browser.ui.UiDensity
 import com.ilyro.browser.ui.WallpaperBlur
 import com.ilyro.browser.ui.WallpaperDim
 import com.ilyro.browser.ui.WallpaperFit
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -30,6 +34,20 @@ internal object BrowserSettingsSyncCodec {
         .put("language", settings.language.name)
         .put("preferredSiteLanguages", settings.preferredSiteLanguages.joinToString(","))
         .put("searchEngine", settings.searchEngine.name)
+        .put(
+            "customSearchEngines",
+            JSONArray().apply {
+                settings.customSearchEngines.forEach { engine ->
+                    put(
+                        JSONObject()
+                            .put("id", engine.id)
+                            .put("name", engine.displayName)
+                            .put("url", engine.queryUrlTemplate)
+                    )
+                }
+            }
+        )
+        .put("customSearchEngineId", settings.customSearchEngineId.orEmpty())
         .put("theme", settings.theme.name)
         .put("appIcon", settings.appIcon.name)
         .put("accent", settings.accent.name)
@@ -70,6 +88,10 @@ internal object BrowserSettingsSyncCodec {
         }
 
         val defaults = BrowserSettings()
+        val customSearchEngines = decodeCustomSearchEngines(json.optJSONArray("customSearchEngines"))
+        val customSearchEngineId = json.optString("customSearchEngineId")
+            .takeIf { id -> customSearchEngines.any { it.id == id } }
+
         return BrowserSettings(
             language = enumOrDefault(json.optString("language"), defaults.language),
             preferredSiteLanguages = json.optString("preferredSiteLanguages")
@@ -80,6 +102,8 @@ internal object BrowserSettingsSyncCodec {
                 .takeIf { it.isNotEmpty() }
                 ?: defaults.preferredSiteLanguages,
             searchEngine = enumOrDefault(json.optString("searchEngine"), defaults.searchEngine),
+            customSearchEngines = customSearchEngines,
+            customSearchEngineId = customSearchEngineId,
             theme = enumOrDefault(json.optString("theme"), defaults.theme),
             appIcon = enumOrDefault(json.optString("appIcon"), defaults.appIcon),
             accent = enumOrDefault(json.optString("accent"), defaults.accent),
@@ -129,6 +153,24 @@ internal object BrowserSettingsSyncCodec {
                 defaults.clearPrivateDataOnExit
             )
         )
+    }
+
+    private fun decodeCustomSearchEngines(array: JSONArray?): List<CustomSearchEngine> {
+        if (array == null) return emptyList()
+        return buildList {
+            for (index in 0 until array.length()) {
+                val item = array.optJSONObject(index) ?: continue
+                val engine = normalizeCustomSearchEngine(
+                    CustomSearchEngine(
+                        id = item.optString("id"),
+                        displayName = item.optString("name"),
+                        queryUrlTemplate = item.optString("url")
+                    )
+                ) ?: continue
+                if (none { it.id == engine.id }) add(engine)
+                if (size >= MAX_CUSTOM_SEARCH_ENGINES) break
+            }
+        }
     }
 
     private inline fun <reified T : Enum<T>> enumOrDefault(value: String, default: T): T =

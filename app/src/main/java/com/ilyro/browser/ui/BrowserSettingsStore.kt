@@ -2,6 +2,8 @@ package com.ilyro.browser.ui
 
 import android.content.SharedPreferences
 import java.util.Locale
+import org.json.JSONArray
+import org.json.JSONObject
 
 internal enum class AppLanguage(val displayName: String) {
     SYSTEM("System"),
@@ -28,6 +30,12 @@ internal enum class SearchEngine(val displayName: String, val queryUrl: String) 
     BRAVE("Brave Search", "https://search.brave.com/search?q="),
     BING("Bing", "https://www.bing.com/search?q=")
 }
+
+internal data class CustomSearchEngine(
+    val id: String,
+    val displayName: String,
+    val queryUrlTemplate: String
+)
 
 internal enum class BrowserTheme(val displayName: String) {
     SYSTEM("System"), LIGHT("Light"), DARK("Dark")
@@ -74,6 +82,8 @@ internal data class BrowserSettings(
     val language: AppLanguage = AppLanguage.SYSTEM,
     val preferredSiteLanguages: List<String> = defaultPreferredSiteLanguages(),
     val searchEngine: SearchEngine = SearchEngine.GOOGLE,
+    val customSearchEngines: List<CustomSearchEngine> = emptyList(),
+    val customSearchEngineId: String? = null,
     val theme: BrowserTheme = BrowserTheme.SYSTEM,
     val appIcon: AppIcon = AppIcon.DEER,
     val accent: BrowserAccent = BrowserAccent.ILYRO,
@@ -106,6 +116,27 @@ internal data class BrowserSettings(
     val clearPrivateDataOnExit: Boolean = true
 )
 
+internal const val MAX_CUSTOM_SEARCH_ENGINES = 20
+
+internal fun BrowserSettings.selectedCustomSearchEngine(): CustomSearchEngine? =
+    customSearchEngines.firstOrNull { it.id == customSearchEngineId }
+
+internal fun isValidCustomSearchEngineTemplate(template: String): Boolean {
+    val value = template.trim()
+    return value.length <= 500 &&
+        (value.startsWith("https://", ignoreCase = true) ||
+            value.startsWith("http://", ignoreCase = true)) &&
+        value.contains("%s")
+}
+
+internal fun normalizeCustomSearchEngine(engine: CustomSearchEngine): CustomSearchEngine? {
+    val id = engine.id.trim().takeIf { it.length in 1..120 } ?: return null
+    val displayName = engine.displayName.trim().takeIf { it.isNotEmpty() }?.take(60) ?: return null
+    val queryUrlTemplate = engine.queryUrlTemplate.trim()
+    if (!isValidCustomSearchEngineTemplate(queryUrlTemplate)) return null
+    return CustomSearchEngine(id, displayName, queryUrlTemplate)
+}
+
 internal fun defaultPreferredSiteLanguages(): List<String> {
     val primaryLanguage = Locale.getDefault().language
         .lowercase(Locale.ROOT)
@@ -117,6 +148,8 @@ internal object BrowserSettingsStore {
     private const val KEY_LANGUAGE = "settings_language"
     private const val KEY_SITE_LANGUAGES = "settings_site_languages"
     private const val KEY_SEARCH_ENGINE = "settings_search_engine"
+    private const val KEY_CUSTOM_SEARCH_ENGINES = "settings_custom_search_engines"
+    private const val KEY_CUSTOM_SEARCH_ENGINE_ID = "settings_custom_search_engine_id"
     private const val KEY_THEME = "settings_theme"
     private const val KEY_APP_ICON = "settings_app_icon"
     private const val KEY_ACCENT = "settings_accent"
@@ -149,6 +182,43 @@ internal object BrowserSettingsStore {
     private const val KEY_GPC = "settings_gpc"
     private const val KEY_CLEAR_PRIVATE = "settings_clear_private"
 
+    private fun restoreCustomSearchEngines(prefs: SharedPreferences): List<CustomSearchEngine> {
+        val raw = prefs.getString(KEY_CUSTOM_SEARCH_ENGINES, null) ?: return emptyList()
+        return runCatching {
+            val array = JSONArray(raw)
+            buildList {
+                for (index in 0 until array.length()) {
+                    val item = array.optJSONObject(index) ?: continue
+                    val candidate = normalizeCustomSearchEngine(
+                        CustomSearchEngine(
+                            id = item.optString("id"),
+                            displayName = item.optString("name"),
+                            queryUrlTemplate = item.optString("url")
+                        )
+                    ) ?: continue
+                    if (none { it.id == candidate.id }) add(candidate)
+                    if (size >= MAX_CUSTOM_SEARCH_ENGINES) break
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
+
+    private fun serializeCustomSearchEngines(engines: List<CustomSearchEngine>): String =
+        JSONArray().apply {
+            engines
+                .mapNotNull(::normalizeCustomSearchEngine)
+                .distinctBy { it.id }
+                .take(MAX_CUSTOM_SEARCH_ENGINES)
+                .forEach { engine ->
+                    put(
+                        JSONObject()
+                            .put("id", engine.id)
+                            .put("name", engine.displayName)
+                            .put("url", engine.queryUrlTemplate)
+                    )
+                }
+        }.toString()
+
     private fun restoreToolbarActions(prefs: SharedPreferences): Set<ToolbarAction> {
         val stored = prefs.getStringSet(KEY_TOOLBAR_ACTIONS, null)
             ?.mapNotNull { name -> ToolbarAction.entries.firstOrNull { it.name == name } }
@@ -178,7 +248,12 @@ internal object BrowserSettingsStore {
         return stored?.takeIf { it.isNotEmpty() } ?: setOf(ToolbarAction.TABS)
     }
 
-    fun restore(prefs: SharedPreferences): BrowserSettings = BrowserSettings(
+    fun restore(prefs: SharedPreferences): BrowserSettings {
+        val customSearchEngines = restoreCustomSearchEngines(prefs)
+        val customSearchEngineId = prefs.getString(KEY_CUSTOM_SEARCH_ENGINE_ID, null)
+            ?.takeIf { id -> customSearchEngines.any { it.id == id } }
+
+        return BrowserSettings(
         language = enumValueOrDefault(prefs.getString(KEY_LANGUAGE, null), AppLanguage.SYSTEM),
         preferredSiteLanguages = prefs.getString(KEY_SITE_LANGUAGES, null)
             ?.split('|')
@@ -188,6 +263,8 @@ internal object BrowserSettingsStore {
             ?.takeIf { it.isNotEmpty() }
             ?: defaultPreferredSiteLanguages(),
         searchEngine = enumValueOrDefault(prefs.getString(KEY_SEARCH_ENGINE, null), SearchEngine.GOOGLE),
+        customSearchEngines = customSearchEngines,
+        customSearchEngineId = customSearchEngineId,
         theme = enumValueOrDefault(prefs.getString(KEY_THEME, null), BrowserTheme.SYSTEM),
         appIcon = enumValueOrDefault(prefs.getString(KEY_APP_ICON, null), AppIcon.DEER),
         accent = enumValueOrDefault(prefs.getString(KEY_ACCENT, null), BrowserAccent.ILYRO),
@@ -221,13 +298,16 @@ internal object BrowserSettingsStore {
         thirdPartyCookieIsolation = prefs.getBoolean(KEY_COOKIE_ISOLATION, true),
         globalPrivacyControl = prefs.getBoolean(KEY_GPC, true),
         clearPrivateDataOnExit = prefs.getBoolean(KEY_CLEAR_PRIVATE, true)
-    )
+        )
+    }
 
     fun save(prefs: SharedPreferences, settings: BrowserSettings) {
         prefs.edit()
             .putString(KEY_LANGUAGE, settings.language.name)
             .putString(KEY_SITE_LANGUAGES, settings.preferredSiteLanguages.joinToString("|"))
             .putString(KEY_SEARCH_ENGINE, settings.searchEngine.name)
+            .putString(KEY_CUSTOM_SEARCH_ENGINES, serializeCustomSearchEngines(settings.customSearchEngines))
+            .putString(KEY_CUSTOM_SEARCH_ENGINE_ID, settings.customSearchEngineId)
             .putString(KEY_THEME, settings.theme.name)
             .putString(KEY_APP_ICON, settings.appIcon.name)
             .putString(KEY_ACCENT, settings.accent.name)

@@ -1427,7 +1427,11 @@ private fun BrowserScreen(
     }
 
     fun navigateInput(input: String) {
-        val target = normalizeAddress(input, settings.searchEngine)
+        val target = normalizeAddress(
+            input,
+            settings.searchEngine,
+            settings.selectedCustomSearchEngine()
+        )
         addressText = if (target == HOME_URL) "" else target
         BrowserEngine.applyPreferredColorScheme(settings.theme)
         runCatching { activeTab.session.compositorController.setClearColor(pageTransitionColor) }
@@ -1739,6 +1743,7 @@ private fun BrowserScreen(
                         onAddressFocusChanged = { addressFocused = it },
                         onNavigate = { input -> navigateInput(input) },
                         searchEngine = settings.searchEngine,
+                        customSearchEngine = settings.selectedCustomSearchEngine(),
                         history = if (activeTab.isPrivate) emptyList() else history,
                         canGoBack = activeTab.canGoBack,
                         canGoForward = activeTab.canGoForward,
@@ -1797,10 +1802,20 @@ private fun BrowserScreen(
                         IlyroHomePage(
                             settings = settings,
                             searchEngine = settings.searchEngine,
+                            customSearchEngine = settings.selectedCustomSearchEngine(),
+                            customSearchEngines = settings.customSearchEngines,
                             history = if (activeTab.isPrivate) emptyList() else history,
                             isPrivate = activeTab.isPrivate,
                             onSearchEngineChange = { engine ->
-                                onSettingsChange(settings.copy(searchEngine = engine))
+                                onSettingsChange(
+                                    settings.copy(
+                                        searchEngine = engine,
+                                        customSearchEngineId = null
+                                    )
+                                )
+                            },
+                            onCustomSearchEngineChange = { engine ->
+                                onSettingsChange(settings.copy(customSearchEngineId = engine?.id))
                             },
                             onNavigate = { navigateInput(it) }
                         )
@@ -1908,6 +1923,7 @@ private fun BrowserScreen(
                         onAddressFocusChanged = { addressFocused = it },
                         onNavigate = { input -> navigateInput(input) },
                         searchEngine = settings.searchEngine,
+                        customSearchEngine = settings.selectedCustomSearchEngine(),
                         history = if (activeTab.isPrivate) emptyList() else history,
                         canGoBack = activeTab.canGoBack,
                         canGoForward = activeTab.canGoForward,
@@ -2902,7 +2918,11 @@ private fun hostLabel(url: String): String {
     return siteHost(url).ifBlank { "New tab" }
 }
 
-private fun normalizeAddress(input: String, searchEngine: SearchEngine): String {
+private fun normalizeAddress(
+    input: String,
+    searchEngine: SearchEngine,
+    customSearchEngine: CustomSearchEngine? = null
+): String {
     val value = input.trim()
 
     if (value.isEmpty()) return HOME_URL
@@ -2912,5 +2932,10 @@ private fun normalizeAddress(input: String, searchEngine: SearchEngine): String 
     if (looksLikeHost) return "https://$value"
 
     val query = URLEncoder.encode(value, StandardCharsets.UTF_8.toString())
-    return searchEngine.queryUrl + query
+    val queryTemplate = customSearchEngine?.queryUrlTemplate
+    return if (queryTemplate != null) {
+        queryTemplate.replace("%s", query)
+    } else {
+        searchEngine.queryUrl + query
+    }
 }

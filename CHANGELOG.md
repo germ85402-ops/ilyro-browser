@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.26.0-rc8 — release candidate
+
+- Add custom search engines in Settings with editable names, URL templates, default selection, and local/sync persistence.
+- Disable remote suggestions for custom engines and keep compact mobile settings and notice layouts readable.
+
+
 ## 0.26.0-rc7 — release candidate
 
 - Report password-vault read and save failures to Autofill and Gecko instead of treating them as an empty vault or a successful save.

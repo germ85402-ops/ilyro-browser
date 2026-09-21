@@ -15,6 +15,14 @@ class BrowserSettingsStoreTest {
             language = AppLanguage.RUSSIAN,
             preferredSiteLanguages = listOf("ru", "en"),
             searchEngine = SearchEngine.DUCKDUCKGO,
+            customSearchEngines = listOf(
+                CustomSearchEngine(
+                    id = "kagi",
+                    displayName = "Kagi",
+                    queryUrlTemplate = "https://kagi.com/search?q=%s"
+                )
+            ),
+            customSearchEngineId = "kagi",
             theme = BrowserTheme.DARK,
             appIcon = AppIcon.PINK_DARK,
             accent = BrowserAccent.VIOLET,

@@ -4,6 +4,7 @@ import com.ilyro.browser.ui.AppIcon
 import com.ilyro.browser.ui.AppLanguage
 import com.ilyro.browser.ui.BrowserSettings
 import com.ilyro.browser.ui.BrowserTheme
+import com.ilyro.browser.ui.CustomSearchEngine
 import com.ilyro.browser.ui.SearchEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -17,6 +18,14 @@ class BrowserSettingsSyncCodecTest {
             language = AppLanguage.RUSSIAN,
             preferredSiteLanguages = listOf("ru", "en", "hy"),
             searchEngine = SearchEngine.DUCKDUCKGO,
+            customSearchEngines = listOf(
+                CustomSearchEngine(
+                    id = "kagi",
+                    displayName = "Kagi",
+                    queryUrlTemplate = "https://kagi.com/search?q=%s"
+                )
+            ),
+            customSearchEngineId = "kagi",
             theme = BrowserTheme.DARK,
             appIcon = AppIcon.PINK_DARK,
             adBlockingEnabled = false,

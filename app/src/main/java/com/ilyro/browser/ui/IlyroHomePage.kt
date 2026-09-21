@@ -83,7 +83,10 @@ internal fun IlyroHomePage(
     history: List<HistoryItem>,
     isPrivate: Boolean,
     onSearchEngineChange: (SearchEngine) -> Unit,
-    onNavigate: (String) -> Unit
+    onNavigate: (String) -> Unit,
+    customSearchEngine: CustomSearchEngine? = null,
+    customSearchEngines: List<CustomSearchEngine> = emptyList(),
+    onCustomSearchEngineChange: (CustomSearchEngine?) -> Unit = {}
 ) {
     val metrics = rememberIlyroLayoutMetrics()
     val context = LocalContext.current
@@ -159,6 +162,9 @@ internal fun IlyroHomePage(
                 history = history,
                 isPrivate = isPrivate,
                 onSearchEngineChange = onSearchEngineChange,
+                customSearchEngine = customSearchEngine,
+                customSearchEngines = customSearchEngines,
+                onCustomSearchEngineChange = onCustomSearchEngineChange,
                 onNavigate = { input ->
                     if (input.isNotBlank()) {
                         query = input

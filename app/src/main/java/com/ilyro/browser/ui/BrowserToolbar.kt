@@ -443,7 +443,8 @@ internal fun BrowserBottomBar(
     homeMode: Boolean,
     position: ToolbarPosition,
     toolbarActions: Set<ToolbarAction>,
-    uiDensity: UiDensity
+    uiDensity: UiDensity,
+    customSearchEngine: CustomSearchEngine? = null
 ) {
     val metrics = rememberIlyroLayoutMetrics()
     val compact = metrics.isCompact
@@ -574,6 +575,7 @@ internal fun BrowserBottomBar(
                     },
                     onNavigate = onNavigate,
                     searchEngine = searchEngine,
+                    customSearchEngine = customSearchEngine,
                     history = history,
                     isPrivate = isPrivate,
                     compact = compact,

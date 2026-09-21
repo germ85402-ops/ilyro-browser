@@ -513,14 +513,7 @@ private fun SettingsCategoryContent(
         SettingsCategory.GENERAL -> {
             LanguageSettingsSection(settings, onSettingsChange)
 
-            SettingsCard(title = tr("Search engine", "Поисковик")) {
-                SearchEngine.entries.forEachIndexed { index, engine ->
-                    ChoiceRow(engine.displayName, settings.searchEngine == engine) {
-                        onSettingsChange(settings.copy(searchEngine = engine))
-                    }
-                    if (index != SearchEngine.entries.lastIndex) SettingsRowDivider()
-                }
-            }
+            SearchEngineSettingsSection(settings, onSettingsChange)
 
             SettingsCard(title = tr("Startup", "Запуск")) {
                 ToggleRow(
@@ -796,7 +789,7 @@ private fun AppIcon.title(): String = when (this) {
 }
 
 @Composable
-private fun SettingsCard(
+internal fun SettingsCard(
     title: String,
     content: @Composable ColumnScope.() -> Unit
 ) {
@@ -824,7 +817,7 @@ private fun SettingsCard(
 }
 
 @Composable
-private fun ChoiceRow(title: String, selected: Boolean, onClick: () -> Unit) {
+internal fun ChoiceRow(title: String, selected: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1096,7 +1089,7 @@ private fun InfoRow(text: String, emphasis: Boolean = true) {
 }
 
 @Composable
-private fun SettingsRowDivider() {
+internal fun SettingsRowDivider() {
     HorizontalDivider(
         modifier = Modifier.padding(horizontal = 16.dp),
         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)

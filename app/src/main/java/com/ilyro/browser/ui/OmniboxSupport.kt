@@ -195,7 +195,10 @@ internal fun IlyroHomeOmnibox(
     isPrivate: Boolean,
     onSearchEngineChange: (SearchEngine) -> Unit,
     onNavigate: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    customSearchEngine: CustomSearchEngine? = null,
+    customSearchEngines: List<CustomSearchEngine> = emptyList(),
+    onCustomSearchEngineChange: (CustomSearchEngine?) -> Unit = {}
 ) {
     var focused by remember { mutableStateOf(false) }
     val ownerToken = remember { Any() }
@@ -241,15 +244,18 @@ internal fun IlyroHomeOmnibox(
                 placeholder = {
                     Text(
                         tr(
-                            "Search with ${searchEngine.displayName} or enter address",
-                            "Поиск через ${searchEngine.displayName} или адрес"
+                            "Search with ${customSearchEngine?.displayName ?: searchEngine.displayName} or enter address",
+                            "Поиск через ${customSearchEngine?.displayName ?: searchEngine.displayName} или адрес
                         )
                     )
                 },
                 leadingIcon = {
                     SearchEngineSelector(
                         engine = searchEngine,
-                        onEngineSelected = onSearchEngineChange
+                        customEngine = customSearchEngine,
+                        customEngines = customSearchEngines,
+                        onEngineSelected = onSearchEngineChange,
+                        onCustomEngineSelected = onCustomSearchEngineChange
                     )
                 },
                 shape = RoundedCornerShape(IlyroVisualTokens.PillRadius),
@@ -277,7 +283,7 @@ internal fun IlyroHomeOmnibox(
                     query = value,
                     searchEngine = searchEngine,
                     history = history,
-                    allowRemote = !isPrivate,
+                    allowRemote = !isPrivate && customSearchEngine == null,
                     placeAbove = false,
                     onDismiss = { },
                     onSelect = { selected ->
@@ -307,7 +313,8 @@ internal fun IlyroAddressOmnibox(
     fieldHeight: Dp,
     suggestionsAbove: Boolean = false,
     trailingIcon: (@Composable () -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    customSearchEngine: CustomSearchEngine? = null
 ) {
     var focused by remember { mutableStateOf(false) }
     val ownerToken = remember { Any() }
@@ -403,7 +410,7 @@ internal fun IlyroAddressOmnibox(
             query = value.text,
             searchEngine = searchEngine,
             history = history,
-            allowRemote = !isPrivate,
+            allowRemote = !isPrivate && customSearchEngine == null,
             placeAbove = suggestionsAbove,
             onDismiss = dismissEditing,
             onSelect = { selected ->
@@ -417,28 +424,46 @@ internal fun IlyroAddressOmnibox(
 @Composable
 private fun SearchEngineSelector(
     engine: SearchEngine,
-    onEngineSelected: (SearchEngine) -> Unit
+    customEngine: CustomSearchEngine?,
+    customEngines: List<CustomSearchEngine>,
+    onEngineSelected: (SearchEngine) -> Unit,
+    onCustomEngineSelected: (CustomSearchEngine?) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
 
     Box {
-        SearchEngineBadge(
-            engine = engine,
-            modifier = Modifier
-                .size(28.dp)
-                .pointerInput(engine) {
-                    detectTapGestures(
-                        onTap = { expanded = true },
-                        onLongPress = { expanded = true }
-                    )
-                }
-        )
+        if (customEngine != null) {
+            CustomSearchEngineBadge(
+                engine = customEngine,
+                modifier = Modifier
+                    .size(28.dp)
+                    .pointerInput(engine, customEngine.id) {
+                        detectTapGestures(
+                            onTap = { expanded = true },
+                            onLongPress = { expanded = true }
+                        )
+                    }
+            )
+        } else {
+            SearchEngineBadge(
+                engine = engine,
+                modifier = Modifier
+                    .size(28.dp)
+                    .pointerInput(engine) {
+                        detectTapGestures(
+                            onTap = { expanded = true },
+                            onLongPress = { expanded = true }
+                        )
+                    }
+            )
+        }
 
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false }
         ) {
             SearchEngine.entries.forEach { candidate ->
+                val selected = customEngine == null && candidate == engine
                 DropdownMenuItem(
                     text = {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -446,16 +471,40 @@ private fun SearchEngineSelector(
                             Text(
                                 text = candidate.displayName,
                                 modifier = Modifier.padding(start = 10.dp),
-                                fontWeight = if (candidate == engine) FontWeight.SemiBold else FontWeight.Normal
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
                             )
                         }
                     },
-                    trailingIcon = if (candidate == engine) {
+                    trailingIcon = if (selected) {
                         { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
                     } else null,
                     onClick = {
                         expanded = false
+                        onCustomEngineSelected(null)
                         onEngineSelected(candidate)
+                    }
+                )
+            }
+
+            customEngines.forEach { candidate ->
+                val selected = customEngine?.id == candidate.id
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CustomSearchEngineBadge(candidate, Modifier.size(26.dp))
+                            Text(
+                                text = candidate.displayName,
+                                modifier = Modifier.padding(start = 10.dp),
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                            )
+                        }
+                    },
+                    trailingIcon = if (selected) {
+                        { Icon(Icons.Rounded.Check, contentDescription = null, modifier = Modifier.size(18.dp)) }
+                    } else null,
+                    onClick = {
+                        expanded = false
+                        onCustomEngineSelected(candidate)
                     }
                 )
             }
@@ -481,6 +530,28 @@ private fun SearchEngineBadge(engine: SearchEngine, modifier: Modifier = Modifie
         )
     } else {
         SearchEngineFallbackBadge(engine, modifier)
+    }
+}
+
+@Composable
+private fun CustomSearchEngineBadge(
+    engine: CustomSearchEngine,
+    modifier: Modifier = Modifier
+) {
+    val initial = engine.displayName.trim().firstOrNull()?.toString()?.uppercase() ?: "?"
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                text = initial,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 
