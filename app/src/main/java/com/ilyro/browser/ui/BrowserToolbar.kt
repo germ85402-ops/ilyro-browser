@@ -36,9 +36,6 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.Fullscreen
-import androidx.compose.material.icons.rounded.Undo
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material.icons.rounded.MoreHoriz
@@ -624,7 +621,6 @@ internal fun BrowserTopNoticeCard(
     allowSwipeDown: Boolean = true
 ) {
     val metrics = rememberIlyroLayoutMetrics()
-    val isDownload = notice.kind == BrowserTopNoticeKind.DOWNLOAD
     val dragOffset = remember(notice.id) {
         Animatable(Offset.Zero, Offset.VectorConverter)
     }
@@ -634,11 +630,18 @@ internal fun BrowserTopNoticeCard(
     val dismissThreshold = with(density) { 64.dp.toPx() }
     val maxDismissOffset = with(density) { 240.dp.toPx() }
 
+    // Keep browser notices visually close to a Chrome-style snackbar: compact,
+    // text-first, and quiet enough not to compete with the page.
+    val snackbarColor = Color(0xFF2A292D).copy(alpha = 0.96f)
+    val snackbarTextColor = Color.White.copy(alpha = 0.94f)
+    val snackbarSecondaryColor = Color.White.copy(alpha = 0.72f)
+    val snackbarActionColor = Color(0xFFB9C7FF)
+
     Surface(
         onClick = onClick,
         modifier = Modifier
-            .fillMaxWidth(if (metrics.isNarrowPhone) 0.88f else 0.62f)
-            .widthIn(max = 300.dp)
+            .fillMaxWidth(if (metrics.isNarrowPhone) 0.90f else 0.52f)
+            .widthIn(min = 180.dp, max = 420.dp)
             .graphicsLayer {
                 translationX = dragOffset.value.x
                 translationY = dragOffset.value.y
@@ -702,81 +705,55 @@ internal fun BrowserTopNoticeCard(
                     )
                 }
             },
-        shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(
-                alpha = IlyroVisualTokens.SelectedBorderAlpha
-            )
-        ),
+        shape = RoundedCornerShape(18.dp),
+        color = snackbarColor,
         tonalElevation = 0.dp,
-        shadowElevation = 2.dp
+        shadowElevation = 5.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 5.dp),
+                .padding(horizontal = 15.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Surface(
-                modifier = Modifier.size(28.dp),
-                shape = RoundedCornerShape(9.dp),
-                color = MaterialTheme.colorScheme.primaryContainer,
-                tonalElevation = 0.dp,
-                shadowElevation = 0.dp
+            Column(
+                modifier = Modifier.weight(1f)
             ) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(
-                        imageVector = when {
-                            isDownload -> Icons.Rounded.Download
-                            notice.kind == BrowserTopNoticeKind.TAB_CLOSED -> Icons.Rounded.Undo
-                            else -> Icons.Rounded.Fullscreen
-                        },
-                        contentDescription = null,
-                        modifier = Modifier.size(17.dp),
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = notice.title,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    color = snackbarTextColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = notice.message,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
+                    color = snackbarSecondaryColor,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
 
             notice.actionLabel?.let { label ->
-                if (!metrics.isNarrowPhone || notice.kind == BrowserTopNoticeKind.TAB_CLOSED) {
-                    Surface(
-                        onClick = onActionClick,
-                        shape = RoundedCornerShape(9.dp),
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.10f),
-                        contentColor = MaterialTheme.colorScheme.primary,
-                        tonalElevation = 0.dp,
-                        shadowElevation = 0.dp
-                    ) {
-                        Text(
-                            text = label,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1
-                        )
-                    }
+                Surface(
+                    onClick = onActionClick,
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color.Transparent,
+                    contentColor = snackbarActionColor,
+                    tonalElevation = 0.dp,
+                    shadowElevation = 0.dp
+                ) {
+                    Text(
+                        text = label,
+                        modifier = Modifier.padding(horizontal = 3.dp, vertical = 5.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = snackbarActionColor,
+                        maxLines = 1
+                    )
                 }
             }
         }
