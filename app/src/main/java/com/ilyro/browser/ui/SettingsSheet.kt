@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.LocalCafe
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Palette
@@ -67,10 +68,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 
-/**
- * Filled with the creator page URL after the Buy Me a Coffee registration is complete.
- */
-private const val BUY_ME_A_COFFEE_URL = ""
+/** Public support page for the ILYRO project. */
+private const val BUY_ME_A_COFFEE_URL = "https://buymeacoffee.com/alexagapita"
 private const val PRIVACY_POLICY_URL = "https://germ85402-ops.github.io/ilyro-browser/privacy.html"
 private const val TERMS_OF_SERVICE_URL = "https://germ85402-ops.github.io/ilyro-browser/terms.html"
 
@@ -651,30 +650,21 @@ private fun SettingsCategoryContent(
             }
 
             SettingsCard(title = tr("Support ILYRO", "Поддержать ILYRO")) {
-                ActionRow(
-                    tr("Buy Me a Coffee", "Buy Me a Coffee"),
-                    if (BUY_ME_A_COFFEE_URL.isBlank()) {
-                        tr(
-                            "The support page will be added after registration.",
-                            "Ссылка поддержки появится после регистрации."
-                        )
-                    } else {
-                        tr(
-                            "Support the browser and its future updates.",
-                            "Поддержать развитие браузера и будущие обновления."
-                        )
-                    },
+                SupportAction(
+                    title = tr("Buy Me a Coffee", "Buy Me a Coffee"),
+                    subtitle = tr(
+                        "Support the browser and its future updates.",
+                        "Поддержать развитие браузера и будущие обновления."
+                    ),
+                    actionLabel = tr("Open", "Открыть"),
                     onClick = {
-                        if (BUY_ME_A_COFFEE_URL.isNotBlank()) {
-                            context.startActivity(
-                                Intent(
-                                    Intent.ACTION_VIEW,
-                                    Uri.parse(BUY_ME_A_COFFEE_URL)
-                                )
+                        context.startActivity(
+                            Intent(
+                                Intent.ACTION_VIEW,
+                                Uri.parse(BUY_ME_A_COFFEE_URL)
                             )
-                        }
-                    },
-                    enabled = BUY_ME_A_COFFEE_URL.isNotBlank()
+                        )
+                    }
                 )
             }
 
@@ -707,9 +697,9 @@ private fun SettingsCategoryContent(
             }
 
             SettingsCard(title = tr("Developers", "Разработчики")) {
-                InfoRow("Alex Agapitov", emphasis = false)
+                DeveloperRow("Alex Agapitov")
                 SettingsRowDivider()
-                InfoRow("Habet Hayrapetyan", emphasis = false)
+                DeveloperRow("Habet Hayrapetyan")
             }
         }
     }
@@ -889,6 +879,115 @@ private fun ToggleRow(
         }
         Spacer(modifier = Modifier.width(12.dp))
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
+private fun SupportAction(
+    title: String,
+    subtitle: String,
+    actionLabel: String,
+    onClick: () -> Unit
+) {
+    val dense = LocalIlyroUiDensity.current == UiDensity.COMPACT
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, bottom = if (dense) 10.dp else 12.dp),
+        shape = RoundedCornerShape(if (dense) 16.dp else 18.dp),
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        tonalElevation = 0.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = if (dense) 12.dp else 14.dp,
+                    vertical = if (dense) 10.dp else 12.dp
+                ),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Surface(
+                modifier = Modifier.size(if (dense) 36.dp else 42.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                contentColor = MaterialTheme.colorScheme.primary,
+                tonalElevation = 0.dp
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Rounded.LocalCafe, contentDescription = null)
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = if (dense) 10.dp else 12.dp)
+            ) {
+                Text(
+                    title,
+                    style = if (dense) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    subtitle,
+                    modifier = Modifier.padding(top = 2.dp),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f)
+                )
+            }
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                tonalElevation = 0.dp
+            ) {
+                Text(
+                    actionLabel,
+                    modifier = Modifier.padding(
+                        horizontal = if (dense) 10.dp else 12.dp,
+                        vertical = 7.dp
+                    ),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeveloperRow(name: String) {
+    val dense = LocalIlyroUiDensity.current == UiDensity.COMPACT
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 14.dp, vertical = if (dense) 10.dp else 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            modifier = Modifier.size(if (dense) 32.dp else 36.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            tonalElevation = 0.dp
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    Icons.Rounded.Person,
+                    contentDescription = null,
+                    modifier = Modifier.size(if (dense) 17.dp else 19.dp)
+                )
+            }
+        }
+        Text(
+            name,
+            modifier = Modifier.padding(start = 12.dp),
+            style = if (dense) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Normal,
+            color = MaterialTheme.colorScheme.onSurface
+        )
     }
 }
 

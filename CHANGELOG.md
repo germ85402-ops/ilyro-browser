@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.26.0-rc5 — release candidate
+
+- Center fullscreen videos without stretching them and preserve the ambient background glow.
+- Make the About screen support action a direct Buy Me a Coffee link with a clearer call-to-action.
+- Refresh the developers block with a compact, consistent presentation.
+
+
 ## 0.26.0-rc4 — release candidate
 
 - Remove YouTube media detection and downloading so the media sheet remains focused on other websites.
