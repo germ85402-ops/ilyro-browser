@@ -14,7 +14,7 @@ def fail(message: str) -> None:
 
 
 if re.search(
-    r"NativeBrowserHost\\.install\\(\\s*this(?:\\s*,|\\s*\\))",
+    r"NativeBrowserHost\.install\(\s*this(?:\s*,|\s*\))",
     main
 ) is None:
     fail("MainActivity is not using the Activity-owned native Gecko host")
