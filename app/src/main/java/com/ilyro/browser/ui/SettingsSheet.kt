@@ -938,7 +938,7 @@ private fun SidebarSupportCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        tr("Buy me a coffee", "Угостить кофе"),
+                        tr("Buy Me a Coffee", "Угостить кофе"),
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Medium,
