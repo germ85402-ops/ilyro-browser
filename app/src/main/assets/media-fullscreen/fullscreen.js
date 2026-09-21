@@ -2,11 +2,15 @@
   const host = location.hostname.toLowerCase();
   const isYouTube = host === 'youtube.com' || host.endsWith('.youtube.com') || host === 'youtu.be';
 
-  // Lightweight fullscreen handling: keep YouTube in control of the player itself.
-  // ILYRO only makes the existing video container fill the fullscreen element and
-  // scales the video inside it with object-fit: contain.
+  // Keep fullscreen videos inside a black viewport without changing their aspect ratio.
+  // YouTube's player owns the controls and chooses the media dimensions; ILYRO only
+  // centers the existing video box when the YouTube player enters fullscreen.
   const style = document.createElement('style');
   style.textContent = `
+    :fullscreen {
+      background: #000 !important;
+    }
+
     video:fullscreen,
     :fullscreen video {
       object-fit: contain !important;
@@ -21,24 +25,29 @@
       height: 100% !important;
       margin: 0 !important;
       overflow: hidden !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
       background: #000 !important;
     }
 
     html.ilyro-youtube-fullscreen :fullscreen .html5-video-container video.html5-main-video,
     html.ilyro-youtube-fullscreen :fullscreen .html5-video-container video.video-stream {
-      position: absolute !important;
-      inset: 0 !important;
-      top: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      bottom: 0 !important;
-      width: 100% !important;
-      height: 100% !important;
+      position: relative !important;
+      inset: auto !important;
+      top: auto !important;
+      left: auto !important;
+      right: auto !important;
+      bottom: auto !important;
+      display: block !important;
+      width: auto !important;
+      height: auto !important;
       min-width: 0 !important;
       min-height: 0 !important;
-      max-width: none !important;
-      max-height: none !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
       margin: 0 !important;
+      flex: 0 0 auto !important;
       transform: none !important;
       object-fit: contain !important;
       object-position: center center !important;
