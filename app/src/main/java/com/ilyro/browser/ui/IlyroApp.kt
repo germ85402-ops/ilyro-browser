@@ -1296,6 +1296,17 @@ private fun BrowserScreen(
         }
     }
 
+    fun dismissTopNotice() {
+        val notice = topNotice ?: return
+        topNotice = null
+        if (notice.kind == BrowserTopNoticeKind.TAB_CLOSED) {
+            // Swiping away the undo snackbar confirms the close immediately,
+            // matching the usual browser snackbar behavior.
+            finalizePendingClosedAllTabs()
+            finalizePendingClosedTab()
+        }
+    }
+
     fun closeTab(tab: BrowserTab) {
         val index = tabs.indexOf(tab)
         if (index < 0) return
@@ -1877,7 +1888,10 @@ private fun BrowserScreen(
                                         runNoticeAction()
                                     }
                                 },
-                                onActionClick = runNoticeAction
+                                onActionClick = runNoticeAction,
+                                onDismiss = { dismissTopNotice() },
+                                allowSwipeUp = !noticeAtBottom,
+                                allowSwipeDown = true
                             )
                         }
                     }
@@ -2029,6 +2043,7 @@ private fun BrowserScreen(
                 tabs.firstOrNull { it.id == id }?.let { closeTab(it) }
             },
             onCloseAll = { closeAllTabs() },
+            onDismissNotice = { dismissTopNotice() },
             tabCloseNotice = topNotice?.takeIf { it.kind == BrowserTopNoticeKind.TAB_CLOSED },
             onUndoClose = { undoPendingClosedTabs() },
             restoredTabId = lastRestoredTabId,
