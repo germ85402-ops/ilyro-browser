@@ -3700,3 +3700,167 @@ button {
     width: 100%;
   }
 }
+
+/* Language and automatic device theme */
+.language-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 2px;
+  background: color-mix(in srgb, var(--surface-strong) 72%, transparent);
+}
+
+.language-switcher button {
+  min-width: 28px;
+  min-height: 26px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 7px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  transition: background 180ms ease, color 180ms ease;
+}
+
+.language-switcher button:hover,
+.language-switcher button:focus-visible {
+  color: var(--text);
+}
+
+.language-switcher button[aria-pressed='true'] {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.home-page .language-switcher {
+  border-color: rgba(126, 177, 202, 0.28);
+  background: rgba(5, 32, 45, 0.62);
+}
+
+.home-page .language-switcher button {
+  color: #a7bbc2;
+}
+
+.home-page .language-switcher button:hover,
+.home-page .language-switcher button:focus-visible {
+  color: #f4fffb;
+}
+
+.home-page .language-switcher button[aria-pressed='true'] {
+  background: var(--home-green);
+  color: #062019;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --bg: #f5f7fb;
+    --bg-soft: #edf1f7;
+    --surface: rgba(255, 255, 255, 0.72);
+    --surface-strong: #ffffff;
+    --surface-light: #0e1420;
+    --line: rgba(13, 21, 36, 0.11);
+    --line-strong: rgba(13, 21, 36, 0.18);
+    --text: #101521;
+    --muted: #5f697a;
+    --muted-strong: #3e4859;
+    --blue: #4d6fe5;
+    --blue-bright: #3e5fd2;
+    --purple: #8059df;
+    --pink: #ce568c;
+    --cyan: #2a9eae;
+    --yellow: #ad7b1b;
+    --shadow: 0 32px 80px rgba(38, 51, 77, 0.14);
+  }
+
+  :root:not([data-theme]) .home-page {
+    --home-bg: #eef7f5;
+    --home-bg-deep: #eaf4f3;
+    --home-surface: rgba(255, 255, 255, 0.86);
+    --home-surface-soft: rgba(248, 255, 253, 0.8);
+    --home-line: rgba(28, 113, 112, 0.18);
+    --home-line-strong: rgba(18, 142, 108, 0.42);
+    --home-text: #102321;
+    --home-muted: #557172;
+    --home-green: #0d9f78;
+    --home-green-soft: #087d63;
+    background:
+      radial-gradient(circle at 78% 14%, rgba(61, 169, 158, 0.2), transparent 31rem),
+      radial-gradient(circle at 8% 48%, rgba(67, 147, 171, 0.13), transparent 30rem),
+      var(--home-bg-deep);
+    color: var(--home-text);
+  }
+
+  :root:not([data-theme]) .home-page .site-header {
+    border-bottom-color: rgba(41, 118, 117, 0.16);
+    background: rgba(235, 247, 245, 0.8);
+  }
+
+  :root:not([data-theme]) .home-page .reference-hero::before {
+    background:
+      linear-gradient(90deg, rgba(235, 247, 245, 0.94) 0%, rgba(235, 247, 245, 0.64) 42%, rgba(235, 247, 245, 0.78) 100%),
+      linear-gradient(180deg, rgba(226, 245, 242, 0.44), rgba(235, 247, 245, 0.94)),
+      url("assets/ilyro-site-backdrop.jpg") center top / cover;
+    opacity: 0.72;
+  }
+
+  :root:not([data-theme]) .home-page .reference-lead,
+  :root:not([data-theme]) .home-page .reference-heading > p,
+  :root:not([data-theme]) .home-page .screenshots-heading p,
+  :root:not([data-theme]) .home-page .download-copy > p:not(.reference-kicker) {
+    color: #557172;
+  }
+
+  :root:not([data-theme]) .home-page .hero-tags span,
+  :root:not([data-theme]) .home-page .benefit-card,
+  :root:not([data-theme]) .home-page .why-card,
+  :root:not([data-theme]) .home-page .new-grid article {
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(231, 246, 243, 0.86));
+  }
+
+  :root:not([data-theme]) .home-page .benefit-card strong,
+  :root:not([data-theme]) .home-page .why-card h3,
+  :root:not([data-theme]) .home-page .reference-shot figcaption strong,
+  :root:not([data-theme]) .home-page .new-grid strong,
+  :root:not([data-theme]) .home-page .download-copy h2,
+  :root:not([data-theme]) .home-page .reference-heading h2 {
+    color: #102321;
+  }
+
+  :root:not([data-theme]) .home-page .benefit-card small,
+  :root:not([data-theme]) .home-page .why-card p,
+  :root:not([data-theme]) .home-page .reference-shot figcaption span,
+  :root:not([data-theme]) .home-page .new-grid p,
+  :root:not([data-theme]) .home-page .footer-intro > p,
+  :root:not([data-theme]) .home-page .footer-copy {
+    color: #557172;
+  }
+
+  :root:not([data-theme]) .home-page .download-copy > p:not(.reference-kicker) {
+    color: #466869;
+  }
+
+  :root:not([data-theme]) .home-page .reference-download {
+    background: #d8eeea;
+  }
+
+  :root:not([data-theme]) .home-page .download-backdrop {
+    opacity: 0.34;
+  }
+
+  :root:not([data-theme]) .home-page .home-page .button-outline,
+  :root:not([data-theme]) .home-page .button-outline {
+    border-color: rgba(28, 113, 112, 0.35);
+    color: #164a4b;
+  }
+
+  :root:not([data-theme]) .home-page .footer-social a {
+    color: #164a4b;
+  }
+}

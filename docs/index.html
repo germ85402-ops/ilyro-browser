@@ -1,24 +1,26 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#061723" />
     <meta
       name="description"
-      content="ILYRO — браузер для Android с GeckoView, защитой uBlock Origin, гибкой настройкой и синхронизацией."
+      content="ILYRO — an Android browser with GeckoView, built-in uBlock Origin protection, flexible customization, and sync."
+      data-i18n-content="meta.description"
     />
-    <meta property="og:title" content="ILYRO — браузер в твоём ритме" />
+    <meta property="og:title" content="ILYRO — a browser in your rhythm" data-i18n-content="meta.ogTitle" />
     <meta
       property="og:description"
-      content="Быстрый, безопасный и настраиваемый Android-браузер."
+      content="A fast, secure, customizable Android browser."
+      data-i18n-content="meta.ogDescription"
     />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="assets/ilyro-browser-home.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
-    <title>ILYRO — браузер в твоём ритме</title>
+    <title data-i18n="meta.title">ILYRO — a browser in your rhythm</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260920-reference" />
+    <link rel="stylesheet" href="styles.css?v=20260921-language-theme" />
     <script>
       document.documentElement.classList.add('js');
     </script>
@@ -30,7 +32,7 @@
 
     <header class="site-header" id="top">
       <div class="header-inner">
-        <a class="brand" href="#top" aria-label="ILYRO, на главную">
+        <a class="brand" href="#top" aria-label="ILYRO, home" data-i18n-aria="brand.home">
           <span class="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 48 48" role="img">
               <path d="M24 38.9c-4.4-1.4-7.5-5.2-7.5-10.1 0-3.6 1.4-6.6 4-8.9-2.7-3.4-3.4-7-1.8-10.7 2.1 1.2 3.9 2.8 5.3 4.9 1.4-2.1 3.2-3.7 5.3-4.9 1.6 3.7.9 7.3-1.8 10.7 2.6 2.3 4 5.3 4 8.9 0 4.9-3.1 8.7-7.5 10.1Z" />
@@ -41,15 +43,18 @@
           <span class="brand-name">ILYRO</span>
         </a>
 
-        <nav class="main-nav" id="main-nav" aria-label="Основная навигация">
-          <a href="#features">Возможности</a>
-          <a href="#screenshots">Скриншоты</a>
-          <a href="#whats-new">Что нового</a>
-          <a href="#download">Скачать</a>
+        <nav class="main-nav" id="main-nav" aria-label="Primary navigation" data-i18n-aria="nav.label">
+          <a href="#features" data-i18n="nav.features">Features</a>
+          <a href="#screenshots" data-i18n="nav.screenshots">Screenshots</a>
+          <a href="#download" data-i18n="nav.download">Download</a>
         </nav>
 
         <div class="header-actions">
-          <button class="icon-button theme-toggle" id="theme-toggle" type="button" aria-label="Включить светлую тему">
+          <div class="language-switcher" role="group" aria-label="Language" data-i18n-aria="language.label">
+            <button type="button" data-language="en" aria-pressed="true">EN</button>
+            <button type="button" data-language="ru" aria-pressed="false">RU</button>
+          </div>
+          <button class="icon-button theme-toggle" id="theme-toggle" type="button" aria-label="Theme follows your device" data-i18n-aria="theme.system">
             <svg class="icon icon-sun" viewBox="0 0 24 24" aria-hidden="true">
               <circle cx="12" cy="12" r="3.6"></circle>
               <path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path>
@@ -58,8 +63,8 @@
               <path d="M20.3 15.1A8.6 8.6 0 0 1 8.9 3.7 8.6 8.6 0 1 0 20.3 15.1Z"></path>
             </svg>
           </button>
-          <a class="header-cta" href="#download">Скачать APK <span aria-hidden="true">↓</span></a>
-          <button class="icon-button menu-toggle" id="menu-toggle" type="button" aria-label="Открыть меню" aria-expanded="false" aria-controls="main-nav">
+          <a class="header-cta" href="#download"><span data-i18n="actions.downloadApk">Download APK</span> <span aria-hidden="true">↓</span></a>
+          <button class="icon-button menu-toggle" id="menu-toggle" type="button" aria-label="Open menu" data-i18n-aria="menu.open" aria-expanded="false" aria-controls="main-nav">
             <span></span><span></span>
           </button>
         </div>
@@ -69,14 +74,14 @@
     <main>
       <section class="reference-hero section-shell reveal is-visible" aria-labelledby="hero-title">
         <div class="reference-hero-copy">
-          <p class="reference-overline">БЫСТРЫЙ. БЕЗОПАСНЫЙ. ТВОЙ.</p>
-          <h1 id="hero-title">ILYRO — браузер<br />для Android<br /><span>в твоём ритме</span></h1>
-          <p class="reference-lead">GeckoView, встроенная защита uBlock Origin,<br />удобные вкладки, быстрые загрузки<br />и гибкая персонализация.</p>
+          <p class="reference-overline" data-i18n="hero.overline">FAST. SECURE. YOURS.</p>
+          <h1 id="hero-title" data-i18n="hero.title" data-i18n-mode="html">ILYRO — browser<br />for Android<br /><span>in your rhythm</span></h1>
+          <p class="reference-lead" data-i18n="hero.lead" data-i18n-mode="html">GeckoView, built-in uBlock Origin protection,<br />convenient tabs, fast downloads<br />and flexible personalization.</p>
           <div class="hero-actions">
-            <a class="button button-primary" href="https://github.com/germ85402-ops/ilyro-browser/releases/latest" target="_blank" rel="noreferrer">Скачать APK <span aria-hidden="true">↓</span></a>
-            <a class="button button-outline" href="https://github.com/germ85402-ops/ilyro-browser" target="_blank" rel="noreferrer"><span class="github-mark" aria-hidden="true">●</span> Открыть GitHub</a>
+            <a class="button button-primary" href="https://github.com/germ85402-ops/ilyro-browser/releases/latest" target="_blank" rel="noreferrer"><span data-i18n="actions.downloadApk">Download APK</span> <span aria-hidden="true">↓</span></a>
+            <a class="button button-outline" href="https://github.com/germ85402-ops/ilyro-browser" target="_blank" rel="noreferrer"><span class="github-mark" aria-hidden="true">●</span> <span data-i18n="actions.openGithub">Open GitHub</span></a>
           </div>
-          <div class="hero-tags" aria-label="Ключевые характеристики">
+          <div class="hero-tags" aria-label="Key features" data-i18n-aria="hero.tagsLabel">
             <span><i class="tag-icon tag-android" aria-hidden="true">✦</i> Android 8+</span>
             <span><i class="tag-icon tag-gecko" aria-hidden="true">◈</i> GeckoView</span>
             <span><i class="tag-icon tag-shield" aria-hidden="true">◇</i> uBlock Origin</span>
@@ -84,70 +89,60 @@
           </div>
         </div>
 
-        <div class="reference-hero-art" aria-label="Главный экран браузера ILYRO">
-          <img src="assets/ilyro-site-hero.jpg" alt="Главный экран браузера ILYRO на фоне водопада" fetchpriority="high" />
-          <p class="hero-note">Больше, чем браузер.<br /><span>Свобода в каждом открытии.</span></p>
+        <div class="reference-hero-art" aria-label="ILYRO browser home screen" data-i18n-aria="hero.artLabel">
+          <img src="assets/ilyro-site-hero.jpg" alt="ILYRO browser home screen with waterfall background" data-i18n-alt="hero.artAlt" fetchpriority="high" />
+          <p class="hero-note" data-i18n="hero.note" data-i18n-mode="html">More than a browser.<br /><span>Freedom in every opening.</span></p>
         </div>
       </section>
 
-      <section class="benefit-strip section-shell reveal is-visible" aria-label="Ключевые возможности">
-        <article class="benefit-card"><span class="benefit-icon benefit-icon-shield" aria-hidden="true">◇</span><div><strong>Защита</strong><small>Встроенный uBlock Origin<br />блокирует рекламу и трекеры</small></div></article>
-        <article class="benefit-card"><span class="benefit-icon benefit-icon-bolt" aria-hidden="true">ϟ</span><div><strong>Быстрое меню</strong><small>Удобный доступ ко всем<br />возможностям</small></div></article>
-        <article class="benefit-card"><span class="benefit-icon benefit-icon-palette" aria-hidden="true">●</span><div><strong>Персонализация</strong><small>Темы, иконки, цвета.<br />Сделайте ILYRO своим</small></div></article>
-        <article class="benefit-card"><span class="benefit-icon benefit-icon-sync" aria-hidden="true">↻</span><div><strong>Синхронизация</strong><small>Ваши данные на всех<br />устройствах через Google</small></div></article>
+      <section class="benefit-strip section-shell reveal is-visible" aria-label="Key features" data-i18n-aria="benefits.label">
+        <article class="benefit-card"><span class="benefit-icon benefit-icon-shield" aria-hidden="true">◇</span><div><strong data-i18n="benefits.shield.title">Protection</strong><small data-i18n="benefits.shield.copy" data-i18n-mode="html">Built-in uBlock Origin<br />blocks ads and trackers</small></div></article>
+        <article class="benefit-card"><span class="benefit-icon benefit-icon-bolt" aria-hidden="true">ϟ</span><div><strong data-i18n="benefits.menu.title">Quick menu</strong><small data-i18n="benefits.menu.copy" data-i18n-mode="html">Easy access to every<br />feature</small></div></article>
+        <article class="benefit-card"><span class="benefit-icon benefit-icon-palette" aria-hidden="true">●</span><div><strong data-i18n="benefits.custom.title">Personalization</strong><small data-i18n="benefits.custom.copy" data-i18n-mode="html">Themes, icons, colors.<br />Make ILYRO yours</small></div></article>
+        <article class="benefit-card"><span class="benefit-icon benefit-icon-sync" aria-hidden="true">↻</span><div><strong data-i18n="benefits.sync.title">Sync</strong><small data-i18n="benefits.sync.copy" data-i18n-mode="html">Your data on every<br />device through Google</small></div></article>
       </section>
 
       <section class="reference-section section-shell reveal is-visible" id="features" aria-labelledby="features-title">
         <div class="reference-heading">
-          <div><p class="reference-kicker">БОЛЬШЕ ВОЗМОЖНОСТЕЙ</p><h2 id="features-title">Почему ILYRO</h2></div>
-          <p>Современный браузер, созданный для свободы.<br />Сочетает производительность, приватность и гибкость настроек.</p>
+          <div><p class="reference-kicker" data-i18n="features.kicker">MORE POSSIBILITIES</p><h2 id="features-title" data-i18n="features.title">Why ILYRO</h2></div>
+          <p data-i18n="features.intro" data-i18n-mode="html">A modern browser built for freedom.<br />Combines performance, privacy, and flexible settings.</p>
         </div>
         <div class="why-grid">
-          <article class="why-card"><img src="assets/ilyro-shot-shield.jpg" alt="Панель ILYRO Shield" /><h3>Надёжная защита</h3><p>Встроенный uBlock Origin. Чистый интернет без рекламы и трекеров.</p></article>
-          <article class="why-card"><img src="assets/ilyro-shot-menu.jpg" alt="Быстрое меню ILYRO" /><h3>Удобное управление</h3><p>Быстрое меню с нужными действиями. Всё под рукой.</p></article>
-          <article class="why-card"><img src="assets/ilyro-shot-appearance.jpg" alt="Настройки внешнего вида ILYRO" /><h3>Гибкая персонализация</h3><p>Темы, иконки, цвета и многое другое. Ваш стиль — ваши правила.</p></article>
-          <article class="why-card"><img src="assets/ilyro-shot-account.jpg" alt="Аккаунт и синхронизация ILYRO" /><h3>Всегда с вами</h3><p>Синхронизация через Google. Закладки, настройки и история на всех устройствах.</p></article>
+          <article class="why-card"><img src="assets/ilyro-shot-shield.jpg" alt="ILYRO Shield panel" data-i18n-alt="features.shield.alt" /><h3 data-i18n="features.shield.title">Reliable protection</h3><p data-i18n="features.shield.copy">Built-in uBlock Origin. A clean web without ads and trackers.</p></article>
+          <article class="why-card"><img src="assets/ilyro-shot-menu.jpg" alt="ILYRO quick menu" data-i18n-alt="features.menu.alt" /><h3 data-i18n="features.menu.title">Easy control</h3><p data-i18n="features.menu.copy">Quick menu with the actions you need. Everything at hand.</p></article>
+          <article class="why-card"><img src="assets/ilyro-shot-appearance.jpg" alt="ILYRO appearance settings" data-i18n-alt="features.custom.alt" /><h3 data-i18n="features.custom.title">Flexible personalization</h3><p data-i18n="features.custom.copy">Themes, icons, colors, and more. Your style — your rules.</p></article>
+          <article class="why-card"><img src="assets/ilyro-shot-account.jpg" alt="ILYRO account and sync" data-i18n-alt="features.sync.alt" /><h3 data-i18n="features.sync.title">Always with you</h3><p data-i18n="features.sync.copy">Sync through Google. Bookmarks, settings, and history on all devices.</p></article>
         </div>
       </section>
 
       <section class="reference-section real-screenshots section-shell reveal is-visible" id="screenshots" aria-labelledby="screenshots-title">
         <div class="reference-heading screenshots-heading">
-          <div><h2 id="screenshots-title">Реальные скриншоты</h2><p>Настоящий интерфейс. Никаких постановочных кадров — только живые скриншоты из приложения.</p></div>
-          <a class="section-link" href="https://github.com/germ85402-ops/ilyro-browser/tree/main/docs/assets" target="_blank" rel="noreferrer">Смотреть все скриншоты <span aria-hidden="true">→</span></a>
+          <div><h2 id="screenshots-title" data-i18n="screenshots.title">Real screenshots</h2><p data-i18n="screenshots.intro">The actual interface. No staged shots — just live screenshots from the app.</p></div>
+          <a class="section-link" href="https://github.com/germ85402-ops/ilyro-browser/tree/main/docs/assets" target="_blank" rel="noreferrer"><span data-i18n="screenshots.link">View all screenshots</span> <span aria-hidden="true">→</span></a>
         </div>
         <div class="reference-shot-grid">
-          <figure class="reference-shot"><img src="assets/ilyro-site-hero.jpg" alt="Новая вкладка ILYRO" /><figcaption><strong>Новая вкладка</strong><span>Стильный и функциональный старт</span></figcaption></figure>
-          <figure class="reference-shot"><img src="assets/ilyro-shot-youtube.jpg" alt="YouTube в браузере ILYRO" /><figcaption><strong>YouTube</strong><span>Комфортный просмотр видео</span></figcaption></figure>
-          <figure class="reference-shot"><img src="assets/ilyro-shot-tabs.jpg" alt="Вкладки ILYRO" /><figcaption><strong>Вкладки</strong><span>Удобная организация</span></figcaption></figure>
-          <figure class="reference-shot"><img src="assets/ilyro-shot-settings.jpg" alt="Настройки ILYRO" /><figcaption><strong>Настройки</strong><span>Языки и поиск</span></figcaption></figure>
-          <figure class="reference-shot"><img src="assets/ilyro-shot-appearance.jpg" alt="Оформление ILYRO" /><figcaption><strong>Оформление</strong><span>Темы и стиль</span></figcaption></figure>
-          <figure class="reference-shot"><img src="assets/ilyro-shot-account.jpg" alt="Аккаунт ILYRO" /><figcaption><strong>Аккаунт</strong><span>Синхронизация данных</span></figcaption></figure>
-        </div>
-      </section>
-
-      <section class="reference-section new-section section-shell reveal is-visible" id="whats-new" aria-labelledby="whats-new-title">
-        <div class="reference-heading compact-reference-heading"><h2 id="whats-new-title">Что нового в 0.26.0-rc2</h2><a class="section-link" href="https://github.com/germ85402-ops/ilyro-browser/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Полный список изменений <span aria-hidden="true">→</span></a></div>
-        <div class="new-grid">
-          <article><span class="new-icon new-icon-globe" aria-hidden="true">◎</span><div><strong>Языки браузера и сайтов</strong><p>Гибкая настройка языка интерфейса и приоритета сайтов.</p></div></article>
-          <article><span class="new-icon new-icon-sync" aria-hidden="true">↻</span><div><strong>Google Sync</strong><p>Безопасная синхронизация данных между устройствами.</p></div></article>
-          <article><span class="new-icon new-icon-video" aria-hidden="true">▶</span><div><strong>Улучшенный YouTube</strong><p>Более комфортный просмотр и стабильная работа.</p></div></article>
-          <article><span class="new-icon new-icon-spark" aria-hidden="true">✦</span><div><strong>Обновлённый интерфейс</strong><p>Новый дизайн и улучшенная эргономика.</p></div></article>
+          <figure class="reference-shot"><img src="assets/ilyro-site-hero.jpg" alt="ILYRO new tab" data-i18n-alt="screenshots.newTab.alt" /><figcaption><strong data-i18n="screenshots.newTab.title">New tab</strong><span data-i18n="screenshots.newTab.copy">A stylish, functional start</span></figcaption></figure>
+          <figure class="reference-shot"><img src="assets/ilyro-shot-youtube.jpg" alt="YouTube in ILYRO" data-i18n-alt="screenshots.youtube.alt" /><figcaption><strong data-i18n="screenshots.youtube.title">YouTube</strong><span data-i18n="screenshots.youtube.copy">Comfortable video viewing</span></figcaption></figure>
+          <figure class="reference-shot"><img src="assets/ilyro-shot-tabs.jpg" alt="ILYRO tabs" data-i18n-alt="screenshots.tabs.alt" /><figcaption><strong data-i18n="screenshots.tabs.title">Tabs</strong><span data-i18n="screenshots.tabs.copy">Easy organization</span></figcaption></figure>
+          <figure class="reference-shot"><img src="assets/ilyro-shot-settings.jpg" alt="ILYRO settings" data-i18n-alt="screenshots.settings.alt" /><figcaption><strong data-i18n="screenshots.settings.title">Settings</strong><span data-i18n="screenshots.settings.copy">Languages and search</span></figcaption></figure>
+          <figure class="reference-shot"><img src="assets/ilyro-shot-appearance.jpg" alt="ILYRO appearance" data-i18n-alt="screenshots.appearance.alt" /><figcaption><strong data-i18n="screenshots.appearance.title">Appearance</strong><span data-i18n="screenshots.appearance.copy">Themes and style</span></figcaption></figure>
+          <figure class="reference-shot"><img src="assets/ilyro-shot-account.jpg" alt="ILYRO account" data-i18n-alt="screenshots.account.alt" /><figcaption><strong data-i18n="screenshots.account.title">Account</strong><span data-i18n="screenshots.account.copy">Data synchronization</span></figcaption></figure>
         </div>
       </section>
 
       <section class="reference-download section-shell reveal is-visible" id="download" aria-labelledby="download-title">
         <div class="download-backdrop" aria-hidden="true"></div>
-        <div class="download-copy"><p class="reference-kicker">ILYRO / ANDROID</p><h2 id="download-title">Скачать ILYRO</h2><p>Начните пользоваться уже сегодня.</p><small>ARM64 · Android 8+ · Release Candidate</small><div class="download-actions"><a class="button button-primary" href="https://github.com/germ85402-ops/ilyro-browser/releases/latest" target="_blank" rel="noreferrer">↓ &nbsp; Скачать APK</a><a class="button button-outline" href="https://github.com/germ85402-ops/ilyro-browser/releases" target="_blank" rel="noreferrer">Релизы ↗</a><a class="button button-outline" href="https://github.com/germ85402-ops/ilyro-browser/releases/latest" target="_blank" rel="noreferrer">▣ &nbsp; SHA-256</a></div></div>
-        <p class="download-note">Твой же мир.<br /><span>Больше свободы.</span></p>
+        <div class="download-copy"><p class="reference-kicker">ILYRO / ANDROID</p><h2 id="download-title" data-i18n="download.title">Download ILYRO</h2><p data-i18n="download.lead">Start using it today.</p><small>ARM64 · Android 8+ · Release Candidate</small><div class="download-actions"><a class="button button-primary" href="https://github.com/germ85402-ops/ilyro-browser/releases/latest" target="_blank" rel="noreferrer">↓ &nbsp; <span data-i18n="actions.downloadApk">Download APK</span></a><a class="button button-outline" href="https://github.com/germ85402-ops/ilyro-browser/releases" target="_blank" rel="noreferrer"><span data-i18n="download.releases">Releases</span> ↗</a><a class="button button-outline" href="https://github.com/germ85402-ops/ilyro-browser/releases/latest" target="_blank" rel="noreferrer">▣ &nbsp; <span data-i18n="download.sha">SHA-256</span></a></div></div>
+        <p class="download-note" data-i18n="download.note" data-i18n-mode="html">Your world.<br /><span>More freedom.</span></p>
       </section>
     </main>
 
     <footer class="site-footer section-shell reference-footer">
-      <div class="footer-intro"><a class="brand footer-brand" href="#top" aria-label="ILYRO, наверх"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 38.9c-4.4-1.4-7.5-5.2-7.5-10.1 0-3.6 1.4-6.6 4-8.9-2.7-3.4-3.4-7-1.8-10.7 2.1 1.2 3.9 2.8 5.3 4.9 1.4-2.1 3.2-3.7 5.3-4.9 1.6 3.7.9 7.3-1.8 10.7 2.6 2.3 4 5.3 4 8.9 0 4.9-3.1 8.7-7.5 10.1Z" /><path class="mark-line" d="M20.7 12.7 16 8.4l-3.2-4.2M27.3 12.7 32 8.4l3.2-4.2M16 8.4l.2-4.8M32 8.4l-.2-4.8" /><path class="mark-cut" d="M20.5 25.2c1.1 1.2 2.3 1.8 3.5 1.8s2.4-.6 3.5-1.8" /></svg></span><span class="brand-name">ILYRO</span></a><p>Открывайте мир по-своему.</p></div>
-      <div class="footer-links"><a href="https://github.com/germ85402-ops/ilyro-browser" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/germ85402-ops/ilyro-browser/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Changelog</a><a href="privacy.html">Privacy Policy</a><a href="terms.html">Terms of Service</a></div>
-      <div class="footer-end"><div class="footer-social" aria-label="Ссылки проекта"><a href="https://github.com/germ85402-ops/ilyro-browser" target="_blank" rel="noreferrer" aria-label="GitHub">●</a><a href="https://github.com/germ85402-ops/ilyro-browser/releases" target="_blank" rel="noreferrer" aria-label="Releases">▶</a></div><div class="footer-copy">© <span id="year"></span> ILYRO. Все права защищены.</div></div>
+      <div class="footer-intro"><a class="brand footer-brand" href="#top" aria-label="ILYRO, back to top" data-i18n-aria="brand.top"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 38.9c-4.4-1.4-7.5-5.2-7.5-10.1 0-3.6 1.4-6.6 4-8.9-2.7-3.4-3.4-7-1.8-10.7 2.1 1.2 3.9 2.8 5.3 4.9 1.4-2.1 3.2-3.7 5.3-4.9 1.6 3.7.9 7.3-1.8 10.7 2.6 2.3 4 5.3 4 8.9 0 4.9-3.1 8.7-7.5 10.1Z" /><path class="mark-line" d="M20.7 12.7 16 8.4l-3.2-4.2M27.3 12.7 32 8.4l3.2-4.2M16 8.4l.2-4.8M32 8.4l-.2-4.8" /><path class="mark-cut" d="M20.5 25.2c1.1 1.2 2.3 1.8 3.5-1.8" /></svg></span><span class="brand-name">ILYRO</span></a><p data-i18n="footer.tagline">Open the world your way.</p></div>
+      <div class="footer-links"><a href="https://github.com/germ85402-ops/ilyro-browser" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/germ85402-ops/ilyro-browser/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Changelog</a><a href="privacy.html" data-i18n="footer.privacy">Privacy Policy</a><a href="terms.html" data-i18n="footer.terms">Terms of Service</a></div>
+      <div class="footer-end"><div class="footer-social" aria-label="Project links" data-i18n-aria="footer.social"><a href="https://github.com/germ85402-ops/ilyro-browser" target="_blank" rel="noreferrer" aria-label="GitHub">●</a><a href="https://github.com/germ85402-ops/ilyro-browser/releases" target="_blank" rel="noreferrer" aria-label="Releases">▶</a></div><div class="footer-copy">© <span id="year"></span> ILYRO. <span data-i18n="footer.rights">All rights reserved.</span></div></div>
     </footer>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=20260921-language-theme"></script>
   </body>
 </html>

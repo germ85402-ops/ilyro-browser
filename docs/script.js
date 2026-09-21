@@ -15,27 +15,178 @@
     }
   };
 
-  const savedTheme = safeStorage.get('ilyro-theme');
-  if (savedTheme === 'light') root.dataset.theme = 'light';
-
-  const updateThemeLabel = () => {
-    const isLight = root.dataset.theme === 'light';
-    themeToggle?.setAttribute('aria-label', isLight ? 'Включить тёмную тему' : 'Включить светлую тему');
-    themeToggle?.setAttribute('title', isLight ? 'Тёмная тема' : 'Светлая тема');
+  const russianTranslations = {
+    'meta.title': 'ILYRO — браузер в твоём ритме',
+    'meta.description': 'ILYRO — браузер для Android с GeckoView, встроенной защитой uBlock Origin, гибкой настройкой и синхронизацией.',
+    'meta.ogTitle': 'ILYRO — браузер в твоём ритме',
+    'meta.ogDescription': 'Быстрый, безопасный и настраиваемый Android-браузер.',
+    'brand.home': 'ILYRO, на главную',
+    'brand.top': 'ILYRO, наверх',
+    'nav.label': 'Основная навигация',
+    'nav.features': 'Возможности',
+    'nav.screenshots': 'Скриншоты',
+    'nav.download': 'Скачать',
+    'language.label': 'Язык',
+    'theme.system': 'Тема следует системе устройства',
+    'menu.open': 'Открыть меню',
+    'menu.close': 'Закрыть меню',
+    'actions.downloadApk': 'Скачать APK',
+    'actions.openGithub': 'Открыть GitHub',
+    'hero.overline': 'БЫСТРЫЙ. БЕЗОПАСНЫЙ. ТВОЙ.',
+    'hero.title': 'ILYRO — браузер<br />для Android<br /><span>в твоём ритме</span>',
+    'hero.lead': 'GeckoView, встроенная защита uBlock Origin,<br />удобные вкладки, быстрые загрузки<br />и гибкая персонализация.',
+    'hero.tagsLabel': 'Ключевые характеристики',
+    'hero.artLabel': 'Главный экран браузера ILYRO',
+    'hero.artAlt': 'Главный экран браузера ILYRO на фоне водопада',
+    'hero.note': 'Больше, чем браузер.<br /><span>Свобода в каждом открытии.</span>',
+    'benefits.label': 'Ключевые возможности',
+    'benefits.shield.title': 'Защита',
+    'benefits.shield.copy': 'Встроенный uBlock Origin<br />блокирует рекламу и трекеры',
+    'benefits.menu.title': 'Быстрое меню',
+    'benefits.menu.copy': 'Удобный доступ ко всем<br />возможностям',
+    'benefits.custom.title': 'Персонализация',
+    'benefits.custom.copy': 'Темы, иконки, цвета.<br />Сделайте ILYRO своим',
+    'benefits.sync.title': 'Синхронизация',
+    'benefits.sync.copy': 'Ваши данные на всех<br />устройствах через Google',
+    'features.kicker': 'БОЛЬШЕ ВОЗМОЖНОСТЕЙ',
+    'features.title': 'Почему ILYRO',
+    'features.intro': 'Современный браузер, созданный для свободы.<br />Сочетает производительность, приватность и гибкость настроек.',
+    'features.shield.alt': 'Панель ILYRO Shield',
+    'features.shield.title': 'Надёжная защита',
+    'features.shield.copy': 'Встроенный uBlock Origin. Чистый интернет без рекламы и трекеров.',
+    'features.menu.alt': 'Быстрое меню ILYRO',
+    'features.menu.title': 'Удобное управление',
+    'features.menu.copy': 'Быстрое меню с нужными действиями. Всё под рукой.',
+    'features.custom.alt': 'Настройки внешнего вида ILYRO',
+    'features.custom.title': 'Гибкая персонализация',
+    'features.custom.copy': 'Темы, иконки, цвета и многое другое. Ваш стиль — ваши правила.',
+    'features.sync.alt': 'Аккаунт и синхронизация ILYRO',
+    'features.sync.title': 'Всегда с вами',
+    'features.sync.copy': 'Синхронизация через Google. Закладки, настройки и история на всех устройствах.',
+    'screenshots.title': 'Реальные скриншоты',
+    'screenshots.intro': 'Настоящий интерфейс. Никаких постановочных кадров — только живые скриншоты из приложения.',
+    'screenshots.link': 'Смотреть все скриншоты',
+    'screenshots.newTab.alt': 'Новая вкладка ILYRO',
+    'screenshots.newTab.title': 'Новая вкладка',
+    'screenshots.newTab.copy': 'Стильный и функциональный старт',
+    'screenshots.youtube.alt': 'YouTube в браузере ILYRO',
+    'screenshots.youtube.title': 'YouTube',
+    'screenshots.youtube.copy': 'Комфортный просмотр видео',
+    'screenshots.tabs.alt': 'Вкладки ILYRO',
+    'screenshots.tabs.title': 'Вкладки',
+    'screenshots.tabs.copy': 'Удобная организация',
+    'screenshots.settings.alt': 'Настройки ILYRO',
+    'screenshots.settings.title': 'Настройки',
+    'screenshots.settings.copy': 'Языки и поиск',
+    'screenshots.appearance.alt': 'Оформление ILYRO',
+    'screenshots.appearance.title': 'Оформление',
+    'screenshots.appearance.copy': 'Темы и стиль',
+    'screenshots.account.alt': 'Аккаунт ILYRO',
+    'screenshots.account.title': 'Аккаунт',
+    'screenshots.account.copy': 'Синхронизация данных',
+    'download.title': 'Скачать ILYRO',
+    'download.lead': 'Начните пользоваться уже сегодня.',
+    'download.releases': 'Релизы',
+    'download.sha': 'SHA-256',
+    'download.note': 'Твой же мир.<br /><span>Больше свободы.</span>',
+    'footer.tagline': 'Открывайте мир по-своему.',
+    'footer.privacy': 'Privacy Policy',
+    'footer.terms': 'Terms of Service',
+    'footer.social': 'Ссылки проекта',
+    'footer.rights': 'Все права защищены.'
   };
 
-  updateThemeLabel();
+  const localizedPage = Boolean(document.querySelector('[data-language]'));
+  const languageButtons = [...document.querySelectorAll('[data-language]')];
+  const localizedElements = [...document.querySelectorAll('[data-i18n]')];
+  const localizedAttributes = {
+    content: [...document.querySelectorAll('[data-i18n-content]')],
+    aria: [...document.querySelectorAll('[data-i18n-aria]')],
+    alt: [...document.querySelectorAll('[data-i18n-alt]')]
+  };
+
+  localizedElements.forEach((element) => {
+    element.dataset.i18nDefault = element.dataset.i18nMode === 'html' ? element.innerHTML : element.textContent;
+  });
+  Object.entries(localizedAttributes).forEach(([attribute, elements]) => {
+    elements.forEach((element) => {
+      const sourceAttribute = attribute === 'content' ? 'content' : attribute === 'aria' ? 'aria-label' : 'alt';
+      element.dataset[`i18nDefault${attribute[0].toUpperCase()}${attribute.slice(1)}`] = element.getAttribute(sourceAttribute) || '';
+    });
+  });
+
+  const applyLanguage = (language, persist = true) => {
+    const nextLanguage = language === 'ru' ? 'ru' : 'en';
+    if (localizedPage) root.lang = nextLanguage;
+    root.dataset.language = nextLanguage;
+
+    localizedElements.forEach((element) => {
+      const value = nextLanguage === 'ru' ? russianTranslations[element.dataset.i18n] : element.dataset.i18nDefault;
+      if (value == null) return;
+      if (element.dataset.i18nMode === 'html') element.innerHTML = value;
+      else element.textContent = value;
+    });
+
+    Object.entries(localizedAttributes).forEach(([attribute, elements]) => {
+      elements.forEach((element) => {
+        const key = element.dataset[`i18n${attribute[0].toUpperCase()}${attribute.slice(1)}`];
+        const defaultKey = `i18nDefault${attribute[0].toUpperCase()}${attribute.slice(1)}`;
+        const value = nextLanguage === 'ru' ? russianTranslations[key] : element.dataset[defaultKey];
+        if (value == null) return;
+        const targetAttribute = attribute === 'content' ? 'content' : attribute === 'aria' ? 'aria-label' : 'alt';
+        element.setAttribute(targetAttribute, value);
+      });
+    });
+
+    languageButtons.forEach((button) => {
+      const selected = button.dataset.language === nextLanguage;
+      button.setAttribute('aria-pressed', String(selected));
+    });
+    if (persist && localizedPage) safeStorage.set('ilyro-language', nextLanguage);
+    updateThemeLabel();
+    updateMenuLabel();
+  };
+
+  const savedThemeMode = safeStorage.get('ilyro-theme-mode');
+  let themeMode = ['system', 'light', 'dark'].includes(savedThemeMode) ? savedThemeMode : 'system';
+
+  const updateThemeLabel = () => {
+    const language = root.dataset.language === 'ru' ? 'ru' : 'en';
+    const labels = {
+      en: { system: 'Theme follows your device', light: 'Theme: light (click to change)', dark: 'Theme: dark (click to change)' },
+      ru: { system: 'Тема следует системе устройства', light: 'Тема: светлая (нажмите, чтобы изменить)', dark: 'Тема: тёмная (нажмите, чтобы изменить)' }
+    };
+    const label = labels[language][themeMode];
+    themeToggle?.setAttribute('aria-label', label);
+    themeToggle?.setAttribute('title', label);
+  };
+
+  const updateMenuLabel = () => {
+    const language = root.dataset.language === 'ru' ? 'ru' : 'en';
+    const isOpen = menuToggle?.getAttribute('aria-expanded') === 'true';
+    menuToggle?.setAttribute('aria-label', isOpen
+      ? (language === 'ru' ? 'Закрыть меню' : 'Close menu')
+      : (language === 'ru' ? 'Открыть меню' : 'Open menu'));
+  };
+
+  const applyTheme = () => {
+    if (themeMode === 'system') delete root.dataset.theme;
+    else root.dataset.theme = themeMode;
+    updateThemeLabel();
+  };
+
+  const initialLanguage = safeStorage.get('ilyro-language') === 'ru' ? 'ru' : 'en';
+  applyLanguage(initialLanguage, false);
+  applyTheme();
+
+  languageButtons.forEach((button) => {
+    button.addEventListener('click', () => applyLanguage(button.dataset.language));
+  });
 
   themeToggle?.addEventListener('click', () => {
-    const isLight = root.dataset.theme === 'light';
-    if (isLight) {
-      delete root.dataset.theme;
-      safeStorage.set('ilyro-theme', 'dark');
-    } else {
-      root.dataset.theme = 'light';
-      safeStorage.set('ilyro-theme', 'light');
-    }
-    updateThemeLabel();
+    themeMode = themeMode === 'system' ? 'light' : themeMode === 'light' ? 'dark' : 'system';
+    safeStorage.set('ilyro-theme-mode', themeMode);
+    applyTheme();
   });
 
   const updateHeader = () => {
@@ -49,6 +200,7 @@
     const isOpen = menuToggle.getAttribute('aria-expanded') === 'true';
     menuToggle.setAttribute('aria-expanded', String(!isOpen));
     mainNav?.classList.toggle('is-open', !isOpen);
+    updateMenuLabel();
   });
 
   mainNav?.querySelectorAll('a').forEach((link) => {
