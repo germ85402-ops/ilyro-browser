@@ -632,11 +632,12 @@ internal fun BrowserTopNoticeCard(
     val snackbarTextColor = themeColors.onSurface
     val snackbarSecondaryColor = themeColors.onSurfaceVariant.copy(alpha = 0.78f)
     val snackbarActionColor = themeColors.primary
+    val compactPhone = metrics.isCompact
 
     Surface(
         onClick = onClick,
         modifier = Modifier
-            .fillMaxWidth(if (metrics.isNarrowPhone) 0.90f else 0.52f)
+            .fillMaxWidth(if (compactPhone) 0.92f else 0.52f)
             .widthIn(min = 180.dp, max = 420.dp)
             .graphicsLayer {
                 translationX = dragOffsetX
@@ -694,15 +695,22 @@ internal fun BrowserTopNoticeCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 15.dp, vertical = 10.dp),
+                .padding(
+                horizontal = if (compactPhone) 12.dp else 15.dp,
+                vertical = if (compactPhone) 8.dp else 10.dp
+            ),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(if (compactPhone) 8.dp else 12.dp)
         ) {
             Column(
                 modifier = Modifier.weight(1f)
             ) {
                 Text(
-                    text = notice.title,
+                    text = if (compactPhone && notice.kind == BrowserTopNoticeKind.TAB_CLOSED) {
+                        tr("Closed", "Закрыта")
+                    } else {
+                        notice.title
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Medium,
                     color = snackbarTextColor,
@@ -713,7 +721,7 @@ internal fun BrowserTopNoticeCard(
                     text = notice.message,
                     style = MaterialTheme.typography.bodySmall,
                     color = snackbarSecondaryColor,
-                    maxLines = 2,
+                    maxLines = if (compactPhone) 1 else 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
@@ -729,7 +737,10 @@ internal fun BrowserTopNoticeCard(
                 ) {
                     Text(
                         text = label,
-                        modifier = Modifier.padding(horizontal = 3.dp, vertical = 5.dp),
+                        modifier = Modifier.padding(
+                            horizontal = if (compactPhone) 2.dp else 3.dp,
+                            vertical = if (compactPhone) 4.dp else 5.dp
+                        ),
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = snackbarActionColor,

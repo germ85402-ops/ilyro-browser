@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.ilyro.browser.account.GoogleAccountManager
 import com.ilyro.browser.account.GoogleAccountProfile
@@ -595,6 +596,8 @@ private fun SignedInAccountContent(
     onAutoSyncChanged: (Boolean) -> Unit,
     onSignOut: () -> Unit
 ) {
+    val metrics = rememberIlyroLayoutMetrics()
+
     val lastSyncLabel = if (lastSyncAtEpochMs > 0L) {
         tr(
             "Last sync: ${formatSyncTime(lastSyncAtEpochMs)}",
@@ -693,32 +696,80 @@ private fun SignedInAccountContent(
         }
     }
 
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
+    if (metrics.isCompact) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text(
+                        tr("Automatic sync", "Автоматическая синхронизация"),
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Text(
+                        tr(
+                            "Every 12 hours when a network is available.",
+                            "Каждые 12 часов при наличии сети."
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = autoSyncEnabled,
+                    enabled = !busy,
+                    onCheckedChange = onAutoSyncChanged
+                )
+            }
             Text(
-                tr("Automatic sync", "Автоматическая синхронизация"),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                tr("Every 12 hours when a network is available.", "Каждые 12 часов при наличии сети."),
+                text = lastSyncLabel,
+                modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
-        Switch(
-            checked = autoSyncEnabled,
-            enabled = !busy,
-            onCheckedChange = onAutoSyncChanged
-        )
-        Text(
-            text = lastSyncLabel,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    tr("Automatic sync", "Автоматическая синхронизация"),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    tr(
+                        "Every 12 hours when a network is available.",
+                        "Каждые 12 часов при наличии сети."
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = autoSyncEnabled,
+                enabled = !busy,
+                onCheckedChange = onAutoSyncChanged
+            )
+            Text(
+                text = lastSyncLabel,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 
     automaticSyncError?.takeIf { it.isNotBlank() }?.let { error ->

@@ -1354,7 +1354,11 @@ private fun BrowserScreen(
         pushTopNotice(
             kind = BrowserTopNoticeKind.TAB_CLOSED,
             title = tr(settings.language, "Tab closed", "Вкладка закрыта"),
-            message = tab.title.ifBlank { hostLabel(tab.url) },
+            message = if (tab.url == HOME_URL) {
+                tr(settings.language, "New tab", "Новая вкладка")
+            } else {
+                tab.title.ifBlank { hostLabel(tab.url) }
+            },
             actionLabel = tr(settings.language, "Undo", "Отменить")
         )
 
