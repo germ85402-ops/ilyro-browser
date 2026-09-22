@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.26.0-rc9 — release candidate
+
+- Refine mobile YouTube/fullscreen surface restoration to reduce black frames and accidental playback interruptions.
+- Prevent stale browser surfaces from flashing when switching between tabs.
+- Show a compact in-browser notice when a download finishes, with a shortcut to Downloads.
+- Replace the support card's coffee icon with a cleaner theme-aware cup, saucer, coffee and steam illustration.
+
 ## 0.26.0-rc8 — release candidate
 
 - Add custom search engines in Settings with editable names, URL templates, default selection, and local/sync persistence.

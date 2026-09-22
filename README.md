@@ -2,7 +2,7 @@
 
 ILYRO is an independent Android browser built with Kotlin, Jetpack Compose, and Mozilla GeckoView.
 
-> Current status: **0.26.0-rc8**. This is a release candidate, not the final stable release.
+> Current status: **0.26.0-rc9**. This is a release candidate, not the final stable release.
 
 ## Highlights
 
@@ -37,7 +37,7 @@ Signed builds are published on the [GitHub Releases](https://github.com/germ8540
 
 ## Build
 
-The repository includes the verified Gradle 9.6.0 Wrapper. Run `./gradlew :app:assembleDebug` for a local debug build. GitHub Actions runs lint, unit tests, helper JavaScript checks, and debug APK compilation for code changes on `main` and pull requests. Version tags such as `v0.26.0-rc8` start the signed release workflow.
+The repository includes the verified Gradle 9.6.0 Wrapper. Run `./gradlew :app:assembleDebug` for a local debug build. GitHub Actions runs lint, unit tests, helper JavaScript checks, and debug APK compilation for code changes on `main` and pull requests. Version tags such as `v0.26.0-rc9` start the signed release workflow.
 
 Release signing requires repository secrets and uses the permanent ILYRO signing identity documented in [docs/release-signing.md](docs/release-signing.md). Never commit a keystore or signing password.
 
