@@ -1027,8 +1027,8 @@ private fun BrowserScreen(
                 controller.isAppearanceLightStatusBars = !darkTheme
                 controller.isAppearanceLightNavigationBars = !darkTheme
 
-                // Orientation restoration happens asynchronously on phones. Re-hide any IME
-                // that Android may try to resurrect from the old fullscreen focus snapshot.
+                // Some Android builds may briefly restore the previous web input connection
+                // while system bars are returning. Re-hide the IME only for this transition.
                 if (fullscreenTransition) {
                     activity.window.decorView.postDelayed({ hideFullscreenTransitionIme() }, 120L)
                     activity.window.decorView.postDelayed({ hideFullscreenTransitionIme() }, 320L)
@@ -1048,10 +1048,7 @@ private fun BrowserScreen(
                 when (event) {
                     Lifecycle.Event.ON_START -> {
                         tabs.forEach { candidate ->
-                            candidate.applyActiveState(
-                                active = candidate.id == activeTabId,
-                                restoreInputFocus = false
-                            )
+                            candidate.applyActiveState(candidate.id == activeTabId)
                         }
                         if (selectedTab != null && !isHome && !readerModeActive) {
                             NativeBrowserHostCoordinator.render(selectedTab.session)
@@ -1060,10 +1057,7 @@ private fun BrowserScreen(
                     }
                     Lifecycle.Event.ON_RESUME -> {
                         tabs.forEach { candidate ->
-                            candidate.applyActiveState(
-                                active = candidate.id == activeTabId,
-                                restoreInputFocus = false
-                            )
+                            candidate.applyActiveState(candidate.id == activeTabId)
                         }
                         ProtectionBridge.setActiveSession(selectedTab?.session)
                         if (selectedTab != null && !isHome && !readerModeActive) {
