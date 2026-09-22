@@ -30,6 +30,17 @@ internal object PageGestureBridge {
                     port.setDelegate(object : WebExtension.PortDelegate {
                         override fun onPortMessage(message: Any, port: WebExtension.Port) {
                             val json = message as? JSONObject ?: return
+                            if (json.optString("type") == "fullscreenGeometry") {
+                                val view = com.ilyro.browser.NativeBrowserHostCoordinator.geckoView()
+                                val root = view?.rootView
+                                val position = IntArray(2)
+                                view?.getLocationInWindow(position)
+                                port.postMessage(JSONObject().apply {
+                                    put("type", "fullscreenGeometry")
+                                    put("geometry", "native px: root=${root?.width}x${root?.height} Gecko=${view?.width}x${view?.height} at ${position[0]},${position[1]}")
+                                })
+                                return
+                            }
                             val progress = json.optDouble("progress", 0.0).toFloat()
                             if (!progress.isFinite()) return
                             callbacks[session]?.invoke(progress.coerceIn(0f, 1f), json.optBoolean("refresh", false))
