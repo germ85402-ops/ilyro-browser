@@ -1143,6 +1143,9 @@ private fun BrowserScreen(
 
     fun selectTab(tab: BrowserTab) {
         if (tab.id != activeTabId) captureActivePreview()
+        if (tab.id != activeTabId) {
+            NativeBrowserHostCoordinator.prepareForSessionSwitch()
+        }
         focusManager.clearFocus()
         addressFocused = false
         currentGeckoView = null
@@ -1244,6 +1247,9 @@ private fun BrowserScreen(
         clearPendingClosedTabState()
 
         if (restoreAsActive || tabs.size == 1) {
+            if (activeTabId != closedTab.id) {
+                NativeBrowserHostCoordinator.prepareForSessionSwitch()
+            }
             activeTabId = closedTab.id
             applyActiveState(closedTab.id)
             addressText = if (closedTab.url == HOME_URL) "" else closedTab.url
@@ -1277,6 +1283,9 @@ private fun BrowserScreen(
         val restoredActive = closedTabs.firstOrNull { it.id == restoreActiveId }
             ?: closedTabs.firstOrNull()
         if (restoredActive != null) {
+            if (activeTabId != restoredActive.id) {
+                NativeBrowserHostCoordinator.prepareForSessionSwitch()
+            }
             activeTabId = restoredActive.id
             applyActiveState(restoredActive.id)
             addressText = if (restoredActive.url == HOME_URL) "" else restoredActive.url
@@ -1316,6 +1325,9 @@ private fun BrowserScreen(
         finalizePendingClosedTab()
 
         val wasActive = tab.id == activeTabId
+        if (wasActive) {
+            NativeBrowserHostCoordinator.prepareForSessionSwitch()
+        }
         tab.applyActiveState(false)
         tabs.removeAt(index)
 
@@ -1378,6 +1390,7 @@ private fun BrowserScreen(
         finalizePendingClosedAllTabs()
 
         val previouslyActiveId = activeTabId
+        NativeBrowserHostCoordinator.prepareForSessionSwitch()
         closedTabs.forEach { tab ->
             tab.applyActiveState(false)
         }
@@ -2465,6 +2478,7 @@ private fun BrowserScreen(
                             tabs.add(newTab)
                             pendingNewTabRequest = null
                             pending.result.complete(newTab.session)
+                            NativeBrowserHostCoordinator.prepareForSessionSwitch()
                             currentGeckoView = null
                             activeTabId = newTab.id
                             addressText = pending.uri

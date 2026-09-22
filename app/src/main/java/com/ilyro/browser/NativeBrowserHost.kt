@@ -67,14 +67,17 @@ internal object NativeBrowserHostCoordinator {
     private var rootRef = WeakReference<BrowserRootLayout>(null)
     private var hostRef = WeakReference<IlyroEngineView>(null)
     private var externalMediaHandoffPending = false
+    private var displayGeneration = 0L
 
     fun attach(root: BrowserRootLayout, host: IlyroEngineView) {
         rootRef = WeakReference(root)
         hostRef = WeakReference(host)
         externalMediaHandoffPending = false
+        displayGeneration += 1
     }
 
     fun detach() {
+        displayGeneration += 1
         hostRef.get()?.release()
         externalMediaHandoffPending = false
         rootRef.clear()
@@ -91,21 +94,46 @@ internal object NativeBrowserHostCoordinator {
         externalMediaHandoffPending = false
     }
 
+    /**
+     * Hide the current compositor before Compose changes the selected tab.
+     *
+     * GeckoView is intentionally reused between tabs. If the old native surface remains visible
+     * until the next Compose frame, Android can present its last frame for one or two frames
+     * before the new session is attached. This is especially visible on phones and on YouTube.
+     */
+    fun prepareForSessionSwitch() {
+        displayGeneration += 1
+        rootRef.get()?.setEngineVisible(false)
+        hostRef.get()?.visibility = View.INVISIBLE
+    }
+
+    private fun revealWhenReady(host: IlyroEngineView, generation: Long) {
+        host.postOnAnimation {
+            if (generation != displayGeneration || hostRef.get() !== host) return@postOnAnimation
+            host.visibility = View.VISIBLE
+            rootRef.get()?.setEngineVisible(true)
+        }
+    }
+
     fun render(session: GeckoSession) {
         val host = hostRef.get() ?: return
+        val generation = ++displayGeneration
         host.render(session)
-        host.visibility = View.VISIBLE
-        rootRef.get()?.setEngineVisible(true)
+        revealWhenReady(host, generation)
     }
 
     fun recreateDisplay() {
         val host = hostRef.get() ?: return
-        host.recreateDisplay()
-        host.visibility = View.VISIBLE
-        rootRef.get()?.setEngineVisible(true)
+        val generation = ++displayGeneration
+        rootRef.get()?.setEngineVisible(false)
+        host.visibility = View.INVISIBLE
+        if (host.recreateDisplay()) {
+            revealWhenReady(host, generation)
+        }
     }
 
     fun release(hide: Boolean = false) {
+        displayGeneration += 1
         // During an explicit external-player handoff, keep the existing native display attached.
         // MainActivity will recreate only the display on return if MIUI invalidated its surface.
         if (hide && externalMediaHandoffPending) return

@@ -72,6 +72,12 @@ internal object GeckoMediaSessionBridge {
     fun stateFor(session: GeckoSession): GeckoMediaPlaybackState =
         playbackBySession[session] ?: GeckoMediaPlaybackState()
 
+    fun hasActivePlayback(): Boolean {
+        val session = selectedSession ?: return false
+        val state = playbackBySession[session] ?: return false
+        return state.active || state.playing
+    }
+
     fun playSelected(): Boolean {
         val controller = selectedSession?.let(controllerBySession::get) ?: return false
         if (!controller.isActive) return false

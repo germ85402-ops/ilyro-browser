@@ -74,8 +74,8 @@ class IlyroEngineView @JvmOverloads constructor(
 
     /** Recreate only Gecko's display view; keep the existing GeckoSession and page state intact. */
     @Synchronized
-    fun recreateDisplay() {
-        val session = renderedSession ?: engineGeckoView.getSession() ?: return
+    fun recreateDisplay(): Boolean {
+        val session = renderedSession ?: engineGeckoView.getSession() ?: return false
         val previous = engineGeckoView
         runCatching { previous.releaseSession() }
         removeView(previous)
@@ -92,6 +92,7 @@ class IlyroEngineView @JvmOverloads constructor(
             ViewCompat.requestApplyInsets(replacement)
             replacement.invalidate()
         }
+        return true
     }
 
     @Synchronized
