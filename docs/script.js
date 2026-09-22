@@ -285,9 +285,9 @@
       const latest = releases.find((release) =>
         !release.draft &&
         Array.isArray(release.assets) &&
-        release.assets.some((asset) => /^ILYRO-.*-arm64\\.apk$/.test(asset.name))
+        release.assets.some((asset) => /^ILYRO-.*-arm64\.apk$/.test(asset.name))
       );
-      const apk = latest?.assets?.find((asset) => /^ILYRO-.*-arm64\\.apk$/.test(asset.name));
+      const apk = latest?.assets?.find((asset) => /^ILYRO-.*-arm64\.apk$/.test(asset.name));
 
       if (!apk?.browser_download_url) throw new Error('No ARM64 APK found');
       links.forEach((link) => {
