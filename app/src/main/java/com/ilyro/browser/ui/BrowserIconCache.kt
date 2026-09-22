@@ -14,9 +14,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
-import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.LinkedHashMap
@@ -271,22 +268,6 @@ internal object BrowserIconCache {
         SearchEngine.BING -> "https://www.bing.com/"
     }
 
-    private fun fetchSiteFavicon(siteUrl: String): Bitmap? = runCatching {
-        val encoded = URLEncoder.encode(siteUrl, StandardCharsets.UTF_8.toString())
-        val connection = (URL("https://www.google.com/s2/favicons?sz=128&domain_url=$encoded")
-            .openConnection() as HttpURLConnection).apply {
-            connectTimeout = 3_500
-            readTimeout = 3_500
-            instanceFollowRedirects = true
-            requestMethod = "GET"
-            setRequestProperty("Accept", "image/*")
-            setRequestProperty("User-Agent", "ILYRO/0.16.26 Android")
-        }
-        try {
-            if (connection.responseCode !in 200..299) return@runCatching null
-            connection.inputStream.use(BitmapFactory::decodeStream)
-        } finally {
-            connection.disconnect()
-        }
-    }.getOrNull()
+    private fun fetchSiteFavicon(siteUrl: String): Bitmap? =
+        SiteIconFetcher.fetch(siteUrl)
 }

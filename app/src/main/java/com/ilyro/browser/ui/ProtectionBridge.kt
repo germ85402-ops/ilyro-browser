@@ -110,7 +110,11 @@ internal object ProtectionBridge {
         )
     }
 
+    // Gecko delivers install prompts on its own thread, so these gates must be visible there.
+    @Volatile
     private var allowNextInstallPrompt = false
+
+    @Volatile
     private var interactiveInstallPrompt = false
     private var pendingInstallPermissionResult:
         GeckoResult<WebExtension.PermissionPromptResponse>? = null
@@ -201,14 +205,13 @@ internal object ProtectionBridge {
             if (!allowedToProceed) {
                 return GeckoResult.fromValue(permissionResponse(false))
             }
-            if (!interactiveInstallPrompt &&
-                permissions.isEmpty() &&
+            // Only a request that asks for nothing may be granted without the user seeing it.
+            // Everything else has to go through the visible permission prompt, even during the
+            // queued onboarding installs.
+            if (permissions.isEmpty() &&
                 origins.isEmpty() &&
                 dataCollectionPermissions.isEmpty()
             ) {
-                return GeckoResult.fromValue(permissionResponse(true))
-            }
-            if (!interactiveInstallPrompt) {
                 return GeckoResult.fromValue(permissionResponse(true))
             }
 

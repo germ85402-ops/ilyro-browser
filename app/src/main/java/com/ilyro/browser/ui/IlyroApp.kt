@@ -1988,6 +1988,8 @@ private fun BrowserScreen(
 
     SitePermissionPromptHost()
 
+    ExtensionPermissionPromptHost()
+
     val openedNewTabMessage = tr("Opened in new tab", "Открыто в новой вкладке")
     val openedPrivateTabMessage = tr("Opened in private tab", "Открыто в приватной вкладке")
     val linkCopiedMessage = tr("Link copied", "Ссылка скопирована")

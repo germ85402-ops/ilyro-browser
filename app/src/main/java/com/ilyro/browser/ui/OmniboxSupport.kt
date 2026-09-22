@@ -957,8 +957,8 @@ private fun looksLikeNavigation(value: String): Boolean {
     return !text.contains(' ') && (text.contains('.') || text.startsWith("localhost", true))
 }
 
-private suspend fun fetchSearchEngineIcon(engine: SearchEngine): Bitmap? = withContext(Dispatchers.IO) {
-    runCatching {
+private suspend fun fetchSearchEngineIcon(engine: SearchEngine): Bitmap? =
+    withContext(Dispatchers.IO) {
         val siteUrl = when (engine) {
             SearchEngine.GOOGLE -> "https://www.google.com/"
             SearchEngine.YANDEX -> "https://yandex.com/"
@@ -966,21 +966,9 @@ private suspend fun fetchSearchEngineIcon(engine: SearchEngine): Bitmap? = withC
             SearchEngine.BRAVE -> "https://search.brave.com/"
             SearchEngine.BING -> "https://www.bing.com/"
         }
-        val encoded = URLEncoder.encode(siteUrl, StandardCharsets.UTF_8.toString())
-        val connection = (URL("https://www.google.com/s2/favicons?sz=128&domain_url=$encoded").openConnection() as HttpURLConnection).apply {
-            connectTimeout = 3000
-            readTimeout = 3000
-            requestMethod = "GET"
-            setRequestProperty("User-Agent", "ILYRO/0.16 Android")
-        }
-        try {
-            if (connection.responseCode !in 200..299) return@runCatching null
-            connection.inputStream.use(BitmapFactory::decodeStream)
-        } finally {
-            connection.disconnect()
-        }
-    }.getOrNull()
-}
+        SiteIconFetcher.fetch(siteUrl)
+    }
+
 
 private suspend fun fetchRemoteSuggestions(engine: SearchEngine, query: String): List<String> =
     withContext(Dispatchers.IO) {

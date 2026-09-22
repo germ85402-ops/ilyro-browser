@@ -57,10 +57,12 @@ internal object HistoryStore {
      */
     fun save(prefs: SharedPreferences, history: List<HistoryItem>) {
         val snapshot = PendingSave(prefs, history.take(MAX_ITEMS).toList())
-        writer.submit {
-            pendingSave.set(null)
-            persist(snapshot)
-        }.get()
+        awaitStoreWrite(
+            writer.submit {
+                pendingSave.set(null)
+                persist(snapshot)
+            }
+        )
     }
 
     /**

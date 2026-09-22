@@ -1,7 +1,6 @@
 package com.ilyro.browser.ui
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import androidx.compose.animation.animateColorAsState
@@ -66,10 +65,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 import kotlin.math.abs
-import java.net.HttpURLConnection
-import java.net.URL
 
 private fun toolbarSiteHost(url: String): String {
     if (url == HOME_URL) return ""
@@ -101,73 +97,14 @@ private fun faviconOrigin(pageUrl: String): String {
     return "$scheme://$host"
 }
 
-private fun decodeFavicon(bytes: ByteArray): Bitmap? {
-    if (bytes.isEmpty()) return null
-
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-
-    var sample = 1
-    val largest = maxOf(bounds.outWidth, bounds.outHeight)
-    while (largest / sample > 96) sample *= 2
-
-    return BitmapFactory.decodeByteArray(
-        bytes,
-        0,
-        bytes.size,
-        BitmapFactory.Options().apply { inSampleSize = sample }
-    )
-}
-
-private suspend fun loadTabletFavicon(pageUrl: String): Bitmap? {
+private suspend fun loadTabletFavicon(pageUrl: String, isPrivate: Boolean): Bitmap? {
     val origin = faviconOrigin(pageUrl)
     if (origin.isBlank()) return null
     TabletFaviconCache.get(origin)?.let { return it }
 
     return withContext(Dispatchers.IO) {
-        val connection = runCatching {
-            (URL("$origin/favicon.ico").openConnection() as HttpURLConnection).apply {
-                connectTimeout = 2500
-                readTimeout = 2500
-                instanceFollowRedirects = true
-                useCaches = true
-                setRequestProperty("User-Agent", "Mozilla/5.0 ILYRO")
-                setRequestProperty(
-                    "Accept",
-                    "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8"
-                )
-            }
-        }.getOrNull() ?: return@withContext null
-
-        try {
-            val code = connection.responseCode
-            if (code !in 200..299) return@withContext null
-
-            val declaredSize = connection.contentLengthLong
-            if (declaredSize > 768 * 1024) return@withContext null
-
-            val bytes = connection.inputStream.use { input ->
-                val output = ByteArrayOutputStream()
-                val buffer = ByteArray(8192)
-                var total = 0
-                while (true) {
-                    val read = input.read(buffer)
-                    if (read <= 0) break
-                    total += read
-                    if (total > 768 * 1024) return@withContext null
-                    output.write(buffer, 0, read)
-                }
-                output.toByteArray()
-            }
-
-            decodeFavicon(bytes)?.also { bitmap ->
-                TabletFaviconCache.put(origin, bitmap)
-            }
-        } catch (_: Throwable) {
-            null
-        } finally {
-            connection.disconnect()
+        SiteIconFetcher.fetch(pageUrl, isPrivate)?.also { bitmap ->
+            TabletFaviconCache.put(origin, bitmap)
         }
     }
 }
@@ -175,6 +112,7 @@ private suspend fun loadTabletFavicon(pageUrl: String): Bitmap? {
 @Composable
 private fun TabletSiteFavicon(
     pageUrl: String,
+    isPrivate: Boolean,
     accent: Color
 ) {
     val origin = remember(pageUrl) { faviconOrigin(pageUrl) }
@@ -182,7 +120,7 @@ private fun TabletSiteFavicon(
 
     LaunchedEffect(origin) {
         if (origin.isNotBlank() && favicon == null) {
-            favicon = loadTabletFavicon(pageUrl)
+            favicon = loadTabletFavicon(pageUrl, isPrivate)
         }
     }
 
@@ -347,6 +285,7 @@ internal fun TabletTabStrip(
                                 else -> {
                                     TabletSiteFavicon(
                                         pageUrl = tab.url,
+                                        isPrivate = tab.isPrivate,
                                         accent = accent
                                     )
                                 }

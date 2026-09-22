@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Security and privacy
+
+- Require a device screen-lock confirmation before Autofill hands a saved password to another app, and match credentials against the domain of the field being filled instead of the first web domain found in the request.
+- Load site icons first-party over HTTPS through Gecko (with private-browsing isolation) instead of querying a third-party icon service with the visited URL.
+- Forbid cleartext traffic for ILYRO's own network code through an explicit network security config; website loading is unaffected and stays governed by the HTTPS-only setting.
+- Enable Gecko's tracking-protection categories and strict social tracking protection instead of relying on cookie behavior alone.
+- Show the WebExtension permission prompt for every install that requests permissions, including the onboarding queue, and never approve such a request silently.
+- Verify that a restored pending APK install URI belongs to ILYRO's own download locations before invoking the package installer.
+
+### Fixed
+
+- Show a permission dialog for WebExtension installs so an install that requests permissions no longer stays pending forever with no user-visible prompt.
+- Stop blocking the main thread on ordered history and tab-session writes, which could cause an ANR with large snapshots.
+
 ## 0.26.0-rc8 — release candidate
 
 - Add custom search engines in Settings with editable names, URL templates, default selection, and local/sync persistence.

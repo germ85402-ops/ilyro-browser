@@ -1,6 +1,10 @@
 package com.ilyro.browser.passwords
 
+import android.app.KeyguardManager
+import android.app.PendingIntent
 import android.app.assist.AssistStructure
+import android.content.IntentSender
+import android.os.Build
 import android.os.CancellationSignal
 import android.view.autofill.AutofillId
 import android.service.autofill.AutofillService
@@ -29,7 +33,16 @@ class IlyroAutofillService : AutofillService() {
         }
 
         val candidates = collectCandidates(structure)
-        val domain = candidates.firstNotNullOfOrNull { it.domain }
+        val usernameField = candidates.firstOrNull { isUsernameField(it.node) }
+        val passwordField = candidates.firstOrNull { isPasswordField(it.node) }
+        if (usernameField == null && passwordField == null) {
+            callback.onSuccess(null)
+            return
+        }
+
+        // Use the domain of the field that is actually being filled. Taking the first web domain
+        // found anywhere in the structure would offer a credential to a third-party iframe.
+        val domain = autofillDomainFor(passwordField?.domain, usernameField?.domain)
         if (domain.isNullOrBlank()) {
             callback.onSuccess(null)
             return
@@ -52,15 +65,8 @@ class IlyroAutofillService : AutofillService() {
             return
         }
 
-        val usernameField = candidates.firstOrNull { isUsernameField(it.node) }
-        val passwordField = candidates.firstOrNull { isPasswordField(it.node) }
-        if (usernameField == null && passwordField == null) {
-            callback.onSuccess(null)
-            return
-        }
-
         val response = FillResponse.Builder()
-        credentials.take(MAX_DATASETS).forEach { credential ->
+        credentials.take(MAX_DATASETS).forEachIndexed { index, credential ->
             val presentation = RemoteViews(packageName, android.R.layout.simple_list_item_1).apply {
                 setTextViewText(
                     android.R.id.text1,
@@ -68,11 +74,25 @@ class IlyroAutofillService : AutofillService() {
                 )
             }
             val dataset = Dataset.Builder(presentation)
-            usernameField?.node?.autofillId?.let { id ->
-                dataset.setValue(id, AutofillValue.forText(credential.username))
-            }
-            passwordField?.node?.autofillId?.let { id ->
-                dataset.setValue(id, AutofillValue.forText(credential.password))
+            // The saved password itself is never handed to the requesting app until the user has
+            // confirmed the device screen lock, so a hostile app cannot silently harvest it.
+            val authentication = unlockIntentSender(
+                credential = credential,
+                usernameId = usernameField?.node?.autofillId,
+                passwordId = passwordField?.node?.autofillId,
+                requestCode = index
+            )
+            if (authentication != null) {
+                usernameField?.node?.autofillId?.let { id -> dataset.setValue(id, null) }
+                passwordField?.node?.autofillId?.let { id -> dataset.setValue(id, null) }
+                dataset.setAuthentication(authentication)
+            } else {
+                usernameField?.node?.autofillId?.let { id ->
+                    dataset.setValue(id, AutofillValue.forText(credential.username))
+                }
+                passwordField?.node?.autofillId?.let { id ->
+                    dataset.setValue(id, AutofillValue.forText(credential.password))
+                }
             }
             response.addDataset(dataset.build())
         }
@@ -89,6 +109,25 @@ class IlyroAutofillService : AutofillService() {
         callback.onSuccess(response.build())
     }
 
+    private fun unlockIntentSender(
+        credential: PasswordCredential,
+        usernameId: AutofillId?,
+        passwordId: AutofillId?,
+        requestCode: Int
+    ): IntentSender? {
+        val keyguard = getSystemService(KeyguardManager::class.java) ?: return null
+        if (!keyguard.isDeviceSecure) return null
+
+        val intent = AutofillUnlockActivity.intentFor(this, credential.guid, usernameId, passwordId)
+        var flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_CANCEL_CURRENT
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            flags = flags or PendingIntent.FLAG_MUTABLE
+        }
+        return runCatching {
+            PendingIntent.getActivity(this, requestCode, intent, flags).intentSender
+        }.getOrNull()
+    }
+
     override fun onSaveRequest(request: SaveRequest, callback: SaveCallback) {
         val structure = request.fillContexts.lastOrNull()?.structure
         if (structure == null) {
@@ -97,9 +136,9 @@ class IlyroAutofillService : AutofillService() {
         }
 
         val candidates = collectCandidates(structure)
-        val domain = candidates.firstNotNullOfOrNull { it.domain }
         val usernameField = candidates.firstOrNull { isUsernameField(it.node) }
         val passwordField = candidates.firstOrNull { isPasswordField(it.node) }
+        val domain = autofillDomainFor(passwordField?.domain, usernameField?.domain)
         val username = usernameField?.node?.autofillValue?.textValue?.toString()
             ?.trim()
             .orEmpty()
@@ -192,4 +231,19 @@ class IlyroAutofillService : AutofillService() {
         const val TAG = "ILYRO.Autofill"
         const val MAX_DATASETS = 10
     }
+}
+
+/**
+ * Resolves the single web domain a fill/save request belongs to.
+ *
+ * A request is only trusted when the username and password fields agree on their domain. That
+ * keeps a third-party frame on the page from receiving a credential saved for the top-level site.
+ */
+internal fun autofillDomainFor(passwordDomain: String?, usernameDomain: String?): String? {
+    val password = passwordDomain?.trim()?.takeIf { it.isNotBlank() }
+    val username = usernameDomain?.trim()?.takeIf { it.isNotBlank() }
+    if (password != null && username != null && !password.equals(username, ignoreCase = true)) {
+        return null
+    }
+    return password ?: username
 }

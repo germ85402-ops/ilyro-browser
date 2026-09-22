@@ -103,10 +103,12 @@ internal object TabSessionStore {
             activeIndex = activeIndex.coerceIn(0, safeUrls.lastIndex)
         )
 
-        writer.submit {
-            pendingSave.set(null)
-            persist(snapshot)
-        }.get()
+        awaitStoreWrite(
+            writer.submit {
+                pendingSave.set(null)
+                persist(snapshot)
+            }
+        )
     }
 
     private fun scheduleWriter() {

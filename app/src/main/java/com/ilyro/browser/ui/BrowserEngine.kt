@@ -36,6 +36,13 @@ internal object BrowserEngine {
     @Volatile
     private var runtime: GeckoRuntime? = null
 
+    /**
+     * The already-created Gecko runtime, or `null` before Gecko has started. Callers must not
+     * create the runtime through this accessor; it exists so auxiliary requests (such as site
+     * icons) can reuse Gecko's network stack, content blocking and private-browsing isolation.
+     */
+    fun runtimeOrNull(): GeckoRuntime? = runtime
+
     // MainActivity owns uiMode changes because it intentionally handles them without recreating
     // the Gecko host. Expose the current system appearance as Compose state so the browser UI,
     // Gecko runtime and already-open pages observe the same change immediately.
@@ -228,6 +235,18 @@ internal object BrowserEngine {
             .setCookieBehaviorPrivateMode(
                 ContentBlocking.CookieBehavior.ACCEPT_FIRST_PARTY_AND_ISOLATE_OTHERS
             )
+        // The protection UI promises tracker blocking, so enable Gecko's tracking protection
+        // categories explicitly instead of relying on cookie behavior alone.
+        currentRuntime.settings.contentBlocking
+            .setAntiTracking(
+                ContentBlocking.AntiTracking.AD or
+                    ContentBlocking.AntiTracking.ANALYTIC or
+                    ContentBlocking.AntiTracking.SOCIAL or
+                    ContentBlocking.AntiTracking.CRYPTOMINING or
+                    ContentBlocking.AntiTracking.FINGERPRINTING or
+                    ContentBlocking.AntiTracking.STP
+            )
+            .setStrictSocialTrackingProtection(true)
     }
 
     private fun withPrivateBrowsingAllowed(
