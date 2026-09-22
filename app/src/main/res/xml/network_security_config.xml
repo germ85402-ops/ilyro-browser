@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ILYRO's own Java/Kotlin network code (site icons, search suggestions, Drive sync) must always
+  use TLS. Web page loading is handled by GeckoView's own network stack, which is not affected by
+  this policy, so plain-HTTP websites keep working and remain governed by the HTTPS-only setting.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

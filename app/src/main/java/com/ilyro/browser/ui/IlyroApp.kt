@@ -195,25 +195,6 @@ internal data class BrowserTopNotice(
     val actionLabel: String? = null
 )
 
-private data class PendingNewTabRequest(
-    val sourceTabId: String,
-    val uri: String,
-    val result: GeckoResult<GeckoSession>
-)
-
-private data class LinkContextMenuRequest(
-    val sourceTabId: String,
-    val url: String,
-    val title: String?
-)
-
-private data class RestorableTabSnapshot(
-    val ids: List<String>,
-    val urls: List<String>,
-    val states: List<String?>,
-    val metadata: List<TabSessionMetadata>
-)
-
 private fun ensureDownloadNotificationPermission(context: Context) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
     val activity = context.findActivity() ?: return
@@ -2035,6 +2016,8 @@ private fun BrowserScreen(
 
     SitePermissionPromptHost()
 
+    ExtensionPermissionPromptHost()
+
     val openedNewTabMessage = tr("Opened in new tab", "Открыто в новой вкладке")
     val openedPrivateTabMessage = tr("Opened in private tab", "Открыто в приватной вкладке")
     val linkCopiedMessage = tr("Link copied", "Ссылка скопирована")
@@ -2973,51 +2956,4 @@ private tailrec fun Context.findActivity(): Activity? = when (this) {
     is Activity -> this
     is ContextWrapper -> baseContext.findActivity()
     else -> null
-}
-
-private fun requestHighFrameRateTree(view: View) {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return
-
-    view.setRequestedFrameRate(View.REQUESTED_FRAME_RATE_CATEGORY_HIGH)
-
-    if (view is ViewGroup) {
-        for (index in 0 until view.childCount) {
-            requestHighFrameRateTree(view.getChildAt(index))
-        }
-    }
-}
-
-private fun siteHost(url: String): String {
-    if (url == HOME_URL) return ""
-    return runCatching {
-        Uri.parse(url).host?.lowercase()?.removePrefix("www.")
-    }.getOrNull()?.takeIf { it.isNotBlank() } ?: ""
-}
-
-private fun hostLabel(url: String): String {
-    if (url == HOME_URL) return "ILYRO Home"
-
-    return siteHost(url).ifBlank { "New tab" }
-}
-
-private fun normalizeAddress(
-    input: String,
-    searchEngine: SearchEngine,
-    customSearchEngine: CustomSearchEngine? = null
-): String {
-    val value = input.trim()
-
-    if (value.isEmpty()) return HOME_URL
-    if (value.startsWith("https://") || value.startsWith("http://")) return value
-
-    val looksLikeHost = !value.contains(' ') && value.contains('.')
-    if (looksLikeHost) return "https://$value"
-
-    val query = URLEncoder.encode(value, StandardCharsets.UTF_8.toString())
-    val queryTemplate = customSearchEngine?.queryUrlTemplate
-    return if (queryTemplate != null) {
-        queryTemplate.replace("%s", query)
-    } else {
-        searchEngine.queryUrl + query
-    }
 }

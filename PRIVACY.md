@@ -41,6 +41,20 @@ When the user performs a search, the query is sent to the search provider select
 
 Private tabs are designed not to expose local browsing-history suggestions or send remote suggestion queries through ILYRO's omnibox suggestion feature.
 
+## Site icons
+
+Site icons (favicons) are requested from the site itself over HTTPS, through GeckoView's network
+stack when it is available, so the requests follow the same content blocking, cookie isolation and
+private-browsing isolation as normal page loads. ILYRO does not send visited addresses to a
+third-party icon service.
+
+## Saved passwords and Autofill
+
+When ILYRO serves the Android Autofill service, credentials are matched against the exact origin of
+the field being filled, and the actual username and password are released only after the user
+confirms the device screen lock. Requests whose username and password fields disagree about their
+domain are refused.
+
 ## Google account and Google Drive sync
 
 Google account features are optional. When the user chooses to sign in and authorize sync, ILYRO can use Google authentication and the Google Drive `appDataFolder` area to upload and restore an ILYRO browser snapshot.

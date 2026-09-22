@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.26.0-rc16 — release candidate
+
+- Require screen-lock confirmation before Autofill releases a saved password, fail closed if the confirmation flow cannot launch, and match credentials to the domain of the field being filled.
+- Keep site-icon requests first-party, private-tab aware, bounded, and isolated from page paths and queries; preserve non-default ports and reject cross-origin redirects in the fallback loader.
+- Show explicit WebExtension permission prompts and bind each response to the exact request, preventing one prompt from approving another request.
+- Keep ILYRO's own network requests on TLS and enable Gecko tracking protection explicitly.
+- Wait for Drive restore writes off the UI thread before reading restored tabs, preventing old queued data from overwriting the restored snapshot.
+- Reject unexpected restored APK-install URIs and include the remote sync snapshot validation fix.
+
 ## 0.26.0-rc15 — release candidate
 
 - Size the YouTube fullscreen video container against the viewport instead of the shorter intermediate player, fixing the top-aligned video and bottom gap confirmed by on-device geometry diagnostics.

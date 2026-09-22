@@ -63,9 +63,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
-import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.time.LocalDate
@@ -614,24 +611,6 @@ private object HistoryFaviconCache {
     }
 }
 
-private suspend fun fetchHistoryFavicon(siteUrl: String): Bitmap? = withContext(Dispatchers.IO) {
-    runCatching {
-        val encoded = URLEncoder.encode(siteUrl, StandardCharsets.UTF_8.toString())
-        val connection = (
-            URL("https://www.google.com/s2/favicons?sz=128&domain_url=$encoded")
-                .openConnection() as HttpURLConnection
-            ).apply {
-            connectTimeout = 3000
-            readTimeout = 3000
-            instanceFollowRedirects = true
-            requestMethod = "GET"
-            setRequestProperty("User-Agent", "ILYRO Android")
-        }
-        try {
-            if (connection.responseCode !in 200..299) return@runCatching null
-            connection.inputStream.use(BitmapFactory::decodeStream)
-        } finally {
-            connection.disconnect()
-        }
-    }.getOrNull()
-}
+private suspend fun fetchHistoryFavicon(siteUrl: String): Bitmap? =
+    withContext(Dispatchers.IO) { SiteIconFetcher.fetch(siteUrl) }
+

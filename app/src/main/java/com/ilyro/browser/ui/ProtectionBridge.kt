@@ -17,6 +17,7 @@ import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.Image
 import org.mozilla.geckoview.WebExtension
 import org.mozilla.geckoview.WebExtensionController
+import java.util.concurrent.atomic.AtomicLong
 
 internal data class InstalledExtensionUi(
     val id: String,
@@ -35,11 +36,17 @@ internal enum class ExtensionPermissionPromptKind {
 }
 
 internal data class ExtensionInstallPermissionRequest(
+    val requestId: Long,
     val extensionName: String,
     val permissions: List<String>,
     val origins: List<String>,
     val dataCollectionPermissions: List<String>,
     val kind: ExtensionPermissionPromptKind
+)
+
+private data class PendingExtensionPermissionPrompt(
+    val request: ExtensionInstallPermissionRequest,
+    val respond: (Boolean) -> Unit
 )
 
 /**
@@ -110,12 +117,16 @@ internal object ProtectionBridge {
         )
     }
 
+    // Gecko delivers install prompts on its own thread, so these gates must be visible there.
+    @Volatile
     private var allowNextInstallPrompt = false
+
+    @Volatile
     private var interactiveInstallPrompt = false
-    private var pendingInstallPermissionResult:
-        GeckoResult<WebExtension.PermissionPromptResponse>? = null
-    private var pendingRuntimePermissionResult: GeckoResult<AllowOrDeny>? = null
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val permissionPromptLock = Any()
+    private val permissionPromptSequence = AtomicLong(0L)
+    private var activePermissionPrompt: PendingExtensionPermissionPrompt? = null
 
     var pendingInstallPermissionRequest by mutableStateOf<ExtensionInstallPermissionRequest?>(null)
         private set
@@ -201,21 +212,19 @@ internal object ProtectionBridge {
             if (!allowedToProceed) {
                 return GeckoResult.fromValue(permissionResponse(false))
             }
-            if (!interactiveInstallPrompt &&
-                permissions.isEmpty() &&
+            // Only a request that asks for nothing may be granted without the user seeing it.
+            // Everything else has to go through the visible permission prompt, even during the
+            // queued onboarding installs.
+            if (permissions.isEmpty() &&
                 origins.isEmpty() &&
                 dataCollectionPermissions.isEmpty()
             ) {
                 return GeckoResult.fromValue(permissionResponse(true))
             }
-            if (!interactiveInstallPrompt) {
-                return GeckoResult.fromValue(permissionResponse(true))
-            }
 
-            pendingInstallPermissionResult?.complete(permissionResponse(false))
             val result = GeckoResult<WebExtension.PermissionPromptResponse>()
-            pendingInstallPermissionResult = result
             val request = ExtensionInstallPermissionRequest(
+                requestId = permissionPromptSequence.incrementAndGet(),
                 extensionName = extension.metaData.name
                     ?.takeIf { it.isNotBlank() }
                     ?: extension.id,
@@ -226,8 +235,8 @@ internal object ProtectionBridge {
                     .filter(String::isNotBlank),
                 kind = ExtensionPermissionPromptKind.INSTALL
             )
-            mainHandler.post {
-                pendingInstallPermissionRequest = request
+            showExtensionPermissionPrompt(request) { approved ->
+                result.complete(permissionResponse(approved))
             }
             return result
         }
@@ -270,12 +279,9 @@ internal object ProtectionBridge {
         dataCollectionPermissions: Array<out String>,
         kind: ExtensionPermissionPromptKind
     ): GeckoResult<AllowOrDeny> {
-        pendingRuntimePermissionResult?.complete(AllowOrDeny.DENY)
-        pendingRuntimePermissionResult = GeckoResult<AllowOrDeny>()
-        val result = pendingRuntimePermissionResult!!
-
-        mainHandler.post {
-            pendingInstallPermissionRequest = ExtensionInstallPermissionRequest(
+        val result = GeckoResult<AllowOrDeny>()
+        val request = ExtensionInstallPermissionRequest(
+                requestId = permissionPromptSequence.incrementAndGet(),
                 extensionName = extension.metaData.name
                     ?.takeIf { it.isNotBlank() }
                     ?: extension.id,
@@ -286,8 +292,30 @@ internal object ProtectionBridge {
                     .filter(String::isNotBlank),
                 kind = kind
             )
+        showExtensionPermissionPrompt(request) { approved ->
+            result.complete(if (approved) AllowOrDeny.ALLOW else AllowOrDeny.DENY)
         }
         return result
+    }
+
+    private fun showExtensionPermissionPrompt(
+        request: ExtensionInstallPermissionRequest,
+        respond: (Boolean) -> Unit
+    ) {
+        val previous = synchronized(permissionPromptLock) {
+            activePermissionPrompt.also {
+                activePermissionPrompt = PendingExtensionPermissionPrompt(request, respond)
+            }
+        }
+        // A newer Gecko request replaces the visible prompt; reject the old request immediately
+        // so a later tap cannot approve permissions that are no longer shown.
+        previous?.respond?.invoke(false)
+        mainHandler.post {
+            val stillActive = synchronized(permissionPromptLock) {
+                activePermissionPrompt?.request?.requestId == request.requestId
+            }
+            if (stillActive) pendingInstallPermissionRequest = request
+        }
     }
 
     private fun syncUserExtensionFromAddonManager(extension: WebExtension) {
@@ -815,26 +843,30 @@ internal object ProtectionBridge {
         return true
     }
 
-    fun respondToInstallPermissionPrompt(approved: Boolean) {
-        val installResult = pendingInstallPermissionResult
-        val runtimeResult = pendingRuntimePermissionResult
-        pendingInstallPermissionResult = null
-        pendingRuntimePermissionResult = null
-        pendingInstallPermissionRequest = null
+    fun respondToInstallPermissionPrompt(requestId: Long, approved: Boolean) {
+        val pending = synchronized(permissionPromptLock) {
+            val current = activePermissionPrompt
+            if (current?.request?.requestId != requestId) return
+            activePermissionPrompt = null
+            current
+        }
+        mainHandler.post {
+            if (pendingInstallPermissionRequest?.requestId == requestId) {
+                pendingInstallPermissionRequest = null
+            }
+        }
         interactiveInstallPrompt = false
-
-        installResult?.complete(permissionResponse(approved))
-        runtimeResult?.complete(if (approved) AllowOrDeny.ALLOW else AllowOrDeny.DENY)
+        pending.respond(approved)
     }
 
     private fun cancelInstallPermissionPrompt() {
-        if (
-            pendingInstallPermissionResult != null ||
-            pendingRuntimePermissionResult != null ||
-            pendingInstallPermissionRequest != null
-        ) {
-            respondToInstallPermissionPrompt(false)
+        val requestId = synchronized(permissionPromptLock) {
+            activePermissionPrompt?.request?.requestId
+        }
+        if (requestId != null) {
+            respondToInstallPermissionPrompt(requestId, false)
         } else {
+            mainHandler.post { pendingInstallPermissionRequest = null }
             interactiveInstallPrompt = false
         }
     }

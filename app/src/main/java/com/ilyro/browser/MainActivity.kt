@@ -7,6 +7,7 @@ import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
+import android.util.Log
 import android.os.Bundle
 import android.view.MotionEvent
 import android.view.View
@@ -432,10 +433,35 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
         val pendingUri = browserPrefs.getString("pending_apk_install_uri_v1", null) ?: return
         browserPrefs.edit().remove("pending_apk_install_uri_v1").apply()
         val uri = runCatching { Uri.parse(pendingUri) }.getOrNull() ?: return
+        if (!isOwnDownloadUri(uri)) {
+            Log.w("ILYRO-Install", "Ignored a pending install for an unexpected URI authority.")
+            return
+        }
         val installIntent = Intent(Intent.ACTION_VIEW)
             .setDataAndType(uri, "application/vnd.android.package-archive")
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         runCatching { startActivity(installIntent) }
+    }
+
+    /**
+     * Only a file that ILYRO itself downloaded may be handed to the package installer. The
+     * pending URI is restored from storage, so its authority is verified instead of trusted.
+     */
+    private fun isOwnDownloadUri(uri: Uri): Boolean {
+        val authority = uri.authority?.lowercase().orEmpty()
+        return when (uri.scheme?.lowercase()) {
+            "content" -> authority == "${packageName.lowercase()}.fileprovider" ||
+                authority == "downloads" ||
+                authority == "media" ||
+                authority.startsWith("com.android.providers.downloads")
+            "file" -> uri.path?.let { path ->
+                path.startsWith(filesDir.absolutePath) ||
+                    path.startsWith(cacheDir.absolutePath) ||
+                    path.startsWith("/storage/emulated/0/Download/") ||
+                    path.startsWith("/sdcard/Download/")
+            } == true
+            else -> false
+        }
     }
 
     private fun applySystemChrome() {
