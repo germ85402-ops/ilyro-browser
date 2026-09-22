@@ -115,7 +115,7 @@ internal object NativeBrowserHostCoordinator {
         }
     }
 
-    /** Restore input/display visibility after a transient Android focus change. */
+    /** Restore display visibility after a transient Android focus change. */
     fun restoreVisible() {
         val host = hostRef.get() ?: return
         host.visibility = View.VISIBLE

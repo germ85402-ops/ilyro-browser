@@ -1021,6 +1021,29 @@ private fun BrowserScreen(
             } else {
                 activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
                 controller.show(WindowInsetsCompat.Type.systemBars())
+                // Fullscreen exit can briefly leave the old landscape/inset geometry attached to
+                // GeckoView. Re-apply the normal window bounds before the orientation callback
+                // arrives; otherwise mobile video may remain pinned to the top edge.
+                activity.window.decorView.requestLayout()
+                ViewCompat.requestApplyInsets(activity.window.decorView)
+                currentGeckoView?.let { view ->
+                    view.requestLayout()
+                    ViewCompat.requestApplyInsets(view)
+                    view.invalidate()
+                }
+
+                // Returning from a web fullscreen element must never reopen an HTML/omnibox IME
+                // that Gecko retained while the Activity was rotating. Hide it again after the
+                // system bars have been restored, without changing the user's page focus state.
+                val hideIme = {
+                    controller.hide(WindowInsetsCompat.Type.ime())
+                    (activity.getSystemService(Context.INPUT_METHOD_SERVICE) as?
+                        android.view.inputmethod.InputMethodManager)
+                        ?.hideSoftInputFromWindow(activity.window.decorView.windowToken, 0)
+                }
+                hideIme()
+                activity.window.decorView.post { hideIme() }
+                activity.window.decorView.postDelayed({ hideIme() }, 160L)
                 controller.isAppearanceLightStatusBars = !darkTheme
                 controller.isAppearanceLightNavigationBars = !darkTheme
 

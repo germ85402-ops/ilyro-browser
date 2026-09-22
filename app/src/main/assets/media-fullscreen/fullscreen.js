@@ -23,26 +23,18 @@
      */
     html.ilyro-youtube-fullscreen :fullscreen {
       background-color: transparent !important;
-      position: fixed !important;
-      inset: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      min-width: 100vw !important;
-      min-height: 100vh !important;
-      max-width: none !important;
-      max-height: none !important;
-      margin: 0 !important;
     }
 
     html.ilyro-youtube-fullscreen :fullscreen .html5-video-container {
       position: absolute !important;
       inset: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      min-width: 100vw !important;
-      min-height: 100vh !important;
-      max-width: none !important;
-      max-height: none !important;
+      width: 100% !important;
+      height: 100% !important;
+      min-width: 0 !important;
+      min-height: 0 !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
+      box-sizing: border-box !important;
       margin: 0 !important;
       overflow: hidden !important;
       display: flex !important;

@@ -383,7 +383,6 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
             view.getSession()?.let { session ->
                 runCatching {
                     session.setActive(true)
-                    session.setFocused(true)
                     session.setPriorityHint(GeckoSession.PRIORITY_HIGH)
                     view.requestLayout()
                     ViewCompat.requestApplyInsets(view)
