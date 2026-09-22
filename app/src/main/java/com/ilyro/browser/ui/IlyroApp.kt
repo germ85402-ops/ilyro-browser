@@ -991,6 +991,20 @@ private fun BrowserScreen(
             )
             val isPhone = activity.resources.configuration.smallestScreenWidthDp < 600
 
+            // Fullscreen transitions can preserve a stale editable Gecko focus across an
+            // orientation/display change. Hide the IME explicitly, but do not steal Gecko
+            // session focus: media controls and playback remain attached to the active page.
+            fun hideFullscreenTransitionIme() {
+                focusManager.clearFocus(force = true)
+                addressFocused = false
+                controller.hide(WindowInsetsCompat.Type.ime())
+                (context.getSystemService(Context.INPUT_METHOD_SERVICE) as?
+                    android.view.inputmethod.InputMethodManager)
+                    ?.hideSoftInputFromWindow(activity.window.decorView.windowToken, 0)
+            }
+            hideFullscreenTransitionIme()
+            activity.window.decorView.post { hideFullscreenTransitionIme() }
+
             if (isFullScreen) {
                 activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
                 controller.systemBarsBehavior =
@@ -1023,6 +1037,11 @@ private fun BrowserScreen(
                 controller.show(WindowInsetsCompat.Type.systemBars())
                 controller.isAppearanceLightStatusBars = !darkTheme
                 controller.isAppearanceLightNavigationBars = !darkTheme
+
+                // Orientation restoration happens asynchronously on phones. Re-hide any IME
+                // that Android may try to resurrect from the old fullscreen focus snapshot.
+                activity.window.decorView.postDelayed({ hideFullscreenTransitionIme() }, 120L)
+                activity.window.decorView.postDelayed({ hideFullscreenTransitionIme() }, 320L)
 
                 if (isPhone && fullscreenForcedLandscape) {
                     activity.requestedOrientation =
