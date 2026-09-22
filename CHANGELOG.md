@@ -11,6 +11,11 @@
 - Show the WebExtension permission prompt for every install that requests permissions, including the onboarding queue, and never approve such a request silently.
 - Verify that a restored pending APK install URI belongs to ILYRO's own download locations before invoking the package installer.
 
+### Changed
+
+- Split `DownloadController.kt` into the controller plus `DownloadNaming.kt` and `DownloadModels.kt`, and move the browser screen's request/snapshot models and view/address helpers into `BrowserScreenModels.kt` and `BrowserScreenSupport.kt`.
+- Document that `TabSessionStore` intentionally ignores an empty tab list, because ILYRO always keeps at least one tab open.
+
 ### Fixed
 
 - Show a permission dialog for WebExtension installs so an install that requests permissions no longer stays pending forever with no user-visible prompt.

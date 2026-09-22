@@ -64,6 +64,15 @@ internal object TabSessionStore {
         )
     }
 
+    /**
+     * Queues a coalesced snapshot of the normal (non-private) tabs.
+     *
+     * ILYRO always keeps at least one tab open: closing the last tab immediately replaces it with
+     * a new home tab, so an empty list means "no snapshot is available yet" (for example during
+     * startup) rather than "the user closed everything". Such a call is ignored on purpose so a
+     * transient empty state cannot wipe a restorable session. Callers that genuinely want to drop
+     * the stored session must pass the tab that replaced it.
+     */
     fun save(
         prefs: SharedPreferences,
         urls: List<String>,
@@ -86,6 +95,8 @@ internal object TabSessionStore {
      * Replaces the persisted normal-tab snapshot and waits for the single writer queue to flush.
      * Drive restore uses this before Activity recreation so an older queued tab save cannot race
      * and overwrite the restored URLs/groups/pins.
+     *
+     * As in [save], an empty list is ignored because ILYRO never holds zero tabs.
      */
     fun saveNow(
         prefs: SharedPreferences,
