@@ -1,0 +1,27 @@
+name: Publish rc11 tag once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-rc11-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create v0.26.0-rc11 tag once
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v0.26.0-rc11" >/dev/null 2>&1; then
+            echo "Tag already exists."
+            exit 0
+          fi
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f ref='refs/tags/v0.26.0-rc11' \
+            -f sha="$GITHUB_SHA"
