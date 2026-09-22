@@ -66,6 +66,7 @@ class IlyroAutofillService : AutofillService() {
         }
 
         val response = FillResponse.Builder()
+        val deviceIsSecure = getSystemService(KeyguardManager::class.java)?.isDeviceSecure == true
         credentials.take(MAX_DATASETS).forEachIndexed { index, credential ->
             val presentation = RemoteViews(packageName, android.R.layout.simple_list_item_1).apply {
                 setTextViewText(
@@ -76,23 +77,32 @@ class IlyroAutofillService : AutofillService() {
             val dataset = Dataset.Builder(presentation)
             // The saved password itself is never handed to the requesting app until the user has
             // confirmed the device screen lock, so a hostile app cannot silently harvest it.
-            val authentication = unlockIntentSender(
-                credential = credential,
-                usernameId = usernameField?.node?.autofillId,
-                passwordId = passwordField?.node?.autofillId,
-                requestCode = index
-            )
-            if (authentication != null) {
-                usernameField?.node?.autofillId?.let { id -> dataset.setValue(id, null) }
-                passwordField?.node?.autofillId?.let { id -> dataset.setValue(id, null) }
-                dataset.setAuthentication(authentication)
+            val authentication = if (deviceIsSecure) {
+                unlockIntentSender(
+                    credential = credential,
+                    usernameId = usernameField?.node?.autofillId,
+                    passwordId = passwordField?.node?.autofillId,
+                    requestCode = index
+                )
             } else {
-                usernameField?.node?.autofillId?.let { id ->
-                    dataset.setValue(id, AutofillValue.forText(credential.username))
+                null
+            }
+            when (autofillAuthorizationDecision(deviceIsSecure, authentication != null)) {
+                AutofillAuthorizationDecision.REQUIRE_DEVICE_CONFIRMATION -> {
+                    val confirmation = authentication ?: return@forEachIndexed
+                    usernameField?.node?.autofillId?.let { id -> dataset.setValue(id, null) }
+                    passwordField?.node?.autofillId?.let { id -> dataset.setValue(id, null) }
+                    dataset.setAuthentication(confirmation)
                 }
-                passwordField?.node?.autofillId?.let { id ->
-                    dataset.setValue(id, AutofillValue.forText(credential.password))
+                AutofillAuthorizationDecision.DIRECT_FILL -> {
+                    usernameField?.node?.autofillId?.let { id ->
+                        dataset.setValue(id, AutofillValue.forText(credential.username))
+                    }
+                    passwordField?.node?.autofillId?.let { id ->
+                        dataset.setValue(id, AutofillValue.forText(credential.password))
+                    }
                 }
+                AutofillAuthorizationDecision.SUPPRESS_CREDENTIAL -> return@forEachIndexed
             }
             response.addDataset(dataset.build())
         }
@@ -115,9 +125,6 @@ class IlyroAutofillService : AutofillService() {
         passwordId: AutofillId?,
         requestCode: Int
     ): IntentSender? {
-        val keyguard = getSystemService(KeyguardManager::class.java) ?: return null
-        if (!keyguard.isDeviceSecure) return null
-
         val intent = AutofillUnlockActivity.intentFor(this, credential.guid, usernameId, passwordId)
         var flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_CANCEL_CURRENT
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

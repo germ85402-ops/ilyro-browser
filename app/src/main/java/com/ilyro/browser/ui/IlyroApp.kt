@@ -123,6 +123,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextRange
@@ -773,6 +774,7 @@ private fun BrowserScreen(
     var textScaleReloadRevision by remember { mutableIntStateOf(0) }
     var fullscreenForcedLandscape by remember { mutableStateOf(false) }
     var fullscreenPreviousOrientation by remember { mutableStateOf<Int?>(null) }
+    var fullscreenImeState by remember { mutableStateOf(false) }
     val pageTransitionColor = MaterialTheme.colorScheme.background.toArgb()
 
     SideEffect {
@@ -781,6 +783,7 @@ private fun BrowserScreen(
 
     val activeTab = tabs.firstOrNull { it.id == activeTabId } ?: tabs.first()
     val isFullScreen = activeTab.isFullScreen
+    val displayConfiguration = LocalConfiguration.current
     var addressText by remember(activeTabId) {
         mutableStateOf(if (activeTab.url == HOME_URL) "" else activeTab.url)
     }
@@ -964,15 +967,43 @@ private fun BrowserScreen(
         }
     }
 
-    LaunchedEffect(isFullScreen, darkTheme) {
+    LaunchedEffect(
+        isFullScreen,
+        darkTheme,
+        displayConfiguration.orientation,
+        displayConfiguration.screenWidthDp,
+        displayConfiguration.screenHeightDp
+    ) {
         context.findActivity()?.let { activity ->
             val controller = WindowCompat.getInsetsController(
                 activity.window,
                 activity.window.decorView
             )
             val isPhone = activity.resources.configuration.smallestScreenWidthDp < 600
+            // Fullscreen transitions can preserve a stale editable Gecko focus across an
+            // orientation/display change. Hide the IME explicitly, but do not steal Gecko
+            // session focus: media controls and playback remain attached to the active page.
+            fun hideFullscreenTransitionIme() {
+                focusManager.clearFocus(force = true)
+                addressFocused = false
+                controller.hide(WindowInsetsCompat.Type.ime())
+                (context.getSystemService(Context.INPUT_METHOD_SERVICE) as?
+                    android.view.inputmethod.InputMethodManager)
+                    ?.hideSoftInputFromWindow(activity.window.decorView.windowToken, 0)
+            }
+            val fullscreenTransition = fullscreenImeState != isFullScreen
+            fullscreenImeState = isFullScreen
+            if (fullscreenTransition) {
+                hideFullscreenTransitionIme()
+                activity.window.decorView.post { hideFullscreenTransitionIme() }
+            }
 
             if (isFullScreen) {
+                // GeckoView is Activity-owned, while the normal page rectangle comes from
+                // Compose. During forced phone rotation Compose can briefly keep portrait bounds;
+                // pin Gecko to the complete native root for the whole fullscreen lifetime.
+                NativeBrowserHostCoordinator.setFullscreenBounds(true)
+
                 activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
                 controller.systemBarsBehavior =
                     WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -981,16 +1012,10 @@ private fun BrowserScreen(
                 activity.window.decorView.requestLayout()
                 currentGeckoView?.let { view ->
                     view.requestLayout()
+                    ViewCompat.requestApplyInsets(activity.window.decorView)
+                    ViewCompat.requestApplyInsets(view)
+                    view.setVerticalClipping(0)
                     view.invalidate()
-                    delay(180L)
-                    if (activeTab.isFullScreen && currentGeckoView === view) {
-                        activity.window.decorView.requestLayout()
-                        view.requestLayout()
-                        ViewCompat.requestApplyInsets(activity.window.decorView)
-                        ViewCompat.requestApplyInsets(view)
-                        view.setVerticalClipping(0)
-                        view.invalidate()
-                    }
                 }
 
                 if (isPhone && !fullscreenForcedLandscape) {
@@ -1005,6 +1030,13 @@ private fun BrowserScreen(
                 controller.isAppearanceLightStatusBars = !darkTheme
                 controller.isAppearanceLightNavigationBars = !darkTheme
 
+                // Some Android builds may briefly restore the previous web input connection
+                // while system bars are returning. Re-hide the IME only for this transition.
+                if (fullscreenTransition) {
+                    activity.window.decorView.postDelayed({ hideFullscreenTransitionIme() }, 120L)
+                    activity.window.decorView.postDelayed({ hideFullscreenTransitionIme() }, 320L)
+                }
+
                 if (isPhone && fullscreenForcedLandscape) {
                     activity.requestedOrientation =
                         fullscreenPreviousOrientation
@@ -1012,6 +1044,16 @@ private fun BrowserScreen(
                     fullscreenPreviousOrientation = null
                     fullscreenForcedLandscape = false
                 }
+
+                // Resume normal Compose-owned browser geometry. setEngineBounds kept the latest
+                // placeholder rectangle even while fullscreen was overriding the visible host.
+                NativeBrowserHostCoordinator.setFullscreenBounds(false)
+            }
+
+            // Run after the current fullscreen/orientation transaction so the Compose content
+            // rectangle and native Gecko host converge on the final landscape/portrait bounds.
+            activity.window.decorView.post {
+                NativeBrowserHostCoordinator.requestLayoutAfterConfigurationChange()
             }
         }
     }
@@ -1045,7 +1087,12 @@ private fun BrowserScreen(
                         }
                     }
                     Lifecycle.Event.ON_PAUSE -> {
-                        tabs.forEach { it.setFocused(false) }
+                        val keepPlayingSessionFocused = GeckoMediaSessionBridge.hasPlayingPlayback()
+                        tabs.forEach { candidate ->
+                            if (candidate.id != activeTabId || !keepPlayingSessionFocused) {
+                                candidate.setFocused(false)
+                            }
+                        }
                     }
                     Lifecycle.Event.ON_STOP -> {
                         tabs.filterNot { it.isPrivate }.forEach { candidate ->

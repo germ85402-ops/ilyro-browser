@@ -90,11 +90,9 @@ private object TabletFaviconCache {
 }
 
 private fun faviconOrigin(pageUrl: String): String {
-    val parsed = runCatching { Uri.parse(pageUrl) }.getOrNull() ?: return ""
-    val host = parsed.host?.trim()?.lowercase().orEmpty()
-    val scheme = parsed.scheme?.lowercase()
-    if (host.isBlank() || (scheme != "http" && scheme != "https")) return ""
-    return "$scheme://$host"
+    return SiteIconFetcher.iconUrl(pageUrl)
+        ?.removeSuffix("/favicon.ico")
+        .orEmpty()
 }
 
 private suspend fun loadTabletFavicon(pageUrl: String, isPrivate: Boolean): Bitmap? {

@@ -122,6 +122,9 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
     private lateinit var browserPrefs: SharedPreferences
     private var externalMediaHandoffPending = false
     private var externalMediaRestoreScheduled = false
+    private var mediaWindowFocusRestoreScheduled = false
+    private var lostFocusDuringMediaPlayback = false
+    private var lastDisplayConfigurationKey = ""
 
     private val sitePermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -140,6 +143,7 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
         setTheme(R.style.Theme_ILYRO_Starting)
         installSplashScreen()
         super.onCreate(savedInstanceState)
+        lastDisplayConfigurationKey = displayConfigurationKey(resources.configuration)
 
         // Avoid double IME resizing on edge-to-edge Android 11+: Compose animates the
         // keyboard inset itself. Pre-R devices keep the proven adjustResize fallback.
@@ -258,21 +262,53 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus && GeckoMediaSessionBridge.hasPlayingPlayback()) {
+            lostFocusDuringMediaPlayback = true
+        }
         if (hasFocus && ::browserPrefs.isInitialized) {
             applySystemChrome()
             window.decorView.post { applySystemChrome() }
         }
         if (hasFocus && externalMediaHandoffPending) {
+            lostFocusDuringMediaPlayback = false
             scheduleExternalMediaRestore()
+        } else if (hasFocus && lostFocusDuringMediaPlayback) {
+            lostFocusDuringMediaPlayback = false
+            scheduleMediaWindowFocusRestore()
         }
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        val previousDisplayKey = lastDisplayConfigurationKey
+        val nextDisplayKey = displayConfigurationKey(newConfig)
+        lastDisplayConfigurationKey = nextDisplayKey
         BrowserEngine.updateSystemDarkTheme(newConfig)
         if (::browserPrefs.isInitialized) {
             applySystemChrome()
             window.decorView.post { applySystemChrome() }
+
+            // configChanges keeps the Activity and GeckoSession alive during phone fullscreen
+            // rotation. Re-measure the complete host hierarchy, not only the Gecko surface.
+            NativeBrowserHostCoordinator.requestLayoutAfterConfigurationChange()
+            window.decorView.postDelayed({
+                NativeBrowserHostCoordinator.requestLayoutAfterConfigurationChange()
+            }, 120L)
+
+            if (
+                previousDisplayKey.isNotBlank() &&
+                    previousDisplayKey != nextDisplayKey &&
+                    GeckoMediaSessionBridge.hasPlayingPlayback()
+            ) {
+                // GeckoView already owns its compositor across handled configuration changes.
+                // Recreating the display here can momentarily detach the video surface and make
+                // YouTube pause/buffer. Keep the surface attached and only refresh layout/insets.
+                window.decorView.post {
+                    if (!hasWindowFocus()) return@post
+                    NativeBrowserHostCoordinator.restoreVisible()
+                    restoreAttachedGeckoSurface(window.decorView)
+                }
+            }
         }
     }
 
@@ -309,22 +345,61 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
     private fun scheduleExternalMediaRestore() {
         if (externalMediaRestoreScheduled) return
         externalMediaRestoreScheduled = true
-        window.decorView.postDelayed({
-            externalMediaRestoreScheduled = false
-            if (!externalMediaHandoffPending || !hasWindowFocus()) return@postDelayed
-            NativeBrowserHostCoordinator.recreateDisplay()
-            restoreAttachedGecko(window.decorView)
-            NativeBrowserHostCoordinator.clearExternalMediaHandoff()
-            externalMediaHandoffPending = false
-        }, 100L)
+        fun restoreAfter(delayMs: Long, remainingAttempts: Int) {
+            window.decorView.postDelayed({
+                if (!externalMediaHandoffPending || !hasWindowFocus()) {
+                    externalMediaRestoreScheduled = false
+                    return@postDelayed
+                }
+
+                NativeBrowserHostCoordinator.recreateDisplay()
+                NativeBrowserHostCoordinator.restoreVisible()
+                restoreAttachedGeckoSurface(window.decorView)
+
+                if (remainingAttempts == 0) {
+                    externalMediaRestoreScheduled = false
+                    NativeBrowserHostCoordinator.clearExternalMediaHandoff()
+                    externalMediaHandoffPending = false
+                } else {
+                    restoreAfter(280L, remainingAttempts - 1)
+                }
+            }, delayMs)
+        }
+        restoreAfter(140L, remainingAttempts = 1)
     }
 
-    private fun restoreAttachedGecko(view: View) {
+    private fun scheduleMediaWindowFocusRestore() {
+        if (mediaWindowFocusRestoreScheduled || externalMediaHandoffPending) return
+        mediaWindowFocusRestoreScheduled = true
+        window.decorView.postDelayed({
+            mediaWindowFocusRestoreScheduled = false
+            if (!hasWindowFocus()) return@postDelayed
+            NativeBrowserHostCoordinator.restoreVisible()
+            restoreAttachedGeckoSurface(window.decorView)
+            GeckoMediaSessionBridge.resumeSelectedPlaybackIfNeeded()
+        }, 140L)
+    }
+
+    private fun displayConfigurationKey(configuration: Configuration): String =
+        listOf(
+            configuration.orientation,
+            configuration.screenWidthDp,
+            configuration.screenHeightDp,
+            configuration.smallestScreenWidthDp
+        ).joinToString(":")
+
+    /**
+     * Restore only the Gecko compositor after Android changed window focus/orientation.
+     *
+     * Do not call GeckoSession.setFocused(true) here. Session focus is input focus, not render
+     * visibility; forcing it during fullscreen restoration can re-focus a previously editable
+     * element and make Android reopen the IME. BrowserScreen owns normal tab focus state.
+     */
+    private fun restoreAttachedGeckoSurface(view: View) {
         if (view is GeckoView) {
             view.getSession()?.let { session ->
                 runCatching {
                     session.setActive(true)
-                    session.setFocused(true)
                     session.setPriorityHint(GeckoSession.PRIORITY_HIGH)
                     view.requestLayout()
                     ViewCompat.requestApplyInsets(view)
@@ -333,7 +408,9 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
             }
         }
         if (view is ViewGroup) {
-            for (index in 0 until view.childCount) restoreAttachedGecko(view.getChildAt(index))
+            for (index in 0 until view.childCount) {
+                restoreAttachedGeckoSurface(view.getChildAt(index))
+            }
         }
     }
 

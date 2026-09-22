@@ -32,9 +32,9 @@ internal class AutofillUnlockActivity : Activity() {
         passwordId = parcelableExtra(EXTRA_PASSWORD_ID)
 
         val keyguard = getSystemService(KeyguardManager::class.java)
-        if (keyguard == null || !keyguard.isDeviceSecure) {
-            // Without a screen lock there is nothing to confirm against.
-            completeWithCredential()
+        if (keyguard?.isDeviceSecure != true) {
+            setResult(RESULT_CANCELED)
+            finish()
             return
         }
 
@@ -43,7 +43,8 @@ internal class AutofillUnlockActivity : Activity() {
             "Confirm your screen lock to fill this saved password."
         )
         if (confirmIntent == null) {
-            completeWithCredential()
+            setResult(RESULT_CANCELED)
+            finish()
             return
         }
         @Suppress("DEPRECATION")

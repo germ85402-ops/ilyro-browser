@@ -2,7 +2,6 @@ package com.ilyro.browser.ui
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.net.Uri
 import android.util.Log
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
@@ -23,6 +22,8 @@ import org.mozilla.geckoview.WebRequest
 internal object SiteIconFetcher {
     private const val LOG_TAG = "ILYRO-SiteIcon"
     private const val MAX_ICON_BYTES = 768 * 1024
+    private const val MAX_ICON_EDGE = 256
+    private const val MAX_REDIRECTS = 3
     private const val GECKO_TIMEOUT_MS = 4_000L
     private const val HTTP_TIMEOUT_MS = 3_500
     private const val ACCEPT_HEADER =
@@ -40,14 +41,7 @@ internal object SiteIconFetcher {
     }
 
     /** `https://host[:port]/favicon.ico` for an HTTP(S) page URL, or `null` when unsupported. */
-    internal fun iconUrl(siteUrl: String): String? {
-        val uri = runCatching { Uri.parse(siteUrl.trim()) }.getOrNull() ?: return null
-        val scheme = uri.scheme?.lowercase()
-        if (scheme != null && scheme != "http" && scheme != "https") return null
-        val host = uri.host?.trim()?.lowercase()?.takeIf { it.isNotBlank() } ?: return null
-        val port = uri.port.takeIf { it > 0 && it != 80 && it != 443 }?.let { ":$it" }.orEmpty()
-        return "https://$host$port/favicon.ico"
-    }
+    internal fun iconUrl(siteUrl: String): String? = BrowserFaviconPolicy.faviconUrl(siteUrl)
 
     private fun fetchWithGecko(iconUrl: String, isPrivate: Boolean): Bitmap? {
         val runtime = BrowserEngine.runtimeOrNull() ?: return null
@@ -77,20 +71,39 @@ internal object SiteIconFetcher {
     }
 
     private fun fetchWithHttps(iconUrl: String): Bitmap? = runCatching {
-        val connection = (URL(iconUrl).openConnection() as HttpURLConnection).apply {
-            connectTimeout = HTTP_TIMEOUT_MS
-            readTimeout = HTTP_TIMEOUT_MS
-            instanceFollowRedirects = true
-            requestMethod = "GET"
-            setRequestProperty("Accept", ACCEPT_HEADER)
+        var currentUrl = iconUrl
+        repeat(MAX_REDIRECTS + 1) { redirectCount ->
+            val connection = (URL(currentUrl).openConnection() as HttpURLConnection).apply {
+                connectTimeout = HTTP_TIMEOUT_MS
+                readTimeout = HTTP_TIMEOUT_MS
+                instanceFollowRedirects = false
+                requestMethod = "GET"
+                setRequestProperty("Accept", ACCEPT_HEADER)
+            }
+            try {
+                when (connection.responseCode) {
+                    in 200..299 -> {
+                        if (connection.contentLengthLong > MAX_ICON_BYTES) return@runCatching null
+                        return@runCatching connection.inputStream.use(::decodeBounded)
+                    }
+                    HttpURLConnection.HTTP_MOVED_PERM,
+                    HttpURLConnection.HTTP_MOVED_TEMP,
+                    HttpURLConnection.HTTP_SEE_OTHER,
+                    307,
+                    308 -> {
+                        if (redirectCount == MAX_REDIRECTS) return@runCatching null
+                        currentUrl = BrowserFaviconPolicy.sameOriginRedirect(
+                            currentUrl,
+                            connection.getHeaderField("Location") ?: return@runCatching null
+                        ) ?: return@runCatching null
+                    }
+                    else -> return@runCatching null
+                }
+            } finally {
+                connection.disconnect()
+            }
         }
-        try {
-            if (connection.responseCode !in 200..299) return null
-            if (connection.contentLengthLong > MAX_ICON_BYTES) return null
-            connection.inputStream.use(::decodeBounded)
-        } finally {
-            connection.disconnect()
-        }
+        null
     }.getOrElse { error ->
         Log.d(LOG_TAG, "First-party icon fetch failed", error)
         null
@@ -118,7 +131,9 @@ internal object SiteIconFetcher {
 
         var sample = 1
         val largest = maxOf(bounds.outWidth, bounds.outHeight)
-        while (largest / sample > maxEdge) sample *= 2
+        while (largest / sample > minOf(maxEdge, MAX_ICON_EDGE) && sample < (1 shl 24)) {
+            sample *= 2
+        }
 
         return BitmapFactory.decodeByteArray(
             bytes,

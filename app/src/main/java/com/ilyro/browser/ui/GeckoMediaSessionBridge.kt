@@ -72,6 +72,26 @@ internal object GeckoMediaSessionBridge {
     fun stateFor(session: GeckoSession): GeckoMediaPlaybackState =
         playbackBySession[session] ?: GeckoMediaPlaybackState()
 
+    /** True only while the selected page was actually playing media. */
+    fun hasPlayingPlayback(): Boolean {
+        val session = selectedSession ?: return false
+        return playbackBySession[session]?.playing == true
+    }
+
+    /**
+     * Restore playback after Android briefly removed window focus or rebuilt the display surface.
+     * This is deliberately conditional: a video that was already paused is never started by us.
+     */
+    fun resumeSelectedPlaybackIfNeeded(): Boolean {
+        val session = selectedSession ?: return false
+        val state = playbackBySession[session] ?: return false
+        if (!state.active || state.playing) return false
+        val controller = controllerBySession[session] ?: return false
+        if (!controller.isActive) return false
+        controller.play()
+        return true
+    }
+
     fun playSelected(): Boolean {
         val controller = selectedSession?.let(controllerBySession::get) ?: return false
         if (!controller.isActive) return false

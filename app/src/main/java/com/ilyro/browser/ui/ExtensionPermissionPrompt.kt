@@ -39,7 +39,9 @@ internal fun ExtensionPermissionPromptHost() {
     }
 
     AlertDialog(
-        onDismissRequest = { ProtectionBridge.respondToInstallPermissionPrompt(false) },
+        onDismissRequest = {
+            ProtectionBridge.respondToInstallPermissionPrompt(request.requestId, false)
+        },
         shape = RoundedCornerShape(24.dp),
         containerColor = MaterialTheme.colorScheme.surface,
         title = { Text(text = title, style = MaterialTheme.typography.titleMedium) },
@@ -71,12 +73,16 @@ internal fun ExtensionPermissionPromptHost() {
             }
         },
         confirmButton = {
-            TextButton(onClick = { ProtectionBridge.respondToInstallPermissionPrompt(true) }) {
+            TextButton(onClick = {
+                ProtectionBridge.respondToInstallPermissionPrompt(request.requestId, true)
+            }) {
                 Text(tr("Allow", "Разрешить"))
             }
         },
         dismissButton = {
-            TextButton(onClick = { ProtectionBridge.respondToInstallPermissionPrompt(false) }) {
+            TextButton(onClick = {
+                ProtectionBridge.respondToInstallPermissionPrompt(request.requestId, false)
+            }) {
                 Text(tr("Cancel", "Отмена"))
             }
         }

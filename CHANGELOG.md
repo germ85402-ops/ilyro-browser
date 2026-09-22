@@ -2,24 +2,59 @@
 
 ## Unreleased
 
-### Security and privacy
+## 0.26.0-rc16 — release candidate
 
-- Require a device screen-lock confirmation before Autofill hands a saved password to another app, and match credentials against the domain of the field being filled instead of the first web domain found in the request.
-- Load site icons first-party over HTTPS through Gecko (with private-browsing isolation) instead of querying a third-party icon service with the visited URL.
-- Forbid cleartext traffic for ILYRO's own network code through an explicit network security config; website loading is unaffected and stays governed by the HTTPS-only setting.
-- Enable Gecko's tracking-protection categories and strict social tracking protection instead of relying on cookie behavior alone.
-- Show the WebExtension permission prompt for every install that requests permissions, including the onboarding queue, and never approve such a request silently.
-- Verify that a restored pending APK install URI belongs to ILYRO's own download locations before invoking the package installer.
+- Require screen-lock confirmation before Autofill releases a saved password, fail closed if the confirmation flow cannot launch, and match credentials to the domain of the field being filled.
+- Keep site-icon requests first-party, private-tab aware, bounded, and isolated from page paths and queries; preserve non-default ports and reject cross-origin redirects in the fallback loader.
+- Show explicit WebExtension permission prompts and bind each response to the exact request, preventing one prompt from approving another request.
+- Keep ILYRO's own network requests on TLS and enable Gecko tracking protection explicitly.
+- Wait for Drive restore writes off the UI thread before reading restored tabs, preventing old queued data from overwriting the restored snapshot.
+- Reject unexpected restored APK-install URIs and include the remote sync snapshot validation fix.
 
-### Changed
+## 0.26.0-rc15 — release candidate
 
-- Split `DownloadController.kt` into the controller plus `DownloadNaming.kt` and `DownloadModels.kt`, and move the browser screen's request/snapshot models and view/address helpers into `BrowserScreenModels.kt` and `BrowserScreenSupport.kt`.
-- Document that `TabSessionStore` intentionally ignores an empty tab list, because ILYRO always keeps at least one tab open.
+- Size the YouTube fullscreen video container against the viewport instead of the shorter intermediate player, fixing the top-aligned video and bottom gap confirmed by on-device geometry diagnostics.
+- Update the bundled fullscreen helper to 1.8.3. The user confirmed the fix in the debug build; signed-release device validation remains pending.
 
-### Fixed
+## 0.26.0-rc14 — release candidate
 
-- Show a permission dialog for WebExtension installs so an install that requests permissions no longer stays pending forever with no user-visible prompt.
-- Stop blocking the main thread on ordered history and tab-session writes, which could cause an ANR with large snapshots.
+- Pin the Activity-owned GeckoView host to the full native window for the complete web-fullscreen lifetime instead of relying on transient Compose bounds during phone rotation.
+- Keep recording normal Compose page bounds while fullscreen is active and restore them immediately on exit, preserving existing tablet orientation and input routing behavior.
+- Reapply native fullscreen bounds whenever the root window changes size so YouTube cannot stay stuck on the pre-rotation portrait rectangle.
+
+## 0.26.0-rc13 — release candidate
+
+- Wait for the bundled media fullscreen helper before opening the first page, preventing release-only YouTube fullscreen sizing races.
+- Make the website APK buttons resolve the newest published ARM64 release automatically, including prereleases.
+
+
+## 0.26.0-rc12 — release candidate
+
+- Re-measure the Compose content rectangle and native Gecko host after phone fullscreen rotation so YouTube expands to the full available landscape surface without cropping.
+- Keep tablet orientation behavior unchanged and avoid restoring Gecko input focus or recreating the media surface during the layout refresh.
+
+## 0.26.0-rc11 — release candidate
+
+- Match Chrome-style fullscreen rotation on phones: enter landscape even when system auto-rotate is off, then restore the previous orientation on exit.
+- Keep tablets and larger screens in their current orientation during fullscreen playback.
+- Keep the Gecko media surface attached across configuration changes instead of recreating the display, reducing pauses and startup buffering.
+- Separate media-surface restoration from Gecko input focus to prevent fullscreen transitions from reopening the keyboard.
+- Improve YouTube fullscreen sizing across phones and tablets with dynamic viewport sizing while preserving aspect ratio.
+
+
+## 0.26.0-rc10 — release candidate
+
+- Include the complete mobile YouTube/fullscreen surface fix in the release tree.
+- Keep playing YouTube media through transient focus and orientation changes without recreating the surface unnecessarily.
+- Restore playback only when Android interrupted a video that was already playing.
+- Preserve the stale-tab-surface fix while switching tabs.
+
+## 0.26.0-rc9 — release candidate
+
+- Refine mobile YouTube/fullscreen surface restoration to reduce black frames and accidental playback interruptions.
+- Prevent stale browser surfaces from flashing when switching between tabs.
+- Show a compact in-browser notice when a download finishes, with a shortcut to Downloads.
+- Replace the support card's coffee icon with a cleaner theme-aware cup, saucer, coffee and steam illustration.
 
 ## 0.26.0-rc8 — release candidate
 

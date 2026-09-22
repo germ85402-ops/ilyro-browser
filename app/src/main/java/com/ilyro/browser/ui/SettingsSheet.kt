@@ -34,7 +34,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.LocalCafe
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Palette
@@ -60,10 +59,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -953,6 +956,23 @@ private fun SidebarSupportCard(
 private fun SteamingCoffeeIcon(compact: Boolean) {
     val primary = MaterialTheme.colorScheme.primary
     val iconSize = if (compact) 38.dp else 44.dp
+    val cupDark = Color(
+        red = primary.red * 0.62f,
+        green = primary.green * 0.62f,
+        blue = primary.blue * 0.62f,
+        alpha = primary.alpha
+    )
+    val saucer = Color(
+        red = primary.red * 0.74f,
+        green = primary.green * 0.74f,
+        blue = primary.blue * 0.74f,
+        alpha = primary.alpha
+    )
+    val outline = primary.copy(alpha = 0.62f)
+    val highlight = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.48f)
+    val coffee = Color(0xFF704329)
+    val coffeeLight = Color(0xFFC48759)
+    val coffeeDark = Color(0xFF472419)
     Surface(
         modifier = Modifier.size(iconSize),
         shape = RoundedCornerShape(if (compact) 13.dp else 15.dp),
@@ -969,40 +989,173 @@ private fun SteamingCoffeeIcon(compact: Boolean) {
                     .fillMaxSize()
                     .padding(if (compact) 4.dp else 5.dp)
             ) {
-                val steamStroke = Stroke(
-                    width = 1.5.dp.toPx(),
-                    cap = StrokeCap.Round
-                )
-                val leftSteam = Path().apply {
-                    moveTo(size.width * 0.36f, size.height * 0.34f)
-                    cubicTo(
-                        size.width * 0.22f,
-                        size.height * 0.25f,
-                        size.width * 0.54f,
-                        size.height * 0.18f,
-                        size.width * 0.42f,
-                        size.height * 0.08f
+                val scaleFactor = size.minDimension / 256f
+                scale(scaleFactor, pivot = Offset.Zero) {
+                    val steamStroke = Stroke(width = 6f, cap = StrokeCap.Round)
+
+                    // Steam: three shorter, asymmetric strokes so the icon stays readable at 38–44dp.
+                    val leftSteam = Path().apply {
+                        moveTo(82f, 72f)
+                        cubicTo(70f, 61f, 73f, 51f, 84f, 42f)
+                        cubicTo(94f, 33f, 97f, 25f, 89f, 17f)
+                    }
+                    val middleSteam = Path().apply {
+                        moveTo(117f, 66f)
+                        cubicTo(105f, 54f, 109f, 44f, 119f, 35f)
+                        cubicTo(128f, 26f, 131f, 18f, 124f, 10f)
+                    }
+                    val rightSteam = Path().apply {
+                        moveTo(151f, 73f)
+                        cubicTo(140f, 62f, 143f, 51f, 154f, 43f)
+                        cubicTo(163f, 35f, 166f, 27f, 160f, 19f)
+                    }
+                    drawPath(leftSteam, primary.copy(alpha = 0.78f), style = steamStroke)
+                    drawPath(
+                        middleSteam,
+                        primary.copy(alpha = 0.58f),
+                        style = Stroke(width = 7f, cap = StrokeCap.Round)
+                    )
+                    drawPath(
+                        rightSteam,
+                        primary.copy(alpha = 0.42f),
+                        style = Stroke(width = 5f, cap = StrokeCap.Round)
+                    )
+
+                    // Soft contact shadow under the saucer.
+                    drawOval(
+                        color = Color.Black.copy(alpha = 0.12f),
+                        topLeft = Offset(36f, 196f),
+                        size = Size(181f, 27f)
+                    )
+
+                    // Handle behind the body.
+                    val handle = Path().apply {
+                        moveTo(171f, 120f)
+                        cubicTo(203f, 114f, 220f, 127f, 220f, 151f)
+                        cubicTo(220f, 175f, 203f, 188f, 172f, 182f)
+                        lineTo(172f, 166f)
+                        cubicTo(191f, 170f, 201f, 164f, 201f, 151f)
+                        cubicTo(201f, 138f, 191f, 133f, 172f, 137f)
+                        close()
+                    }
+                    drawPath(
+                        path = handle,
+                        brush = Brush.linearGradient(
+                            colors = listOf(primary, cupDark),
+                            start = Offset(36f, 86f),
+                            end = Offset(204f, 214f)
+                        )
+                    )
+                    drawPath(handle, outline, style = Stroke(width = 3f))
+
+                    val handleHighlight = Path().apply {
+                        moveTo(178f, 133f)
+                        cubicTo(192f, 130f, 201f, 136f, 201f, 151f)
+                        cubicTo(201f, 164f, 193f, 171f, 178f, 168f)
+                    }
+                    drawPath(
+                        handleHighlight,
+                        highlight.copy(alpha = 0.42f),
+                        style = Stroke(width = 4f, cap = StrokeCap.Round)
+                    )
+
+                    // Saucer: slightly darker than the cup so the silhouette does not merge.
+                    drawOval(
+                        brush = Brush.linearGradient(
+                            colors = listOf(saucer, cupDark),
+                            start = Offset(38f, 198f),
+                            end = Offset(210f, 224f)
+                        ),
+                        topLeft = Offset(36f, 184f),
+                        size = Size(180f, 42f)
+                    )
+                    drawOval(
+                        outline,
+                        topLeft = Offset(36f, 184f),
+                        size = Size(180f, 42f),
+                        style = Stroke(width = 3f)
+                    )
+                    drawOval(
+                        color = highlight.copy(alpha = 0.18f),
+                        topLeft = Offset(63f, 193f),
+                        size = Size(126f, 16f)
+                    )
+
+                    // Cup body.
+                    val body = Path().apply {
+                        moveTo(43f, 104f)
+                        cubicTo(44f, 128f, 48f, 166f, 60f, 187f)
+                        cubicTo(70f, 203f, 91f, 210f, 123f, 210f)
+                        cubicTo(155f, 210f, 176f, 203f, 186f, 187f)
+                        cubicTo(198f, 166f, 201f, 128f, 202f, 104f)
+                        close()
+                    }
+                    drawPath(
+                        path = body,
+                        brush = Brush.linearGradient(
+                            colors = listOf(primary, cupDark),
+                            start = Offset(34f, 86f),
+                            end = Offset(204f, 214f)
+                        )
+                    )
+                    drawPath(body, outline, style = Stroke(width = 3f))
+
+                    val frontHighlight = Path().apply {
+                        moveTo(60f, 127f)
+                        cubicTo(64f, 156f, 70f, 178f, 82f, 188f)
+                        cubicTo(91f, 195f, 103f, 198f, 118f, 200f)
+                    }
+                    drawPath(
+                        frontHighlight,
+                        highlight.copy(alpha = 0.34f),
+                        style = Stroke(width = 7f, cap = StrokeCap.Round)
+                    )
+
+                    // Rim, warm coffee surface and a small specular accent.
+                    drawOval(
+                        brush = Brush.linearGradient(
+                            colors = listOf(primary.copy(alpha = 0.98f), cupDark),
+                            start = Offset(42f, 86f),
+                            end = Offset(202f, 126f)
+                        ),
+                        topLeft = Offset(42f, 80f),
+                        size = Size(160f, 50f)
+                    )
+                    drawOval(
+                        outline,
+                        topLeft = Offset(42f, 80f),
+                        size = Size(160f, 50f),
+                        style = Stroke(width = 3f)
+                    )
+                    drawOval(
+                        brush = Brush.radialGradient(
+                            colors = listOf(coffeeLight, coffee, coffeeDark),
+                            center = Offset(122f, 104f),
+                            radius = 78f
+                        ),
+                        topLeft = Offset(57f, 88f),
+                        size = Size(130f, 32f)
+                    )
+                    val coffeeShine = Path().apply {
+                        moveTo(74f, 102f)
+                        cubicTo(91f, 94f, 124f, 91f, 154f, 99f)
+                    }
+                    drawPath(
+                        coffeeShine,
+                        coffeeLight.copy(alpha = 0.62f),
+                        style = Stroke(width = 3.5f, cap = StrokeCap.Round)
+                    )
+                    val specular = Path().apply {
+                        moveTo(75f, 120f)
+                        cubicTo(77f, 127f, 80f, 134f, 83f, 139f)
+                    }
+                    drawPath(
+                        specular,
+                        Color.White.copy(alpha = 0.58f),
+                        style = Stroke(width = 4f, cap = StrokeCap.Round)
                     )
                 }
-                val rightSteam = Path().apply {
-                    moveTo(size.width * 0.62f, size.height * 0.32f)
-                    cubicTo(
-                        size.width * 0.49f,
-                        size.height * 0.22f,
-                        size.width * 0.77f,
-                        size.height * 0.16f,
-                        size.width * 0.65f,
-                        size.height * 0.06f
-                    )
-                }
-                drawPath(leftSteam, primary.copy(alpha = 0.62f), style = steamStroke)
-                drawPath(rightSteam, primary.copy(alpha = 0.38f), style = steamStroke)
             }
-            Icon(
-                Icons.Rounded.LocalCafe,
-                contentDescription = null,
-                modifier = Modifier.size(if (compact) 20.dp else 23.dp)
-            )
         }
     }
 }

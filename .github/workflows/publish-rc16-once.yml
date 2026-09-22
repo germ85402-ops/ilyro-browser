@@ -1,0 +1,22 @@
+name: Publish rc16 tag once
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-rc16-once.yml"]
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create rc16 tag and dispatch signed release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref='refs/tags/v0.26.0-rc16' -f sha="$GITHUB_SHA"
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref v0.26.0-rc16

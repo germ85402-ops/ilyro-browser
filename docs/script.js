@@ -267,5 +267,38 @@
     firstTab?.click();
   });
 
-  if (year) year.textContent = String(new Date().getFullYear());
+  const updateLatestApkLinks = async () => {
+    const links = [...document.querySelectorAll('[data-latest-apk-link]')];
+    if (!links.length) return;
+
+    const releasesUrl = 'https://github.com/germ85402-ops/ilyro-browser/releases';
+    const apiUrl = 'https://api.github.com/repos/germ85402-ops/ilyro-browser/releases?per_page=20';
+
+    try {
+      const response = await fetch(apiUrl, {
+        headers: { Accept: 'application/vnd.github+json' },
+        cache: 'no-store'
+      });
+      if (!response.ok) throw new Error('GitHub Releases request failed');
+
+      const releases = await response.json();
+      const latest = releases.find((release) =>
+        !release.draft &&
+        Array.isArray(release.assets) &&
+        release.assets.some((asset) => /^ILYRO-.*-arm64\.apk$/.test(asset.name))
+      );
+      const apk = latest?.assets?.find((asset) => /^ILYRO-.*-arm64\.apk$/.test(asset.name));
+
+      if (!apk?.browser_download_url) throw new Error('No ARM64 APK found');
+      links.forEach((link) => {
+        link.href = apk.browser_download_url;
+        link.dataset.releaseTag = latest.tag_name || '';
+      });
+    } catch {
+      // Keep a useful fallback if the API is rate-limited or temporarily unavailable.
+      links.forEach((link) => { link.href = releasesUrl; });
+    }
+  };
+
+  updateLatestApkLinks();
 })();

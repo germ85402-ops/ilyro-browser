@@ -11,6 +11,8 @@ import com.ilyro.browser.ui.QuickLinkStore
 import com.ilyro.browser.ui.RestoredTabSession
 import com.ilyro.browser.ui.TabSessionMetadata
 import com.ilyro.browser.ui.TabSessionStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 internal data class SyncOutcome(
@@ -72,9 +74,16 @@ internal class BrowserSettingsSyncManager(context: Context) {
             SyncResult.NotAuthorized -> return SyncResult.NotAuthorized
         }
 
-        val remoteData = remote
-            ?.takeIf { it.schemaVersion == BrowserDataSyncCodec.SCHEMA_VERSION }
-            ?.let { runCatching { BrowserDataSyncCodec.decode(it.payload) }.getOrNull() }
+        val remoteData = remote?.let { snapshot ->
+            try {
+                SyncSnapshotPayloadDecoder.decode(snapshot)
+            } catch (_: Exception) {
+                return SyncResult.Failure(
+                    message = "Remote ILYRO sync data is unsupported or incomplete. Local and cloud data were left unchanged.",
+                    recoverable = false
+                )
+            }
+        }
         val remoteIsNewer = remoteData != null && remote?.let { snapshot ->
             SyncOrderingPolicy.isRemoteNewer(
                 snapshot = snapshot,
@@ -105,13 +114,15 @@ internal class BrowserSettingsSyncManager(context: Context) {
         if (applyRemoteControl) {
             BrowserSettingsStore.save(browserPrefs, effectiveSettings)
             if (appliedRemoteTabs) {
-                TabSessionStore.saveNow(
-                    prefs = browserPrefs,
-                    urls = effectiveTabs.urls,
-                    states = effectiveTabs.states,
-                    metadata = effectiveTabs.metadata,
-                    activeIndex = effectiveTabs.activeIndex
-                )
+                withContext(Dispatchers.IO) {
+                    TabSessionStore.saveNow(
+                        prefs = browserPrefs,
+                        urls = effectiveTabs.urls,
+                        states = effectiveTabs.states,
+                        metadata = effectiveTabs.metadata,
+                        activeIndex = effectiveTabs.activeIndex
+                    )
+                }
             }
         }
 
@@ -166,32 +177,26 @@ internal class BrowserSettingsSyncManager(context: Context) {
                     ?: return SyncResult.Success<BrowserSettings?>(null)
 
                 return try {
-                    val restored = when (snapshot.schemaVersion) {
-                        BrowserSettingsSyncCodec.SCHEMA_VERSION -> RestoredBrowserData(
-                            settings = BrowserSettingsSyncCodec.decode(snapshot.payload)
-                        )
+                    val restored = SyncSnapshotPayloadDecoder.decode(snapshot)
 
-                        BrowserDataSyncCodec.SCHEMA_VERSION -> BrowserDataSyncCodec.decode(snapshot.payload)
-
-                        else -> return SyncResult.Failure(
-                            message = "Unsupported ILYRO sync schema " + snapshot.schemaVersion,
-                            recoverable = false
-                        )
-                    }
-
-                    restored.history?.let { HistoryStore.save(browserPrefs, it) }
-                    restored.bookmarks?.let { BookmarkStore.save(browserPrefs, it) }
-                    restored.quickLinks?.let { QuickLinkStore.save(browserPrefs, it) }
-                    restored.tabs?.let { synced ->
-                        TabSessionStore.saveNow(
-                            prefs = browserPrefs,
-                            urls = synced.tabs.map { it.url },
-                            states = List(synced.tabs.size) { null },
-                            metadata = synced.tabs.map { tab ->
-                                TabSessionMetadata(pinned = tab.pinned, group = tab.group)
-                            },
-                            activeIndex = synced.activeIndex
-                        )
+                    // These ordered stores may wait for their writer futures. Restore runs from
+                    // the UI flow, so wait off-main before reading the restored tabs or recreating
+                    // the Activity; otherwise an older queued save can overwrite the remote state.
+                    withContext(Dispatchers.IO) {
+                        restored.history?.let { HistoryStore.save(browserPrefs, it) }
+                        restored.bookmarks?.let { BookmarkStore.save(browserPrefs, it) }
+                        restored.quickLinks?.let { QuickLinkStore.save(browserPrefs, it) }
+                        restored.tabs?.let { synced ->
+                            TabSessionStore.saveNow(
+                                prefs = browserPrefs,
+                                urls = synced.tabs.map { it.url },
+                                states = List(synced.tabs.size) { null },
+                                metadata = synced.tabs.map { tab ->
+                                    TabSessionMetadata(pinned = tab.pinned, group = tab.group)
+                                },
+                                activeIndex = synced.activeIndex
+                            )
+                        }
                     }
 
                     val localSettings = BrowserSettingsStore.restore(browserPrefs)
