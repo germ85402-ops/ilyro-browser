@@ -115,11 +115,15 @@ internal object BrowserDataSyncCodec {
         val root = JSONObject(payload)
         val settingsJson = root.getJSONObject("settings")
         val settings = BrowserSettingsSyncCodec.decode(settingsJson.toString())
+        val historyArray = root.getJSONArray("history")
+        val bookmarkArray = root.getJSONArray("bookmarks")
+        val quickLinkArray = root.getJSONArray("quickLinks")
+        val tabObject = root.getJSONObject("tabs")
+        val tabItems = tabObject.getJSONArray("items")
 
         val history = buildList {
-            val array = root.optJSONArray("history") ?: JSONArray()
-            for (index in 0 until minOf(array.length(), MAX_HISTORY_ITEMS)) {
-                val item = array.optJSONObject(index) ?: continue
+            for (index in 0 until minOf(historyArray.length(), MAX_HISTORY_ITEMS)) {
+                val item = historyArray.optJSONObject(index) ?: continue
                 val url = item.optString("url").trim()
                 if (url.isBlank()) continue
                 val title = item.optString("title").trim().ifBlank { url }
@@ -129,9 +133,8 @@ internal object BrowserDataSyncCodec {
         }.sortedByDescending { it.visitedAt }
 
         val bookmarks = buildList {
-            val array = root.optJSONArray("bookmarks") ?: JSONArray()
-            for (index in 0 until minOf(array.length(), MAX_BOOKMARKS)) {
-                val item = array.optJSONObject(index) ?: continue
+            for (index in 0 until minOf(bookmarkArray.length(), MAX_BOOKMARKS)) {
+                val item = bookmarkArray.optJSONObject(index) ?: continue
                 val url = item.optString("url").trim()
                 if (url.isBlank()) continue
                 val title = item.optString("title").trim().ifBlank { url }
@@ -151,9 +154,8 @@ internal object BrowserDataSyncCodec {
         }.distinctBy { it.url }
 
         val quickLinks = buildList {
-            val array = root.optJSONArray("quickLinks") ?: JSONArray()
-            for (index in 0 until minOf(array.length(), MAX_QUICK_LINKS)) {
-                val item = array.optJSONObject(index) ?: continue
+            for (index in 0 until minOf(quickLinkArray.length(), MAX_QUICK_LINKS)) {
+                val item = quickLinkArray.optJSONObject(index) ?: continue
                 val id = item.optString("id").trim()
                 val label = item.optString("label").trim()
                 val url = item.optString("url").trim()
@@ -162,37 +164,31 @@ internal object BrowserDataSyncCodec {
             }
         }
 
-        val tabObject = root.optJSONObject("tabs")
-        val tabItems = tabObject?.optJSONArray("items")
-        val tabs = if (tabItems == null) {
-            null
-        } else {
-            val decoded = buildList {
-                for (index in 0 until minOf(tabItems.length(), MAX_TABS)) {
-                    val item = tabItems.optJSONObject(index) ?: continue
-                    val url = item.optString("url").trim()
-                    if (url.isBlank()) continue
-                    add(
-                        SyncedTab(
-                            url = url,
-                            pinned = item.optBoolean("pinned", false),
-                            group = item.optString("group")
-                                .trim()
-                                .takeIf { it.isNotBlank() }
-                                ?.take(MAX_GROUP_NAME_CHARS)
-                        )
+        val decodedTabs = buildList {
+            for (index in 0 until minOf(tabItems.length(), MAX_TABS)) {
+                val item = tabItems.optJSONObject(index) ?: continue
+                val url = item.optString("url").trim()
+                if (url.isBlank()) continue
+                add(
+                    SyncedTab(
+                        url = url,
+                        pinned = item.optBoolean("pinned", false),
+                        group = item.optString("group")
+                            .trim()
+                            .takeIf { it.isNotBlank() }
+                            ?.take(MAX_GROUP_NAME_CHARS)
                     )
-                }
-            }
-            if (decoded.isEmpty()) {
-                null
-            } else {
-                SyncedTabSession(
-                    tabs = decoded,
-                    activeIndex = tabObject.optInt("activeIndex", 0)
-                        .coerceIn(0, decoded.lastIndex)
                 )
             }
+        }
+        val tabs = if (decodedTabs.isEmpty()) {
+            null
+        } else {
+            SyncedTabSession(
+                tabs = decodedTabs,
+                activeIndex = tabObject.optInt("activeIndex", 0)
+                    .coerceIn(0, decodedTabs.lastIndex)
+            )
         }
 
         return RestoredBrowserData(
