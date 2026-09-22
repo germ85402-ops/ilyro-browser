@@ -72,9 +72,16 @@ internal class BrowserSettingsSyncManager(context: Context) {
             SyncResult.NotAuthorized -> return SyncResult.NotAuthorized
         }
 
-        val remoteData = remote
-            ?.takeIf { it.schemaVersion == BrowserDataSyncCodec.SCHEMA_VERSION }
-            ?.let { runCatching { BrowserDataSyncCodec.decode(it.payload) }.getOrNull() }
+        val remoteData = remote?.let { snapshot ->
+            try {
+                SyncSnapshotPayloadDecoder.decode(snapshot)
+            } catch (_: Exception) {
+                return SyncResult.Failure(
+                    message = "Remote ILYRO sync data is unsupported or incomplete. Local and cloud data were left unchanged.",
+                    recoverable = false
+                )
+            }
+        }
         val remoteIsNewer = remoteData != null && remote?.let { snapshot ->
             SyncOrderingPolicy.isRemoteNewer(
                 snapshot = snapshot,
@@ -166,18 +173,7 @@ internal class BrowserSettingsSyncManager(context: Context) {
                     ?: return SyncResult.Success<BrowserSettings?>(null)
 
                 return try {
-                    val restored = when (snapshot.schemaVersion) {
-                        BrowserSettingsSyncCodec.SCHEMA_VERSION -> RestoredBrowserData(
-                            settings = BrowserSettingsSyncCodec.decode(snapshot.payload)
-                        )
-
-                        BrowserDataSyncCodec.SCHEMA_VERSION -> BrowserDataSyncCodec.decode(snapshot.payload)
-
-                        else -> return SyncResult.Failure(
-                            message = "Unsupported ILYRO sync schema " + snapshot.schemaVersion,
-                            recoverable = false
-                        )
-                    }
+                    val restored = SyncSnapshotPayloadDecoder.decode(snapshot)
 
                     restored.history?.let { HistoryStore.save(browserPrefs, it) }
                     restored.bookmarks?.let { BookmarkStore.save(browserPrefs, it) }
