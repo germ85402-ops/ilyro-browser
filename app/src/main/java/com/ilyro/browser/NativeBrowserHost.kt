@@ -183,6 +183,16 @@ internal object NativeBrowserHostCoordinator {
     }
 
     /**
+     * While web content is fullscreen, let the native Gecko host own the complete Activity
+     * surface instead of following the Compose page placeholder. Compose can briefly report the
+     * pre-rotation rectangle while Android is changing orientation; keeping Gecko pinned to the
+     * root avoids a permanently letterboxed/cropped compositor on phones.
+     */
+    fun setFullscreenBounds(enabled: Boolean) {
+        rootRef.get()?.setEngineFullscreen(enabled)
+    }
+
+    /**
      * Re-measure the native Gecko host after an Activity-handled configuration change.
      *
      * Fullscreen rotation keeps MainActivity alive via configChanges. The window changes size,
@@ -194,6 +204,7 @@ internal object NativeBrowserHostCoordinator {
         val root = rootRef.get() ?: return
 
         fun requestLayoutPass() {
+            root.refreshEngineBounds()
             root.requestLayout()
             ViewCompat.requestApplyInsets(root)
             root.invalidate()
@@ -233,7 +244,9 @@ internal class BrowserRootLayout(
     private var transitionColor = initialTransitionColor
     private var engineHost: IlyroEngineView? = null
     private val engineBounds = Rect()
+    private val composeEngineBounds = Rect()
     private val engineInputExclusionBounds = Rect()
+    private var engineFullscreen = false
     private var engineVisible = false
     private var engineInputEnabled = false
     private var engineGestureActive = false
@@ -266,6 +279,48 @@ internal class BrowserRootLayout(
     fun setEngineBounds(left: Int, top: Int, right: Int, bottom: Int) {
         val safeRight = right.coerceAtLeast(left + 1)
         val safeBottom = bottom.coerceAtLeast(top + 1)
+        composeEngineBounds.set(left, top, safeRight, safeBottom)
+
+        // Fullscreen geometry is owned by the native root. Keep accepting Compose updates so the
+        // latest normal-page rectangle is ready to restore immediately when fullscreen exits.
+        if (engineFullscreen) return
+
+        applyEngineBounds(left, top, safeRight, safeBottom)
+    }
+
+    fun setEngineFullscreen(enabled: Boolean) {
+        if (engineFullscreen != enabled) {
+            engineFullscreen = enabled
+            cancelEngineGesture()
+        }
+        refreshEngineBounds()
+    }
+
+    fun refreshEngineBounds() {
+        if (engineFullscreen) {
+            if (width > 0 && height > 0) {
+                applyEngineBounds(0, 0, width, height)
+            } else {
+                post {
+                    if (engineFullscreen) refreshEngineBounds()
+                }
+            }
+            return
+        }
+
+        if (!composeEngineBounds.isEmpty) {
+            applyEngineBounds(
+                composeEngineBounds.left,
+                composeEngineBounds.top,
+                composeEngineBounds.right,
+                composeEngineBounds.bottom
+            )
+        }
+    }
+
+    private fun applyEngineBounds(left: Int, top: Int, right: Int, bottom: Int) {
+        val safeRight = right.coerceAtLeast(left + 1)
+        val safeBottom = bottom.coerceAtLeast(top + 1)
         if (
             engineBounds.left == left &&
             engineBounds.top == top &&
@@ -280,6 +335,15 @@ internal class BrowserRootLayout(
             topMargin = engineBounds.top
         }
         host.requestLayout()
+        ViewCompat.requestApplyInsets(host)
+        host.invalidate()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        if (engineFullscreen && w > 0 && h > 0) {
+            applyEngineBounds(0, 0, w, h)
+        }
     }
 
     fun setEngineInputExclusion(left: Int, top: Int, right: Int, bottom: Int) {

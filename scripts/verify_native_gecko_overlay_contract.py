@@ -4,9 +4,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MAIN = ROOT / "app/src/main/java/com/ilyro/browser/MainActivity.kt"
 APP = ROOT / "app/src/main/java/com/ilyro/browser/ui/IlyroApp.kt"
+HOST = ROOT / "app/src/main/java/com/ilyro/browser/NativeBrowserHost.kt"
 
 main = MAIN.read_text(encoding="utf-8")
 app = APP.read_text(encoding="utf-8")
+host = HOST.read_text(encoding="utf-8")
 
 
 def fail(message: str) -> None:
@@ -24,6 +26,21 @@ if "NativeBrowserHostCoordinator.setBounds(" not in app:
 
 if "NativeBrowserHostCoordinator.setInputEnabled(" not in app:
     fail("Compose is not controlling native Gecko input routing")
+
+if "NativeBrowserHostCoordinator.setFullscreenBounds(true)" not in app:
+    fail("web fullscreen does not enable native full-window Gecko bounds")
+
+if "NativeBrowserHostCoordinator.setFullscreenBounds(false)" not in app:
+    fail("web fullscreen exit does not restore Compose-owned Gecko bounds")
+
+for expected_host_contract in (
+    "fun setEngineFullscreen(enabled: Boolean)",
+    "if (engineFullscreen) return",
+    "override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int)",
+    "applyEngineBounds(0, 0, w, h)",
+):
+    if expected_host_contract not in host:
+        fail(f"native fullscreen host contract is missing: {expected_host_contract}")
 
 outer_expected = (
     "color = if (onboardingComplete) Color.Transparent else "

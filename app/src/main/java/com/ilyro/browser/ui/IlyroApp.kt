@@ -1018,6 +1018,11 @@ private fun BrowserScreen(
             }
 
             if (isFullScreen) {
+                // GeckoView is Activity-owned, while the normal page rectangle comes from
+                // Compose. During forced phone rotation Compose can briefly keep portrait bounds;
+                // pin Gecko to the complete native root for the whole fullscreen lifetime.
+                NativeBrowserHostCoordinator.setFullscreenBounds(true)
+
                 activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
                 controller.systemBarsBehavior =
                     WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -1058,6 +1063,10 @@ private fun BrowserScreen(
                     fullscreenPreviousOrientation = null
                     fullscreenForcedLandscape = false
                 }
+
+                // Resume normal Compose-owned browser geometry. setEngineBounds kept the latest
+                // placeholder rectangle even while fullscreen was overriding the visible host.
+                NativeBrowserHostCoordinator.setFullscreenBounds(false)
             }
 
             // Run after the current fullscreen/orientation transaction so the Compose content

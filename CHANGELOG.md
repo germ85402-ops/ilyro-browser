@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.26.0-rc14 — release candidate
+
+- Pin the Activity-owned GeckoView host to the full native window for the complete web-fullscreen lifetime instead of relying on transient Compose bounds during phone rotation.
+- Keep recording normal Compose page bounds while fullscreen is active and restore them immediately on exit, preserving existing tablet orientation and input routing behavior.
+- Reapply native fullscreen bounds whenever the root window changes size so YouTube cannot stay stuck on the pre-rotation portrait rectangle.
+
 ## 0.26.0-rc13 — release candidate
 
 - Wait for the bundled media fullscreen helper before opening the first page, preventing release-only YouTube fullscreen sizing races.
