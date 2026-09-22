@@ -60,11 +60,13 @@ internal object BrowserEngine {
 
     var mediaDetectorReady by mutableStateOf(false)
         private set
+    var mediaFullscreenReady by mutableStateOf(false)
+        private set
     var darkReaderReady by mutableStateOf(false)
         private set
 
     val startupExtensionsReady: Boolean
-        get() = mediaDetectorReady && darkReaderReady
+        get() = mediaFullscreenReady && mediaDetectorReady && darkReaderReady
 
     fun prepareForSettings(settings: BrowserSettings) {
         adBlockingEnabled = settings.adBlockingEnabled
@@ -109,6 +111,10 @@ internal object BrowserEngine {
                     },
                     { error -> Log.e(ENGINE_LOG_TAG, "Failed to initialize YouTube performance helper", error) }
                 )
+                // The release build can reach the first page faster than debug. Treat the
+                // fullscreen helper as part of the startup barrier so YouTube cannot load before
+                // its fullscreen CSS/content script is enabled.
+                mediaFullscreenReady = false
                 controller.ensureBuiltIn(
                     MEDIA_FULLSCREEN_EXTENSION_URI,
                     MEDIA_FULLSCREEN_EXTENSION_ID
@@ -117,10 +123,18 @@ internal object BrowserEngine {
                         if (extension != null) {
                             prepareHelperExtension(controller, extension) { stableExtension ->
                                 PageGestureBridge.attach(stableExtension)
+                                mediaFullscreenReady = true
                             }
+                        } else {
+                            // Gecko can still provide native fullscreen if the optional helper
+                            // is unavailable, but the startup barrier must not wait forever.
+                            mediaFullscreenReady = true
                         }
                     },
-                    { error -> Log.e(ENGINE_LOG_TAG, "Failed to initialize media fullscreen helper", error) }
+                    { error ->
+                        Log.e(ENGINE_LOG_TAG, "Failed to initialize media fullscreen helper", error)
+                        mediaFullscreenReady = true
+                    }
                 )
                 mediaDetectorReady = false
                 controller.ensureBuiltIn(
