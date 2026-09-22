@@ -65,6 +65,9 @@ internal object BrowserEngine {
     var darkReaderReady by mutableStateOf(false)
         private set
 
+    // Do not restore or open the first tab until every page-affecting helper is active.
+    // This barrier is especially important in minified release builds, which can reach navigation
+    // before the asynchronous media-fullscreen enable callback otherwise completes.
     val startupExtensionsReady: Boolean
         get() = mediaFullscreenReady && mediaDetectorReady && darkReaderReady
 
