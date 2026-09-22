@@ -117,18 +117,25 @@ internal object NativeBrowserHostCoordinator {
 
     fun render(session: GeckoSession) {
         val host = hostRef.get() ?: return
+        val changed = host.render(session)
+        if (!changed) {
+            // Re-rendering the already attached session is common after focus/lifecycle
+            // callbacks. Do not hide the surface in that case: doing so can interrupt media
+            // playback and creates an unnecessary black frame.
+            host.visibility = View.VISIBLE
+            rootRef.get()?.setEngineVisible(true)
+            return
+        }
         val generation = ++displayGeneration
-        host.render(session)
         revealWhenReady(host, generation)
     }
 
     fun recreateDisplay() {
         val host = hostRef.get() ?: return
-        val generation = ++displayGeneration
-        rootRef.get()?.setEngineVisible(false)
-        host.visibility = View.INVISIBLE
+        displayGeneration += 1
         if (host.recreateDisplay()) {
-            revealWhenReady(host, generation)
+            host.visibility = View.VISIBLE
+            rootRef.get()?.setEngineVisible(true)
         }
     }
 

@@ -121,8 +121,6 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
     private lateinit var browserPrefs: SharedPreferences
     private var externalMediaHandoffPending = false
     private var externalMediaRestoreScheduled = false
-    private var mediaWindowFocusRestoreScheduled = false
-    private var lostFocusDuringMediaPlayback = false
 
     private val sitePermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
@@ -259,19 +257,12 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (!hasFocus && GeckoMediaSessionBridge.hasActivePlayback()) {
-            lostFocusDuringMediaPlayback = true
-        }
         if (hasFocus && ::browserPrefs.isInitialized) {
             applySystemChrome()
             window.decorView.post { applySystemChrome() }
         }
         if (hasFocus && externalMediaHandoffPending) {
-            lostFocusDuringMediaPlayback = false
             scheduleExternalMediaRestore()
-        } else if (hasFocus && lostFocusDuringMediaPlayback) {
-            lostFocusDuringMediaPlayback = false
-            scheduleMediaWindowFocusRestore()
         }
     }
 
@@ -281,10 +272,6 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
         if (::browserPrefs.isInitialized) {
             applySystemChrome()
             window.decorView.post { applySystemChrome() }
-            window.decorView.postDelayed({
-                NativeBrowserHostCoordinator.recreateDisplay()
-                restoreAttachedGecko(window.decorView)
-            }, 120L)
         }
     }
 
@@ -321,37 +308,14 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
     private fun scheduleExternalMediaRestore() {
         if (externalMediaRestoreScheduled) return
         externalMediaRestoreScheduled = true
-        fun restoreAfter(delayMs: Long, remainingAttempts: Int) {
-            window.decorView.postDelayed({
-                if (!externalMediaHandoffPending || !hasWindowFocus()) {
-                    externalMediaRestoreScheduled = false
-                    return@postDelayed
-                }
-
-                NativeBrowserHostCoordinator.recreateDisplay()
-                restoreAttachedGecko(window.decorView)
-
-                if (remainingAttempts == 0) {
-                    externalMediaRestoreScheduled = false
-                    NativeBrowserHostCoordinator.clearExternalMediaHandoff()
-                    externalMediaHandoffPending = false
-                } else {
-                    restoreAfter(280L, remainingAttempts - 1)
-                }
-            }, delayMs)
-        }
-        restoreAfter(140L, remainingAttempts = 1)
-    }
-
-    private fun scheduleMediaWindowFocusRestore() {
-        if (mediaWindowFocusRestoreScheduled || externalMediaHandoffPending) return
-        mediaWindowFocusRestoreScheduled = true
         window.decorView.postDelayed({
-            mediaWindowFocusRestoreScheduled = false
-            if (!hasWindowFocus() || !GeckoMediaSessionBridge.hasActivePlayback()) return@postDelayed
+            externalMediaRestoreScheduled = false
+            if (!externalMediaHandoffPending || !hasWindowFocus()) return@postDelayed
             NativeBrowserHostCoordinator.recreateDisplay()
             restoreAttachedGecko(window.decorView)
-        }, 140L)
+            NativeBrowserHostCoordinator.clearExternalMediaHandoff()
+            externalMediaHandoffPending = false
+        }, 100L)
     }
 
     private fun restoreAttachedGecko(view: View) {

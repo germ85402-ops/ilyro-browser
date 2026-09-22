@@ -61,8 +61,8 @@ class IlyroEngineView @JvmOverloads constructor(
     }
 
     @Synchronized
-    fun render(session: GeckoSession) {
-        if (renderedSession === session && engineGeckoView.getSession() === session) return
+    fun render(session: GeckoSession): Boolean {
+        if (renderedSession === session && engineGeckoView.getSession() === session) return false
         if (engineGeckoView.getSession() != null) runCatching { engineGeckoView.releaseSession() }
         renderedSession = session
         engineGeckoView.setBackgroundColor(transitionColor)
@@ -70,6 +70,7 @@ class IlyroEngineView @JvmOverloads constructor(
         engineGeckoView.setSession(session)
         configureSurfaceLifecycle(engineGeckoView)
         engineGeckoView.post { configureSurfaceLifecycle(engineGeckoView) }
+        return true
     }
 
     /** Recreate only Gecko's display view; keep the existing GeckoSession and page state intact. */

@@ -434,6 +434,7 @@ private fun BrowserScreen(
     val prefs = remember { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
     val downloadController = remember(runtime) { DownloadController(context, prefs, runtime) }
     val downloads = remember { mutableStateListOf<DownloadUiItem>() }
+    val currentSettings by rememberUpdatedState(settings)
     fun isDownloadActive(item: DownloadUiItem): Boolean = when (item.status) {
         android.app.DownloadManager.STATUS_PENDING,
         android.app.DownloadManager.STATUS_RUNNING,
@@ -458,6 +459,9 @@ private fun BrowserScreen(
     var pendingClosedAllToken by remember { mutableStateOf(0L) }
     var lastRestoredTabId by remember { mutableStateOf<String?>(null) }
     var tabRestoreGeneration by remember { mutableStateOf(0L) }
+    var observedDownloadStatuses by remember {
+        mutableStateOf<Map<Long, Int>?>(null)
+    }
 
     fun pushTopNotice(
         kind: BrowserTopNoticeKind,
@@ -479,6 +483,24 @@ private fun BrowserScreen(
     }
 
     fun applyDownloadsSnapshot(latest: List<DownloadUiItem>) {
+        val previousStatuses = observedDownloadStatuses
+        if (previousStatuses != null) {
+            latest.asSequence()
+                .filter { item ->
+                    item.status == android.app.DownloadManager.STATUS_SUCCESSFUL &&
+                        previousStatuses[item.record.id] != android.app.DownloadManager.STATUS_SUCCESSFUL
+                }
+                .maxByOrNull { it.record.createdAt }
+                ?.let { completed ->
+                    pushTopNotice(
+                        kind = BrowserTopNoticeKind.DOWNLOAD,
+                        title = tr(currentSettings.language, "Download complete", "Загрузка завершена"),
+                        message = completed.record.fileName,
+                        actionLabel = tr(currentSettings.language, "Open downloads", "Открыть загрузки")
+                    )
+                }
+        }
+        observedDownloadStatuses = latest.associate { it.record.id to it.status }
         downloads.clear()
         downloads.addAll(latest)
         downloadsActive = latest.any(::isDownloadActive) ||
@@ -564,7 +586,6 @@ private fun BrowserScreen(
             NativeBrowserHostCoordinator.clearInputExclusion()
         }
     }
-    val currentSettings by rememberUpdatedState(settings)
     val onDownloadResponse: (WebResponse, String?, Boolean) -> Unit = { response, referrer, isPrivate ->
         ensureDownloadNotificationPermission(context)
         val record = downloadController.enqueue(
