@@ -10,7 +10,7 @@ internal object SyncSnapshotPayloadDecoder {
         BrowserDataSyncCodec.SCHEMA_VERSION -> BrowserDataSyncCodec.decode(snapshot.payload)
 
         else -> throw IllegalArgumentException(
-            "Unsupported ILYRO sync schema \${snapshot.schemaVersion}. Local and cloud data were left unchanged."
+            "Unsupported ILYRO sync schema ${snapshot.schemaVersion}. Local and cloud data were left unchanged."
         )
     }
 }
