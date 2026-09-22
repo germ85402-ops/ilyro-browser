@@ -82,7 +82,6 @@ jobs:
           ./gradlew :app:testDebugUnitTest :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace
 
       - name: Upload debug APK
-        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: ILYRO-debug-${{ github.sha }}
