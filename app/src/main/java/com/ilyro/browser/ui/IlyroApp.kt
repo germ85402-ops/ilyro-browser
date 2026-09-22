@@ -790,8 +790,6 @@ private fun BrowserScreen(
     var currentGeckoView by remember { mutableStateOf<GeckoView?>(null) }
     var previewRecencyCounter by remember { mutableIntStateOf(0) }
     var textScaleReloadRevision by remember { mutableIntStateOf(0) }
-    var fullscreenForcedLandscape by remember { mutableStateOf(false) }
-    var fullscreenPreviousOrientation by remember { mutableStateOf<Int?>(null) }
     var fullscreenImeState by remember { mutableStateOf(false) }
     val pageTransitionColor = MaterialTheme.colorScheme.background.toArgb()
 
@@ -990,8 +988,6 @@ private fun BrowserScreen(
                 activity.window,
                 activity.window.decorView
             )
-            val isPhone = activity.resources.configuration.smallestScreenWidthDp < 600
-
             // Fullscreen transitions can preserve a stale editable Gecko focus across an
             // orientation/display change. Hide the IME explicitly, but do not steal Gecko
             // session focus: media controls and playback remain attached to the active page.
@@ -1019,24 +1015,12 @@ private fun BrowserScreen(
                 activity.window.decorView.requestLayout()
                 currentGeckoView?.let { view ->
                     view.requestLayout()
+                    ViewCompat.requestApplyInsets(activity.window.decorView)
+                    ViewCompat.requestApplyInsets(view)
+                    view.setVerticalClipping(0)
                     view.invalidate()
-                    delay(180L)
-                    if (activeTab.isFullScreen && currentGeckoView === view) {
-                        activity.window.decorView.requestLayout()
-                        view.requestLayout()
-                        ViewCompat.requestApplyInsets(activity.window.decorView)
-                        ViewCompat.requestApplyInsets(view)
-                        view.setVerticalClipping(0)
-                        view.invalidate()
-                    }
                 }
 
-                if (isPhone && !fullscreenForcedLandscape) {
-                    fullscreenPreviousOrientation = activity.requestedOrientation
-                    activity.requestedOrientation =
-                        android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-                    fullscreenForcedLandscape = true
-                }
             } else {
                 activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
                 controller.show(WindowInsetsCompat.Type.systemBars())
@@ -1050,13 +1034,6 @@ private fun BrowserScreen(
                     activity.window.decorView.postDelayed({ hideFullscreenTransitionIme() }, 320L)
                 }
 
-                if (isPhone && fullscreenForcedLandscape) {
-                    activity.requestedOrientation =
-                        fullscreenPreviousOrientation
-                            ?: android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-                    fullscreenPreviousOrientation = null
-                    fullscreenForcedLandscape = false
-                }
             }
         }
     }
@@ -1071,7 +1048,10 @@ private fun BrowserScreen(
                 when (event) {
                     Lifecycle.Event.ON_START -> {
                         tabs.forEach { candidate ->
-                            candidate.applyActiveState(candidate.id == activeTabId)
+                            candidate.applyActiveState(
+                                active = candidate.id == activeTabId,
+                                restoreInputFocus = false
+                            )
                         }
                         if (selectedTab != null && !isHome && !readerModeActive) {
                             NativeBrowserHostCoordinator.render(selectedTab.session)
@@ -1080,7 +1060,10 @@ private fun BrowserScreen(
                     }
                     Lifecycle.Event.ON_RESUME -> {
                         tabs.forEach { candidate ->
-                            candidate.applyActiveState(candidate.id == activeTabId)
+                            candidate.applyActiveState(
+                                active = candidate.id == activeTabId,
+                                restoreInputFocus = false
+                            )
                         }
                         ProtectionBridge.setActiveSession(selectedTab?.session)
                         if (selectedTab != null && !isHome && !readerModeActive) {
