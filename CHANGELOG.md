@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.26.0-rc10 — release candidate
+
+- Include the complete mobile YouTube/fullscreen surface fix in the release tree.
+- Keep playing YouTube media through transient focus and orientation changes without recreating the surface unnecessarily.
+- Restore playback only when Android interrupted a video that was already playing.
+- Preserve the stale-tab-surface fix while switching tabs.
+
 ## 0.26.0-rc9 — release candidate
 
 - Refine mobile YouTube/fullscreen surface restoration to reduce black frames and accidental playback interruptions.

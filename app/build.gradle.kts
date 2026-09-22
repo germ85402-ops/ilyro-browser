@@ -14,7 +14,7 @@ android {
     compileSdk { version = release(37) { minorApiLevel = 2 } }
     defaultConfig {
         applicationId = "com.ilyro.browser"; minSdk = 26; targetSdk = 36
-        versionCode = 147; versionName = "0.26.0-rc9"
+        versionCode = 148; versionName = "0.26.0-rc10"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["appLabel"] = "ILYRO"
         ndk { abiFilters += "arm64-v8a" }

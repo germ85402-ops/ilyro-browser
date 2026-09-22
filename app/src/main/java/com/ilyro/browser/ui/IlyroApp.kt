@@ -1064,7 +1064,12 @@ private fun BrowserScreen(
                         }
                     }
                     Lifecycle.Event.ON_PAUSE -> {
-                        tabs.forEach { it.setFocused(false) }
+                        val keepPlayingSessionFocused = GeckoMediaSessionBridge.hasPlayingPlayback()
+                        tabs.forEach { candidate ->
+                            if (candidate.id != activeTabId || !keepPlayingSessionFocused) {
+                                candidate.setFocused(false)
+                            }
+                        }
                     }
                     Lifecycle.Event.ON_STOP -> {
                         tabs.filterNot { it.isPrivate }.forEach { candidate ->

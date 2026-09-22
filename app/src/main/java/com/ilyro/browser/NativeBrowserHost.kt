@@ -115,6 +115,13 @@ internal object NativeBrowserHostCoordinator {
         }
     }
 
+    /** Restore input/display visibility after a transient Android focus change. */
+    fun restoreVisible() {
+        val host = hostRef.get() ?: return
+        host.visibility = View.VISIBLE
+        rootRef.get()?.setEngineVisible(true)
+    }
+
     fun render(session: GeckoSession) {
         val host = hostRef.get() ?: return
         val changed = host.render(session)
