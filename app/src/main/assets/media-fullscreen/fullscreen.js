@@ -36,13 +36,21 @@
       margin: 0 !important;
     }
 
+    /* Use viewport units: 100% resolves against YouTube's intermediate player,
+     * which can reserve 48px for controls (880x348 inside an 880x396 fullscreen).
+     * Native Gecko bounds are already correct; do not resize or recreate its surface.
+     */
     html.ilyro-youtube-fullscreen :fullscreen .html5-video-container {
+      box-sizing: border-box !important;
+      padding: 0 !important;
       position: absolute !important;
       inset: 0 !important;
-      width: 100% !important;
-      height: 100% !important;
-      min-width: 100% !important;
-      min-height: 100% !important;
+      width: 100vw !important;
+      width: 100dvw !important;
+      height: 100vh !important;
+      height: 100dvh !important;
+      min-width: 100dvw !important;
+      min-height: 100dvh !important;
       max-width: none !important;
       max-height: none !important;
       margin: 0 !important;
