@@ -291,13 +291,14 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
                     previousDisplayKey != nextDisplayKey &&
                     GeckoMediaSessionBridge.hasPlayingPlayback()
             ) {
-                window.decorView.postDelayed({
-                    if (!hasWindowFocus()) return@postDelayed
-                    NativeBrowserHostCoordinator.recreateDisplay()
+                // GeckoView already owns its compositor across handled configuration changes.
+                // Recreating the display here can momentarily detach the video surface and make
+                // YouTube pause/buffer. Keep the surface attached and only refresh layout/insets.
+                window.decorView.post {
+                    if (!hasWindowFocus()) return@post
                     NativeBrowserHostCoordinator.restoreVisible()
                     restoreAttachedGeckoSurface(window.decorView)
-                    GeckoMediaSessionBridge.resumeSelectedPlaybackIfNeeded()
-                }, 140L)
+                }
             }
         }
     }
