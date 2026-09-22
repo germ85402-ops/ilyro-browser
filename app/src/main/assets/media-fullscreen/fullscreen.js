@@ -87,6 +87,58 @@
 
   if (!isYouTube) return;
 
+
+  // Opt-in, geometry-only diagnostics; never collect page text, URLs or media sources.
+  if (new URLSearchParams(location.search).get('ilyro_fs_debug') === '1') {
+    let panel = null;
+    let port = null;
+    let nativeGeometry = 'native: waiting';
+    function box(element) {
+      if (!element) return 'none';
+      const r = element.getBoundingClientRect();
+      return element.tagName + ' ' + [r.x, r.y, r.width, r.height].map(Math.round).join(',');
+    }
+    function sample() {
+      const fs = document.fullscreenElement;
+      if (!fs) {
+        panel?.remove();
+        panel = null;
+        return;
+      }
+      if (!panel) {
+        panel = document.createElement('pre');
+        panel.style.cssText = 'position:fixed!important;left:4px!important;bottom:4px!important;z-index:2147483647!important;background:#000d!important;color:#fff!important;font:11px monospace!important;padding:6px!important;margin:0!important;pointer-events:none!important;white-space:pre-wrap!important;max-width:95vw!important;';
+        (fs instanceof HTMLVideoElement ? document.documentElement : fs).appendChild(panel);
+      }
+      const video = fs instanceof HTMLVideoElement ? fs : fs.querySelector('video');
+      const lines = [
+        'ILYRO fullscreen diagnostic',
+        nativeGeometry,
+        'viewport: ' + innerWidth + 'x' + innerHeight + ' DPR ' + devicePixelRatio,
+        'fullscreen: ' + box(fs),
+        'video: ' + box(video),
+        'parent: ' + box(video?.parentElement),
+        'helper CSS: ' + Boolean(video?.matches(':fullscreen .html5-video-container video.html5-main-video, :fullscreen .html5-video-container video.video-stream')),
+        'source size: ' + (video ? video.videoWidth + 'x' + video.videoHeight : 'none')
+      ];
+      panel.textContent = lines.join('\n');
+      try {
+        if (!port) {
+          port = browser.runtime.connectNative('ilyro_gestures');
+          port.onMessage.addListener(message => {
+            if (message.type === 'fullscreenGeometry') nativeGeometry = message.geometry;
+          });
+          port.onDisconnect.addListener(() => { port = null; });
+        }
+        port.postMessage({ type: 'fullscreenGeometry' });
+      } catch (_) { nativeGeometry = 'native: unavailable'; }
+    }
+    document.addEventListener('fullscreenchange', sample, true);
+    window.addEventListener('resize', sample);
+    // One bounded-rate sample while fullscreen; no video styles or focus changes.
+    setInterval(() => { if (document.fullscreenElement) sample(); }, 1000);
+  }
+
   function syncFullscreenState() {
     document.documentElement?.classList.toggle(
       'ilyro-youtube-fullscreen',
