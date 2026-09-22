@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.26.0-rc15 — release candidate
+
+- Size the YouTube fullscreen video container against the viewport instead of the shorter intermediate player, fixing the top-aligned video and bottom gap confirmed by on-device geometry diagnostics.
+- Update the bundled fullscreen helper to 1.8.3. The user confirmed the fix in the debug build; signed-release device validation remains pending.
+
 ## 0.26.0-rc14 — release candidate
 
 - Pin the Activity-owned GeckoView host to the full native window for the complete web-fullscreen lifetime instead of relying on transient Compose bounds during phone rotation.
