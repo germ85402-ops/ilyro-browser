@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.26.0-rc13 — release candidate
+
+- Wait for the bundled media fullscreen helper before opening the first page, preventing release-only YouTube fullscreen sizing races.
+- Make the website APK buttons resolve the newest published ARM64 release automatically, including prereleases.
+
+
 ## 0.26.0-rc12 — release candidate
 
 - Re-measure the Compose content rectangle and native Gecko host after phone fullscreen rotation so YouTube expands to the full available landscape surface without cropping.
