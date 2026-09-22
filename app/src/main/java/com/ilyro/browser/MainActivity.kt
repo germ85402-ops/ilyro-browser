@@ -295,7 +295,7 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
                     if (!hasWindowFocus()) return@postDelayed
                     NativeBrowserHostCoordinator.recreateDisplay()
                     NativeBrowserHostCoordinator.restoreVisible()
-                    restoreAttachedGecko(window.decorView)
+                    restoreAttachedGeckoSurface(window.decorView)
                     GeckoMediaSessionBridge.resumeSelectedPlaybackIfNeeded()
                 }, 140L)
             }
@@ -344,7 +344,7 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
 
                 NativeBrowserHostCoordinator.recreateDisplay()
                 NativeBrowserHostCoordinator.restoreVisible()
-                restoreAttachedGecko(window.decorView)
+                restoreAttachedGeckoSurface(window.decorView)
 
                 if (remainingAttempts == 0) {
                     externalMediaRestoreScheduled = false
@@ -365,7 +365,7 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
             mediaWindowFocusRestoreScheduled = false
             if (!hasWindowFocus()) return@postDelayed
             NativeBrowserHostCoordinator.restoreVisible()
-            restoreAttachedGecko(window.decorView)
+            restoreAttachedGeckoSurface(window.decorView)
             GeckoMediaSessionBridge.resumeSelectedPlaybackIfNeeded()
         }, 140L)
     }
@@ -378,12 +378,18 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
             configuration.smallestScreenWidthDp
         ).joinToString(":")
 
-    private fun restoreAttachedGecko(view: View) {
+    /**
+     * Restore only the Gecko compositor after Android changed window focus/orientation.
+     *
+     * Do not call GeckoSession.setFocused(true) here. Session focus is input focus, not render
+     * visibility; forcing it during fullscreen restoration can re-focus a previously editable
+     * element and make Android reopen the IME. BrowserScreen owns normal tab focus state.
+     */
+    private fun restoreAttachedGeckoSurface(view: View) {
         if (view is GeckoView) {
             view.getSession()?.let { session ->
                 runCatching {
                     session.setActive(true)
-                    session.setFocused(true)
                     session.setPriorityHint(GeckoSession.PRIORITY_HIGH)
                     view.requestLayout()
                     ViewCompat.requestApplyInsets(view)
@@ -392,7 +398,9 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
             }
         }
         if (view is ViewGroup) {
-            for (index in 0 until view.childCount) restoreAttachedGecko(view.getChildAt(index))
+            for (index in 0 until view.childCount) {
+                restoreAttachedGeckoSurface(view.getChildAt(index))
+            }
         }
     }
 
