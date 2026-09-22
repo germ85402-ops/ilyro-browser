@@ -117,28 +117,7 @@ internal object BrowserEngine {
                 // The release build can reach the first page faster than debug. Treat the
                 // fullscreen helper as part of the startup barrier so YouTube cannot load before
                 // its fullscreen CSS/content script is enabled.
-                mediaFullscreenReady = false
-                controller.ensureBuiltIn(
-                    MEDIA_FULLSCREEN_EXTENSION_URI,
-                    MEDIA_FULLSCREEN_EXTENSION_ID
-                ).accept(
-                    { extension ->
-                        if (extension != null) {
-                            prepareHelperExtension(controller, extension) { stableExtension ->
-                                PageGestureBridge.attach(stableExtension)
-                                mediaFullscreenReady = true
-                            }
-                        } else {
-                            // Gecko can still provide native fullscreen if the optional helper
-                            // is unavailable, but the startup barrier must not wait forever.
-                            mediaFullscreenReady = true
-                        }
-                    },
-                    { error ->
-                        Log.e(ENGINE_LOG_TAG, "Failed to initialize media fullscreen helper", error)
-                        mediaFullscreenReady = true
-                    }
-                )
+                initializeFullscreenHelper(context.applicationContext, controller)
                 mediaDetectorReady = false
                 controller.ensureBuiltIn(
                     MEDIA_DETECTOR_EXTENSION_URI,
@@ -287,6 +266,59 @@ internal object BrowserEngine {
                 onReady(extension)
             }
         )
+    }
+
+    // Verify the actual returned version, not just successful completion of ensureBuiltIn.
+    // Retry once using the APK directly; never uninstall or clear the Gecko profile.
+    private fun initializeFullscreenHelper(context: Context, controller: WebExtensionController) {
+        mediaFullscreenReady = false
+        val expected = try {
+            context.assets.open("media-fullscreen/manifest.json").bufferedReader().use {
+                org.json.JSONObject(it.readText()).getString("version")
+            }
+        } catch (error: Exception) {
+            Log.e(ENGINE_LOG_TAG, "Cannot read bundled fullscreen version", error)
+            mediaFullscreenReady = true
+            return
+        }
+
+        fun attempt(reinstall: Boolean) {
+            fun failed(reason: String, error: Throwable? = null) {
+                Log.e(ENGINE_LOG_TAG, reason, error)
+                if (!reinstall) {
+                    attempt(true)
+                } else {
+                    // Optional helper failure must not make the entire browser unusable.
+                    // No success marker is persisted: the next process startup retries.
+                    mediaFullscreenReady = true
+                }
+            }
+            val result = if (reinstall) {
+                controller.installBuiltIn(MEDIA_FULLSCREEN_EXTENSION_URI)
+            } else {
+                controller.ensureBuiltIn(MEDIA_FULLSCREEN_EXTENSION_URI, MEDIA_FULLSCREEN_EXTENSION_ID)
+            }
+            result.accept(
+                { extension ->
+                    if (extension == null || extension.metaData.version != expected) {
+                        failed("Fullscreen helper version mismatch: expected=$expected actual=${extension?.metaData?.version}")
+                    } else {
+                        prepareHelperExtension(controller, extension) { stable ->
+                            if (stable.metaData.version != expected || !stable.metaData.enabled ||
+                                !stable.metaData.allowedInPrivateBrowsing) {
+                                failed("Fullscreen helper did not reach the required enabled state")
+                            } else {
+                                PageGestureBridge.attach(stable)
+                                Log.i(ENGINE_LOG_TAG, "Fullscreen helper ready: $expected; reinstall=$reinstall")
+                                mediaFullscreenReady = true
+                            }
+                        }
+                    }
+                },
+                { error -> failed("Fullscreen helper initialization failed; reinstall=$reinstall", error) }
+            )
+        }
+        attempt(false)
     }
 
     private fun prepareHelperExtension(

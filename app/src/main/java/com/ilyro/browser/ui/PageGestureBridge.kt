@@ -37,6 +37,7 @@ internal object PageGestureBridge {
                                 view?.getLocationInWindow(position)
                                 port.postMessage(JSONObject().apply {
                                     put("type", "fullscreenGeometry")
+                                    put("helperVersion", extension.metaData.version)
                                     put("geometry", "native px: root=${root?.width}x${root?.height} Gecko=${view?.width}x${view?.height} at ${position[0]},${position[1]}")
                                 })
                                 return

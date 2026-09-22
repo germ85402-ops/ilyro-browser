@@ -101,6 +101,7 @@
     let panel = null;
     let port = null;
     let nativeGeometry = 'native: waiting';
+    let installedVersion = 'waiting';
     function box(element) {
       if (!element) return 'none';
       const r = element.getBoundingClientRect();
@@ -121,6 +122,7 @@
       const video = fs instanceof HTMLVideoElement ? fs : fs.querySelector('video');
       const lines = [
         'ILYRO fullscreen diagnostic',
+        'helper: script=' + browser.runtime.getManifest().version + ' native=' + installedVersion,
         nativeGeometry,
         'viewport: ' + innerWidth + 'x' + innerHeight + ' DPR ' + devicePixelRatio,
         'fullscreen: ' + box(fs),
@@ -134,7 +136,10 @@
         if (!port) {
           port = browser.runtime.connectNative('ilyro_gestures');
           port.onMessage.addListener(message => {
-            if (message.type === 'fullscreenGeometry') nativeGeometry = message.geometry;
+            if (message.type === 'fullscreenGeometry') {
+              nativeGeometry = message.geometry;
+              installedVersion = message.helperVersion || 'unreported';
+            }
           });
           port.onDisconnect.addListener(() => { port = null; });
         }
