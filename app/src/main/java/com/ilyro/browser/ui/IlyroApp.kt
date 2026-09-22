@@ -792,6 +792,7 @@ private fun BrowserScreen(
     var textScaleReloadRevision by remember { mutableIntStateOf(0) }
     var fullscreenForcedLandscape by remember { mutableStateOf(false) }
     var fullscreenPreviousOrientation by remember { mutableStateOf<Int?>(null) }
+    var fullscreenImeState by remember { mutableStateOf(false) }
     val pageTransitionColor = MaterialTheme.colorScheme.background.toArgb()
 
     SideEffect {
@@ -1002,8 +1003,12 @@ private fun BrowserScreen(
                     android.view.inputmethod.InputMethodManager)
                     ?.hideSoftInputFromWindow(activity.window.decorView.windowToken, 0)
             }
-            hideFullscreenTransitionIme()
-            activity.window.decorView.post { hideFullscreenTransitionIme() }
+            val fullscreenTransition = fullscreenImeState != isFullScreen
+            fullscreenImeState = isFullScreen
+            if (fullscreenTransition) {
+                hideFullscreenTransitionIme()
+                activity.window.decorView.post { hideFullscreenTransitionIme() }
+            }
 
             if (isFullScreen) {
                 activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
@@ -1040,8 +1045,10 @@ private fun BrowserScreen(
 
                 // Orientation restoration happens asynchronously on phones. Re-hide any IME
                 // that Android may try to resurrect from the old fullscreen focus snapshot.
-                activity.window.decorView.postDelayed({ hideFullscreenTransitionIme() }, 120L)
-                activity.window.decorView.postDelayed({ hideFullscreenTransitionIme() }, 320L)
+                if (fullscreenTransition) {
+                    activity.window.decorView.postDelayed({ hideFullscreenTransitionIme() }, 120L)
+                    activity.window.decorView.postDelayed({ hideFullscreenTransitionIme() }, 320L)
+                }
 
                 if (isPhone && fullscreenForcedLandscape) {
                     activity.requestedOrientation =
