@@ -25,10 +25,12 @@
       background-color: transparent !important;
       position: fixed !important;
       inset: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      min-width: 100vw !important;
-      min-height: 100vh !important;
+      width: 100% !important;
+      height: 100% !important;
+      width: 100dvw !important;
+      height: 100dvh !important;
+      min-width: 100% !important;
+      min-height: 100% !important;
       max-width: none !important;
       max-height: none !important;
       margin: 0 !important;
@@ -37,10 +39,10 @@
     html.ilyro-youtube-fullscreen :fullscreen .html5-video-container {
       position: absolute !important;
       inset: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      min-width: 100vw !important;
-      min-height: 100vh !important;
+      width: 100% !important;
+      height: 100% !important;
+      min-width: 100% !important;
+      min-height: 100% !important;
       max-width: none !important;
       max-height: none !important;
       margin: 0 !important;
@@ -53,6 +55,7 @@
 
     html.ilyro-youtube-fullscreen :fullscreen .html5-video-container video.html5-main-video,
     html.ilyro-youtube-fullscreen :fullscreen .html5-video-container video.video-stream {
+      box-sizing: border-box !important;
       position: relative !important;
       inset: auto !important;
       top: auto !important;
