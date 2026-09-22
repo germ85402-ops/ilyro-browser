@@ -181,6 +181,41 @@ internal object NativeBrowserHostCoordinator {
         rootRef.get()?.clearEngineInputExclusion()
     }
 
+    /**
+     * Re-measure the native Gecko host after an Activity-handled configuration change.
+     *
+     * Fullscreen rotation keeps MainActivity alive via configChanges. The window changes size,
+     * but the Compose content rectangle and the native host can otherwise retain the previous
+     * portrait bounds for one or more frames. Request both passes without touching Gecko input
+     * focus or recreating the media surface.
+     */
+    fun requestLayoutAfterConfigurationChange() {
+        val root = rootRef.get() ?: return
+
+        fun requestLayoutPass() {
+            root.requestLayout()
+            ViewCompat.requestApplyInsets(root)
+            root.invalidate()
+
+            hostRef.get()?.let { host ->
+                host.requestLayout()
+                ViewCompat.requestApplyInsets(host)
+                host.invalidate()
+
+                host.geckoView().let { view ->
+                    view.requestLayout()
+                    ViewCompat.requestApplyInsets(view)
+                    view.invalidate()
+                }
+            }
+        }
+
+        root.post {
+            requestLayoutPass()
+            root.postOnAnimation { requestLayoutPass() }
+        }
+    }
+
     fun setBounds(left: Int, top: Int, right: Int, bottom: Int) {
         rootRef.get()?.setEngineBounds(left, top, right, bottom)
     }

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.26.0-rc12 — release candidate
+
+- Re-measure the Compose content rectangle and native Gecko host after phone fullscreen rotation so YouTube expands to the full available landscape surface without cropping.
+- Keep tablet orientation behavior unchanged and avoid restoring Gecko input focus or recreating the media surface during the layout refresh.
+
 ## 0.26.0-rc11 — release candidate
 
 - Match Chrome-style fullscreen rotation on phones: enter landscape even when system auto-rotate is off, then restore the previous orientation on exit.

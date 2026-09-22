@@ -286,6 +286,14 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
         if (::browserPrefs.isInitialized) {
             applySystemChrome()
             window.decorView.post { applySystemChrome() }
+
+            // configChanges keeps the Activity and GeckoSession alive during phone fullscreen
+            // rotation. Re-measure the complete host hierarchy, not only the Gecko surface.
+            NativeBrowserHostCoordinator.requestLayoutAfterConfigurationChange()
+            window.decorView.postDelayed({
+                NativeBrowserHostCoordinator.requestLayoutAfterConfigurationChange()
+            }, 120L)
+
             if (
                 previousDisplayKey.isNotBlank() &&
                     previousDisplayKey != nextDisplayKey &&

@@ -123,6 +123,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextRange
@@ -801,6 +802,7 @@ private fun BrowserScreen(
 
     val activeTab = tabs.firstOrNull { it.id == activeTabId } ?: tabs.first()
     val isFullScreen = activeTab.isFullScreen
+    val displayConfiguration = LocalConfiguration.current
     var addressText by remember(activeTabId) {
         mutableStateOf(if (activeTab.url == HOME_URL) "" else activeTab.url)
     }
@@ -984,7 +986,13 @@ private fun BrowserScreen(
         }
     }
 
-    LaunchedEffect(isFullScreen, darkTheme) {
+    LaunchedEffect(
+        isFullScreen,
+        darkTheme,
+        displayConfiguration.orientation,
+        displayConfiguration.screenWidthDp,
+        displayConfiguration.screenHeightDp
+    ) {
         context.findActivity()?.let { activity ->
             val controller = WindowCompat.getInsetsController(
                 activity.window,
@@ -1050,6 +1058,12 @@ private fun BrowserScreen(
                     fullscreenPreviousOrientation = null
                     fullscreenForcedLandscape = false
                 }
+            }
+
+            // Run after the current fullscreen/orientation transaction so the Compose content
+            // rectangle and native Gecko host converge on the final landscape/portrait bounds.
+            activity.window.decorView.post {
+                NativeBrowserHostCoordinator.requestLayoutAfterConfigurationChange()
             }
         }
     }
