@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.26.0-rc11 — release candidate
+
+- Match Chrome-style fullscreen rotation on phones: enter landscape even when system auto-rotate is off, then restore the previous orientation on exit.
+- Keep tablets and larger screens in their current orientation during fullscreen playback.
+- Keep the Gecko media surface attached across configuration changes instead of recreating the display, reducing pauses and startup buffering.
+- Separate media-surface restoration from Gecko input focus to prevent fullscreen transitions from reopening the keyboard.
+- Improve YouTube fullscreen sizing across phones and tablets with dynamic viewport sizing while preserving aspect ratio.
+
+
 ## 0.26.0-rc10 — release candidate
 
 - Include the complete mobile YouTube/fullscreen surface fix in the release tree.
