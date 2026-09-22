@@ -366,10 +366,14 @@ internal class BrowserTab(
         }
     }
 
-    fun applyActiveState(active: Boolean) {
+    fun applyActiveState(active: Boolean, restoreInputFocus: Boolean = true) {
         if (!sessionOpened && !session.isOpen()) return
         session.setActive(active)
-        session.setFocused(active)
+        if (!active) {
+            session.setFocused(false)
+        } else if (restoreInputFocus) {
+            session.setFocused(true)
+        }
         session.setPriorityHint(
             if (active) GeckoSession.PRIORITY_HIGH else GeckoSession.PRIORITY_DEFAULT
         )
