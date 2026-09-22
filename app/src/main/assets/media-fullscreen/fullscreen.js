@@ -22,17 +22,14 @@
      * surface transparent so that glow remains visible around the centered video.
      */
     html.ilyro-youtube-fullscreen :fullscreen {
+      /*
+       * The fullscreen element's containing block is already the viewport, so inset: 0 is
+       * enough. Viewport units (dvw/dvh) can still report the pre-transition size while the
+       * system bars are being hidden, which letterboxed or cropped the video.
+       */
       background-color: transparent !important;
       position: fixed !important;
       inset: 0 !important;
-      width: 100% !important;
-      height: 100% !important;
-      width: 100dvw !important;
-      height: 100dvh !important;
-      min-width: 100% !important;
-      min-height: 100% !important;
-      max-width: none !important;
-      max-height: none !important;
       margin: 0 !important;
     }
 
@@ -41,10 +38,11 @@
       inset: 0 !important;
       width: 100% !important;
       height: 100% !important;
-      min-width: 100% !important;
-      min-height: 100% !important;
-      max-width: none !important;
-      max-height: none !important;
+      min-width: 0 !important;
+      min-height: 0 !important;
+      max-width: 100% !important;
+      max-height: 100% !important;
+      box-sizing: border-box !important;
       margin: 0 !important;
       overflow: hidden !important;
       display: flex !important;

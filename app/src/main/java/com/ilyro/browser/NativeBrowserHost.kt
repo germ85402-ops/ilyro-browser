@@ -194,6 +194,7 @@ internal object NativeBrowserHostCoordinator {
         val root = rootRef.get() ?: return
 
         fun requestLayoutPass() {
+            root.refreshEngineBounds()
             root.requestLayout()
             ViewCompat.requestApplyInsets(root)
             root.invalidate()
@@ -221,6 +222,18 @@ internal object NativeBrowserHostCoordinator {
         rootRef.get()?.setEngineBounds(left, top, right, bottom)
     }
 
+    /**
+     * Switch the native host between Compose-driven chrome bounds and window-sized fullscreen.
+     *
+     * Web fullscreen must never depend on a Compose measurement pass: entering fullscreen also
+     * rotates the phone, and the window can reach its final landscape size one or more frames
+     * before Compose reports the new content rectangle. While fullscreen is active the host is
+     * laid out directly against the root window bounds and refreshed from onSizeChanged.
+     */
+    fun setFullscreen(enabled: Boolean) {
+        rootRef.get()?.setEngineFullscreen(enabled)
+    }
+
     fun setInputEnabled(enabled: Boolean) {
         rootRef.get()?.setEngineInputEnabled(enabled)
     }
@@ -233,11 +246,13 @@ internal class BrowserRootLayout(
     private var transitionColor = initialTransitionColor
     private var engineHost: IlyroEngineView? = null
     private val engineBounds = Rect()
+    private val fullscreenBounds = Rect()
     private val engineInputExclusionBounds = Rect()
     private var engineVisible = false
     private var engineInputEnabled = false
     private var engineGestureActive = false
     private var engineGestureDownTime = 0L
+    private var engineFullscreen = false
 
     init {
         setBackgroundColor(transitionColor)
@@ -266,20 +281,54 @@ internal class BrowserRootLayout(
     fun setEngineBounds(left: Int, top: Int, right: Int, bottom: Int) {
         val safeRight = right.coerceAtLeast(left + 1)
         val safeBottom = bottom.coerceAtLeast(top + 1)
+        engineBounds.set(left, top, safeRight, safeBottom)
+        // Fullscreen owns the host geometry. Keep the reported chrome rectangle so it can be
+        // restored on exit, but never let a late Compose pass shrink the fullscreen surface.
+        if (engineFullscreen) return
+        applyEngineBounds(engineBounds)
+    }
+
+    fun setEngineFullscreen(enabled: Boolean) {
+        if (engineFullscreen == enabled) return
+        engineFullscreen = enabled
+        refreshEngineBounds()
+    }
+
+    /** Re-apply the currently authoritative host geometry after a layout/configuration change. */
+    fun refreshEngineBounds() {
+        if (engineFullscreen) {
+            if (width <= 0 || height <= 0) return
+            fullscreenBounds.set(0, 0, width, height)
+            applyEngineBounds(fullscreenBounds)
+        } else if (!engineBounds.isEmpty) {
+            applyEngineBounds(engineBounds)
+        }
+    }
+
+    private fun activeEngineBounds(): Rect = if (engineFullscreen) fullscreenBounds else engineBounds
+
+    private fun applyEngineBounds(bounds: Rect) {
+        val host = engineHost ?: return
+        val current = host.layoutParams as? LayoutParams
         if (
-            engineBounds.left == left &&
-            engineBounds.top == top &&
-            engineBounds.right == safeRight &&
-            engineBounds.bottom == safeBottom
+            current != null &&
+            current.width == bounds.width() &&
+            current.height == bounds.height() &&
+            current.leftMargin == bounds.left &&
+            current.topMargin == bounds.top
         ) return
 
-        engineBounds.set(left, top, safeRight, safeBottom)
-        val host = engineHost ?: return
-        host.layoutParams = LayoutParams(engineBounds.width(), engineBounds.height()).apply {
-            leftMargin = engineBounds.left
-            topMargin = engineBounds.top
+        host.layoutParams = LayoutParams(bounds.width(), bounds.height()).apply {
+            leftMargin = bounds.left
+            topMargin = bounds.top
         }
         host.requestLayout()
+    }
+
+    override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
+        super.onSizeChanged(width, height, oldWidth, oldHeight)
+        // Phone fullscreen rotation resizes the window while Compose is still measuring.
+        if (engineFullscreen) refreshEngineBounds()
     }
 
     fun setEngineInputExclusion(left: Int, top: Int, right: Int, bottom: Int) {
@@ -318,18 +367,19 @@ internal class BrowserRootLayout(
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
         val host = engineHost
         if (host != null && engineVisible && engineInputEnabled) {
+            val bounds = activeEngineBounds()
             if (event.actionMasked == MotionEvent.ACTION_DOWN) {
                 val x = event.x.toInt()
                 val y = event.y.toInt()
                 engineGestureActive =
-                    engineBounds.contains(x, y) &&
+                    bounds.contains(x, y) &&
                         !engineInputExclusionBounds.contains(x, y)
                 engineGestureDownTime = if (engineGestureActive) event.downTime else 0L
             }
 
             if (engineGestureActive) {
                 val copy = MotionEvent.obtain(event)
-                copy.offsetLocation(-engineBounds.left.toFloat(), -engineBounds.top.toFloat())
+                copy.offsetLocation(-bounds.left.toFloat(), -bounds.top.toFloat())
                 val handled = host.dispatchTouchEvent(copy)
                 copy.recycle()
 

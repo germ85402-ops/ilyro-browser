@@ -1018,7 +1018,9 @@ private fun BrowserScreen(
             }
 
             if (isFullScreen) {
-                activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
+                // Do not use the deprecated FLAG_FULLSCREEN together with edge-to-edge: on
+                // API 30+ it is ignored and can leave stale insets during the transition.
+                NativeBrowserHostCoordinator.setFullscreen(true)
                 controller.systemBarsBehavior =
                     WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
                 controller.hide(WindowInsetsCompat.Type.systemBars())
@@ -1039,7 +1041,7 @@ private fun BrowserScreen(
                     fullscreenForcedLandscape = true
                 }
             } else {
-                activity.window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_FULLSCREEN)
+                NativeBrowserHostCoordinator.setFullscreen(false)
                 controller.show(WindowInsetsCompat.Type.systemBars())
                 controller.isAppearanceLightStatusBars = !darkTheme
                 controller.isAppearanceLightNavigationBars = !darkTheme

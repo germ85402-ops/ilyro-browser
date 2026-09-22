@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Lay the native Gecko host out directly against the window while web fullscreen is active, so phone fullscreen rotation no longer depends on a late Compose measurement pass.
+- Stop combining the deprecated `FLAG_FULLSCREEN` with edge-to-edge insets during fullscreen transitions.
+- Simplify the bundled YouTube fullscreen CSS: rely on the fullscreen containing block instead of `dvw`/`dvh`, which could report the pre-transition viewport size.
+
 ## 0.26.0-rc13 — release candidate
 
 - Wait for the bundled media fullscreen helper before opening the first page, preventing release-only YouTube fullscreen sizing races.
