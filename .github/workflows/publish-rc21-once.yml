@@ -11,24 +11,19 @@ permissions:
 
 jobs:
   release:
-    if: github.event.head_commit.message == 'Enable rc21 publisher'
+    if: startsWith(github.event.head_commit.message, 'Retry rc21 publication')
     runs-on: ubuntu-latest
     steps:
       - name: Create rc21 tag and dispatch signed release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: v0.26.0-rc21
         run: |
           set -euo pipefail
-          release_sha='69ba591a4e834c159ac05227f22b1a86847ec4db'
-          ref="refs/tags/$RELEASE_TAG"
-          existing_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha' 2>/dev/null || true)
-          if [ -z "$existing_sha" ]; then
-            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=$ref" -f "sha=$release_sha"
-          else
-            test "$existing_sha" = "$release_sha"
+          tag_name='v0.26.0-rc21'
+          if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag_name" >/dev/null 2>&1; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$tag_name" -f "sha=$GITHUB_SHA"
           fi
-          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$RELEASE_TAG"
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$tag_name"
 
       - name: Remove the one-time publisher
         env:
