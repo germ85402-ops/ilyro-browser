@@ -123,4 +123,65 @@ class OmniboxLayoutTest {
             )
         )
     }
+
+    @Test
+    fun phonePortraitKeepsBothToolbarLayoutsBetweenFieldAndKeyboard() {
+        // A 720 dp tall phone window at roughly 3.3 px/dp, with the keyboard open.
+        val windowHeight = 2400
+        val statusBar = 72
+        val navigationBar = 72
+        val ime = 840
+        val gap = 24
+        val safeBottom = windowHeight - ime
+
+        val belowTopToolbar = calculateOmniboxPopupAvailableHeight(
+            placeAbove = false,
+            anchorTop = 260,
+            anchorBottom = 410,
+            windowHeight = windowHeight,
+            imeBottom = ime,
+            verticalGap = gap,
+            safeTopInset = statusBar,
+            navigationBarBottomInset = navigationBar
+        )
+        val topY = calculateOmniboxPopupY(
+            placeAbove = false,
+            anchorTop = 260,
+            anchorBottom = 410,
+            popupHeight = belowTopToolbar,
+            windowHeight = windowHeight,
+            imeBottom = ime,
+            verticalGap = gap,
+            safeTopInset = statusBar,
+            navigationBarBottomInset = navigationBar
+        )
+        assertEquals(1126, belowTopToolbar)
+        assertEquals(434, topY)
+        assertEquals(safeBottom, topY + belowTopToolbar)
+
+        val aboveBottomToolbar = calculateOmniboxPopupAvailableHeight(
+            placeAbove = true,
+            anchorTop = 1350,
+            anchorBottom = 1500,
+            windowHeight = windowHeight,
+            imeBottom = ime,
+            verticalGap = gap,
+            safeTopInset = statusBar,
+            navigationBarBottomInset = navigationBar
+        )
+        val bottomY = calculateOmniboxPopupY(
+            placeAbove = true,
+            anchorTop = 1350,
+            anchorBottom = 1500,
+            popupHeight = aboveBottomToolbar,
+            windowHeight = windowHeight,
+            imeBottom = ime,
+            verticalGap = gap,
+            safeTopInset = statusBar,
+            navigationBarBottomInset = navigationBar
+        )
+        assertEquals(1254, aboveBottomToolbar)
+        assertEquals(statusBar, bottomY)
+        assert(bottomY + aboveBottomToolbar < 1350)
+    }
 }
