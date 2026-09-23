@@ -1,0 +1,60 @@
+name: Prune old prereleases to the latest three once
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/cleanup-old-prereleases-once.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old prerelease pages and tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_tags=(
+            v0.26.0-rc11
+            v0.26.0-rc12
+            v0.26.0-rc13
+            v0.26.0-rc14
+            v0.26.0-rc15
+          )
+          old_tags=(
+            v0.26.0-rc6
+            v0.26.0-rc7
+            v0.26.0-rc8
+            v0.26.0-rc9
+            v0.26.0-rc10
+            v0.26.0-rc11
+            v0.26.0-rc12
+            v0.26.0-rc13
+            v0.26.0-rc14
+            v0.26.0-rc15
+          )
+          for tag in "${release_tags[@]}"; do
+            release_id="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq '.id')"
+            release_tag="$(gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" --jq '.tag_name')"
+            test "$release_tag" = "$tag"
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/releases/$release_id"
+          done
+          for tag in "${old_tags[@]}"; do
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/git/refs/tags/$tag"
+          done
+      - name: Remove this one-shot workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          path=.github/workflows/cleanup-old-prereleases-once.yml
+          sha="$(gh api "repos/$GITHUB_REPOSITORY/contents/$path?ref=main" --jq '.sha')"
+          gh api --method DELETE "repos/$GITHUB_REPOSITORY/contents/$path" \
+            -f message="Remove one-shot prerelease cleanup workflow" \
+            -f sha="$sha" \
+            -f branch=main
