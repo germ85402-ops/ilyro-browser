@@ -59,7 +59,7 @@ internal object BrowserSettingsSyncCodec {
         .put("showShortcutLabels", settings.showShortcutLabels)
         .put("homeBackground", settings.homeBackground.name)
         .put("customWallpaperUri", settings.customWallpaperUri.orEmpty())
-        .put("useSeparateDarkBackground", settings.useSeparateDarkBackground)
+        .put("useSeparateDarkBackground", true)
         .put("darkHomeBackground", settings.darkHomeBackground.name)
         .put("darkCustomWallpaperUri", settings.darkCustomWallpaperUri.orEmpty())
         .put("wallpaperFit", settings.wallpaperFit.name)
@@ -123,10 +123,7 @@ internal object BrowserSettingsSyncCodec {
             showShortcutLabels = json.optBoolean("showShortcutLabels", defaults.showShortcutLabels),
             homeBackground = enumOrDefault(json.optString("homeBackground"), defaults.homeBackground),
             customWallpaperUri = json.optString("customWallpaperUri").takeIf { it.isNotBlank() },
-            useSeparateDarkBackground = json.optBoolean(
-                "useSeparateDarkBackground",
-                defaults.useSeparateDarkBackground
-            ),
+            useSeparateDarkBackground = true,
             darkHomeBackground = enumOrDefault(
                 json.optString("darkHomeBackground"),
                 defaults.darkHomeBackground
