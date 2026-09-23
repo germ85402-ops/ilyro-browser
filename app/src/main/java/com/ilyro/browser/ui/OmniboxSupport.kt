@@ -1,5 +1,6 @@
 package com.ilyro.browser.ui
 
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image as ComposeImage
@@ -8,11 +9,14 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.horizontalScroll
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -27,12 +31,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ContentCopy
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -58,14 +68,18 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.input.TextRange
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
@@ -77,6 +91,7 @@ import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import androidx.compose.ui.zIndex
+import androidx.compose.foundation.shape.CircleShape
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -95,13 +110,13 @@ import java.nio.charset.StandardCharsets
  *
  * Compose's AndroidComposeView owns touch dispatch, so attaching an Android OnTouchListener to
  * LocalView is not reliable for taps that are handled inside Compose. MainActivity forwards the
- * initial window ACTION_DOWN here instead. We keep the two interactive rectangles separate so a
- * tap on the empty home area dismisses search, while the field and suggestion list remain
- * fully interactive.
+ * initial window ACTION_DOWN here instead. Tablet layouts dismiss on outside taps; phone layouts
+ * keep the fullscreen suggestion flow open so Android Back can close it in two steps.
  */
 internal object HomeOmniboxTouchCoordinator {
     private var owner: Any? = null
     private var active = false
+    private var dismissOnOutsideTap = false
     private var fieldBounds = Rect.Zero
     private var suggestionBounds = Rect.Zero
     private var dismissAction: (() -> Unit)? = null
@@ -115,14 +130,16 @@ internal object HomeOmniboxTouchCoordinator {
         if (owner !== ownerToken) return
         owner = null
         active = false
+        dismissOnOutsideTap = false
         fieldBounds = Rect.Zero
         suggestionBounds = Rect.Zero
         dismissAction = null
     }
 
-    fun setActive(ownerToken: Any, value: Boolean) {
+    fun setActive(ownerToken: Any, value: Boolean, dismissOutside: Boolean) {
         if (owner !== ownerToken) return
         active = value
+        dismissOnOutsideTap = dismissOutside
         if (!value) suggestionBounds = Rect.Zero
     }
 
@@ -139,7 +156,7 @@ internal object HomeOmniboxTouchCoordinator {
         val point = Offset(x, y)
         val insideField = fieldBounds != Rect.Zero && fieldBounds.contains(point)
         val insideSuggestions = suggestionBounds != Rect.Zero && suggestionBounds.contains(point)
-        if (!insideField && !insideSuggestions) {
+        if (dismissOnOutsideTap && !insideField && !insideSuggestions) {
             dismissAction?.invoke()
         }
     }
@@ -148,6 +165,7 @@ internal object HomeOmniboxTouchCoordinator {
 internal object AddressOmniboxTouchCoordinator {
     private var owner: Any? = null
     private var active = false
+    private var dismissOnOutsideTap = false
     private var fieldBounds = Rect.Zero
     private var suggestionBounds = Rect.Zero
     private var dismissAction: (() -> Unit)? = null
@@ -161,14 +179,16 @@ internal object AddressOmniboxTouchCoordinator {
         if (owner !== ownerToken) return
         owner = null
         active = false
+        dismissOnOutsideTap = false
         fieldBounds = Rect.Zero
         suggestionBounds = Rect.Zero
         dismissAction = null
     }
 
-    fun setActive(ownerToken: Any, value: Boolean) {
+    fun setActive(ownerToken: Any, value: Boolean, dismissOutside: Boolean) {
         if (owner !== ownerToken) return
         active = value
+        dismissOnOutsideTap = dismissOutside
     }
 
     fun setFieldBounds(ownerToken: Any, bounds: Rect) {
@@ -184,7 +204,7 @@ internal object AddressOmniboxTouchCoordinator {
         val point = Offset(x, y)
         val insideField = fieldBounds != Rect.Zero && fieldBounds.contains(point)
         val insideSuggestions = suggestionBounds != Rect.Zero && suggestionBounds.contains(point)
-        if (!insideField && !insideSuggestions) dismissAction?.invoke()
+        if (dismissOnOutsideTap && !insideField && !insideSuggestions) dismissAction?.invoke()
     }
 }
 
@@ -210,6 +230,9 @@ internal fun IlyroHomeOmnibox(
     val ownerToken = remember { Any() }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val dismissOnOutside = shouldDismissOmniboxOnOutsideTap(
+        LocalConfiguration.current.smallestScreenWidthDp
+    )
     var fieldBounds by remember { mutableStateOf(Rect.Zero) }
     DisposableEffect(ownerToken, focusManager, keyboardController) {
         HomeOmniboxTouchCoordinator.bind(ownerToken) {
@@ -244,7 +267,11 @@ internal fun IlyroHomeOmnibox(
                     .onFocusChanged { state ->
                         focused = state.isFocused
                         onFocusChanged(state.isFocused)
-                        HomeOmniboxTouchCoordinator.setActive(ownerToken, state.isFocused)
+                        HomeOmniboxTouchCoordinator.setActive(
+                            ownerToken,
+                            state.isFocused,
+                            dismissOutside = dismissOnOutside
+                        )
                         if (!state.isFocused) {
                             fieldBounds = Rect.Zero
                             HomeOmniboxTouchCoordinator.setSuggestionBounds(ownerToken, Rect.Zero)
@@ -297,6 +324,8 @@ internal fun IlyroHomeOmnibox(
                 allowRemote = onlineSearchSuggestionsEnabled && !isPrivate && customSearchEngine == null,
                 placeAbove = false,
                 anchorBounds = fieldBounds,
+                currentPageTitle = tr("ILYRO Browser", "Браузер ILYRO"),
+                currentPageSubtitle = tr("New tab", "Новая вкладка"),
                 onSelect = { selected ->
                     focusManager.clearFocus(force = true)
                     keyboardController?.hide()
@@ -333,6 +362,9 @@ internal fun IlyroAddressOmnibox(
     val ownerToken = remember { Any() }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val dismissOnOutside = shouldDismissOmniboxOnOutsideTap(
+        LocalConfiguration.current.smallestScreenWidthDp
+    )
     val secure = value.text.startsWith("https://", ignoreCase = true)
     var fieldBounds by remember { mutableStateOf(Rect.Zero) }
     val suggestionQuery = if (
@@ -343,6 +375,10 @@ internal fun IlyroAddressOmnibox(
     } else {
         value.text
     }
+    val historyPageTitle = history.firstOrNull { samePageAddress(it.url, value.text) }
+        ?.title?.takeIf { it.isNotBlank() && it != value.text }
+    val currentPageTitle = historyPageTitle
+        ?: omniboxHostLabel(value.text).ifBlank { value.text }.takeIf { value.text.isNotBlank() }
 
     val dismissEditing: () -> Unit = {
         focused = false
@@ -373,7 +409,11 @@ internal fun IlyroAddressOmnibox(
                 }
                 .onFocusChanged { state ->
                     focused = state.isFocused
-                    AddressOmniboxTouchCoordinator.setActive(ownerToken, state.isFocused)
+                    AddressOmniboxTouchCoordinator.setActive(
+                        ownerToken,
+                        state.isFocused,
+                        dismissOutside = dismissOnOutside
+                    )
                     if (!state.isFocused) {
                         fieldBounds = Rect.Zero
                         AddressOmniboxTouchCoordinator.setSuggestionBounds(ownerToken, Rect.Zero)
@@ -443,6 +483,12 @@ internal fun IlyroAddressOmnibox(
             allowRemote = onlineSearchSuggestionsEnabled && !isPrivate && customSearchEngine == null,
             placeAbove = suggestionsAbove,
             anchorBounds = fieldBounds,
+            currentPageTitle = currentPageTitle,
+            currentPageSubtitle = omniboxHostLabel(value.text).ifBlank { value.text },
+            currentPageUrl = value.text.takeIf { looksLikeNavigation(it) },
+            onEditCurrentPage = {
+                onValueChange(value.copy(selection = TextRange(0, value.text.length)))
+            },
             onBoundsChanged = {
                 AddressOmniboxTouchCoordinator.setSuggestionBounds(ownerToken, it)
             },
@@ -728,6 +774,10 @@ private fun OmniboxSuggestionsMenu(
     allowRemote: Boolean,
     placeAbove: Boolean,
     anchorBounds: Rect,
+    currentPageTitle: String? = null,
+    currentPageSubtitle: String? = null,
+    currentPageUrl: String? = null,
+    onEditCurrentPage: (() -> Unit)? = null,
     onBoundsChanged: (Rect) -> Unit = { },
     onSelect: (String) -> Unit
 ) {
@@ -740,13 +790,24 @@ private fun OmniboxSuggestionsMenu(
         quickLinks = quickLinks,
         allowRemote = allowRemote
     )
-    LaunchedEffect(expanded, suggestions.isEmpty()) {
-        if (!expanded || suggestions.isEmpty()) onBoundsChanged(Rect.Zero)
+    val recentSearches = buildRecentSearchSuggestions(history)
+    val displayRecentItems = if (query.isBlank()) {
+        recentSearches.ifEmpty { suggestions.filter { it.kind != OmniboxSuggestionKind.QUICK_LINK } }
+            .take(10)
+    } else {
+        emptyList()
     }
-    if (!expanded || suggestions.isEmpty()) return
+    val hasCurrentPage = query.isBlank() && !currentPageTitle.isNullOrBlank()
+    val hasQuickLinks = query.isBlank() && quickLinks.isNotEmpty()
+    val hasContent = suggestions.isNotEmpty() || hasCurrentPage || hasQuickLinks
+    LaunchedEffect(expanded, hasContent) {
+        if (!expanded || !hasContent) onBoundsChanged(Rect.Zero)
+    }
+    if (!expanded || !hasContent) return
 
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
+    val wideLayout = shouldDismissOmniboxOnOutsideTap(configuration.smallestScreenWidthDp)
     val hostView = LocalView.current
     val hostRoot = hostView.rootView
     // Popup content lives in another Android window. Measure against the Activity root that owns
@@ -772,7 +833,14 @@ private fun OmniboxSuggestionsMenu(
         navigationBarBottomInset = navigationBarBottomInsetPx
     )
     val maxPanelHeight = with(density) { availableHeightPx.coerceAtLeast(1).toDp() }
-    val popupWidth = with(density) { hostWindowWidthPx.toDp() }.minus(16.dp).coerceAtLeast(1.dp)
+    val popupWidthPx = calculateOmniboxPopupWidthPx(
+        viewportWidthPx = hostWindowWidthPx,
+        wideLayout = wideLayout,
+        maxWideWidthPx = with(density) { 920.dp.roundToPx() },
+        phoneSideMarginPx = with(density) { 8.dp.roundToPx() },
+        wideSideMarginPx = with(density) { 16.dp.roundToPx() }
+    )
+    val popupWidth = with(density) { popupWidthPx.toDp() }
     val positionProvider = remember(
         placeAbove,
         gapPx,
@@ -791,7 +859,7 @@ private fun OmniboxSuggestionsMenu(
         )
     }
 
-    if (maxPanelHeight <= 0.dp || anchorBounds == Rect.Zero) return
+    if (availableHeightPx <= 0 || anchorBounds == Rect.Zero) return
 
     Popup(
         popupPositionProvider = positionProvider,
@@ -807,7 +875,10 @@ private fun OmniboxSuggestionsMenu(
         Surface(
             modifier = Modifier
                 .width(popupWidth)
-                .height(maxPanelHeight)
+                .then(
+                    if (wideLayout) Modifier.heightIn(max = maxPanelHeight)
+                    else Modifier.height(maxPanelHeight)
+                )
                 .onGloballyPositioned { onBoundsChanged(it.boundsInWindow()) },
             shape = RoundedCornerShape(IlyroVisualTokens.CardRadius),
             color = MaterialTheme.colorScheme.surface,
@@ -820,15 +891,78 @@ private fun OmniboxSuggestionsMenu(
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .then(if (wideLayout) Modifier.fillMaxWidth() else Modifier.fillMaxSize())
                     .verticalScroll(rememberScrollState())
-                    .padding(vertical = 4.dp)
+                    .padding(vertical = 8.dp)
             ) {
-                suggestions.take(8).forEach { suggestion ->
-                    OmniboxSuggestionRow(
-                        suggestion = suggestion,
-                        onClick = { onSelect(suggestion.value) }
-                    )
+                if (query.isBlank()) {
+                    if (hasCurrentPage) {
+                        OmniboxCurrentPageCard(
+                            title = currentPageTitle.orEmpty(),
+                            subtitle = currentPageSubtitle.orEmpty(),
+                            url = currentPageUrl,
+                            onEdit = onEditCurrentPage
+                        )
+                    }
+
+                    if (hasQuickLinks) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            quickLinks.take(12).forEach { link ->
+                                OmniboxQuickSite(
+                                    site = link,
+                                    onClick = { onSelect(link.url) }
+                                )
+                            }
+                        }
+                    }
+
+                    if (displayRecentItems.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = tr(
+                                if (recentSearches.isNotEmpty()) "Recent searches" else "Recent activity",
+                                if (recentSearches.isNotEmpty()) "Недавние запросы" else "Недавнее"
+                            ),
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 7.dp),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        displayRecentItems.forEachIndexed { index, suggestion ->
+                            OmniboxSuggestionRow(
+                                suggestion = suggestion,
+                                showSubtitle = recentSearches.isEmpty(),
+                                onClick = { onSelect(suggestion.value) }
+                            )
+                            if (index < displayRecentItems.lastIndex) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(start = 54.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f)
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    val visibleSuggestions = suggestions.take(8)
+                    visibleSuggestions.forEachIndexed { index, suggestion ->
+                        OmniboxSuggestionRow(
+                            suggestion = suggestion,
+                            onClick = { onSelect(suggestion.value) }
+                        )
+                        if (index < visibleSuggestions.lastIndex) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(start = 54.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f)
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -836,8 +970,135 @@ private fun OmniboxSuggestionsMenu(
 }
 
 @Composable
+private fun OmniboxCurrentPageCard(
+    title: String,
+    subtitle: String,
+    url: String?,
+    onEdit: (() -> Unit)?
+) {
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp),
+        shape = RoundedCornerShape(IlyroVisualTokens.CardRadius),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.48f),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.20f)
+        ),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 4.dp, top = 9.dp, bottom = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Surface(
+                modifier = Modifier.size(42.dp),
+                shape = RoundedCornerShape(13.dp),
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = if (url.isNullOrBlank()) Icons.Rounded.Home else Icons.Rounded.Link,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold
+                )
+                if (subtitle.isNotBlank()) {
+                    Text(
+                        text = subtitle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            if (!url.isNullOrBlank()) {
+                IconButton(
+                    onClick = {
+                        val send = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_TEXT, url)
+                        }
+                        runCatching { context.startActivity(Intent.createChooser(send, null)) }
+                    }
+                ) {
+                    Icon(
+                        Icons.Rounded.Share,
+                        contentDescription = tr("Share current page", "Поделиться страницей"),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = { clipboard.setText(AnnotatedString(url)) }) {
+                    Icon(
+                        Icons.Rounded.ContentCopy,
+                        contentDescription = tr("Copy address", "Скопировать адрес"),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (onEdit != null) {
+                    IconButton(onClick = onEdit) {
+                        Icon(
+                            Icons.Rounded.Edit,
+                            contentDescription = tr("Edit address", "Изменить адрес"),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OmniboxQuickSite(site: QuickLink, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(76.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 3.dp, vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Surface(
+            modifier = Modifier.size(48.dp),
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                QuickSiteIcon(site)
+            }
+        }
+        Spacer(modifier = Modifier.height(7.dp))
+        Text(
+            text = site.label,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
 private fun OmniboxSuggestionRow(
     suggestion: OmniboxSuggestion,
+    showSubtitle: Boolean = true,
     onClick: () -> Unit
 ) {
     val subtitle = suggestion.subtitle.ifBlank {
@@ -851,7 +1112,7 @@ private fun OmniboxSuggestionRow(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 16.dp, vertical = if (showSubtitle && subtitle.isNotBlank()) 8.dp else 11.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Surface(
@@ -882,7 +1143,7 @@ private fun OmniboxSuggestionRow(
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium
             )
-            if (subtitle.isNotBlank()) {
+            if (showSubtitle && subtitle.isNotBlank()) {
                 Text(
                     text = subtitle,
                     maxLines = 1,

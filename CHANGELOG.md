@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.26.0-rc24 — release candidate
+
+- Rework focused search into a responsive, ILYRO-styled panel: phones use the available screen area, while tablets show a compact floating card with the page still visible around it.
+- Add the active page row with share, copy, and edit actions, a horizontally scrolling quick-site strip, and recent search queries decoded from browser history.
+- On tablets, tapping outside the suggestions card closes it. Back first hides the keyboard and keeps suggestions open; the next Back closes suggestions on both the home page and websites.
+- Add regression tests for query history, phone/tablet sizing, outside-tap behavior, and the two-step Back action.
+
 ## 0.26.0-rc23 — release candidate
 
 - Measure the fullscreen omnibox suggestions panel against the Activity window and the same status-bar, navigation-bar, and keyboard insets as its field.

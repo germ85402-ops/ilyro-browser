@@ -94,7 +94,8 @@ internal fun IlyroHomePage(
     customSearchEngine: CustomSearchEngine? = null,
     customSearchEngines: List<CustomSearchEngine> = emptyList(),
     onCustomSearchEngineChange: (CustomSearchEngine?) -> Unit = {},
-    onlineSearchSuggestionsEnabled: Boolean = true
+    onlineSearchSuggestionsEnabled: Boolean = true,
+    onOmniboxFocusChanged: (Boolean) -> Unit = {}
 ) {
     val metrics = rememberIlyroLayoutMetrics()
     val context = LocalContext.current
@@ -194,7 +195,10 @@ internal fun IlyroHomePage(
                 bookmarks = bookmarks,
                 quickLinks = quickLinks,
                 onlineSearchSuggestionsEnabled = onlineSearchSuggestionsEnabled,
-                onFocusChanged = { omniboxFocused = it },
+                onFocusChanged = {
+                    omniboxFocused = it
+                    onOmniboxFocusChanged(it)
+                },
                 onNavigate = { input ->
                     if (input.isNotBlank()) {
                         query = input
@@ -818,7 +822,7 @@ private fun QuickLinkEditorDialog(
 }
 
 @Composable
-private fun QuickSiteIcon(site: QuickLink) {
+internal fun QuickSiteIcon(site: QuickLink) {
     var bitmap by remember(site.url) { mutableStateOf(QuickSiteIconCache.peek(site.url)) }
 
     LaunchedEffect(site.url) {

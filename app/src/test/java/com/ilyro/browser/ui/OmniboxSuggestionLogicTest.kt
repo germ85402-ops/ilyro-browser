@@ -67,4 +67,60 @@ class OmniboxSuggestionLogicTest {
         assertTrue(looksLikeNavigation("localhost:3000"))
         assertFalse(looksLikeNavigation("best local cafes"))
     }
+
+    @Test
+    fun recentSearchesShowDecodedQueriesAndSkipOrdinaryPages() {
+        val recent = buildRecentSearchSuggestions(
+            listOf(
+                HistoryItem("https://www.google.com/search?q=tasklet+ai", "tasklet ai - Поиск в Google", 4L),
+                HistoryItem("https://google.com/search?q=github", "github - Search Google", 3L),
+                HistoryItem("https://shop.example/items?q=boots", "Boots", 2L)
+            )
+        )
+
+        assertEquals(listOf("tasklet ai", "github"), recent.map { it.title })
+        assertEquals("https://www.google.com/search?q=tasklet+ai", recent.first().value)
+    }
+
+    @Test
+    fun backHidesKeyboardBeforeClosingFocusedSuggestions() {
+        assertEquals(
+            OmniboxBackAction.HIDE_KEYBOARD,
+            nextOmniboxBackAction(isFocused = true, imeVisible = true)
+        )
+        assertEquals(
+            OmniboxBackAction.CLOSE_SUGGESTIONS,
+            nextOmniboxBackAction(isFocused = true, imeVisible = false)
+        )
+        assertEquals(
+            OmniboxBackAction.NONE,
+            nextOmniboxBackAction(isFocused = false, imeVisible = false)
+        )
+    }
+
+    @Test
+    fun outsideTapDismissalAndPopupWidthAdaptToPhoneAndTablet() {
+        assertFalse(shouldDismissOmniboxOnOutsideTap(411))
+        assertTrue(shouldDismissOmniboxOnOutsideTap(600))
+        assertEquals(
+            968,
+            calculateOmniboxPopupWidthPx(
+                viewportWidthPx = 1000,
+                wideLayout = false,
+                maxWideWidthPx = 1200,
+                phoneSideMarginPx = 16,
+                wideSideMarginPx = 24
+            )
+        )
+        assertEquals(
+            780,
+            calculateOmniboxPopupWidthPx(
+                viewportWidthPx = 1000,
+                wideLayout = true,
+                maxWideWidthPx = 900,
+                phoneSideMarginPx = 16,
+                wideSideMarginPx = 24
+            )
+        )
+    }
 }
