@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.26.0-rc25 — release candidate
+
+- Add six generated light-theme wallpapers and pair them with six dark-theme presets; the browser now switches to the matching saved background automatically when its theme changes.
+- Add a subtle pencil control at the lower-right of the home screen that opens a theme-aware wallpaper picker with built-in images, a gallery photo, and “No wallpaper”.
+- Widen and enlarge wallpaper previews in Appearance settings and first-run setup, using landscape artwork so the image subject remains recognizable on phones and tablets.
+- Use readable dark text on the new light wallpapers and preserve legacy Obsidian selections during the preset update.
+
 ## 0.26.0-rc24 — release candidate
 
 - Rework focused search into a responsive, ILYRO-styled panel: phones use the available screen area, while tablets show a compact floating card with the page still visible around it.
