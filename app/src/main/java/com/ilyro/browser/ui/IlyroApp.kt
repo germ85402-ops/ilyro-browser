@@ -48,6 +48,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBars
@@ -126,6 +127,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -774,6 +777,7 @@ private fun BrowserScreen(
     var sitePermissions by remember { mutableStateOf<List<GeckoSession.PermissionDelegate.ContentPermission>>(emptyList()) }
     var siteDesktopRevision by remember { mutableIntStateOf(0) }
     var addressFocused by remember { mutableStateOf(false) }
+    var homeOmniboxFocused by remember { mutableStateOf(false) }
     var currentGeckoView by remember { mutableStateOf<GeckoView?>(null) }
     var previewRecencyCounter by remember { mutableIntStateOf(0) }
     var textScaleReloadRevision by remember { mutableIntStateOf(0) }
@@ -1720,9 +1724,15 @@ private fun BrowserScreen(
     }
 
     val browserBackEnabled =
-        isFullScreen || extensionPopupSession != null || pendingNewTabRequest != null || linkContextMenu != null || addressFocused ||
+        isFullScreen || extensionPopupSession != null || pendingNewTabRequest != null || linkContextMenu != null || addressFocused || (isHome && homeOmniboxFocused) ||
             showTabs || showMenu || showBookmarks || showHistory || showDownloads || showMedia ||
             showSettings || showProtection || showFindInPage || showTranslation || readerModeActive || activeTab.canGoBack || !isHome
+
+    val omniboxKeyboardController = LocalSoftwareKeyboardController.current
+    val omniboxDensity = LocalDensity.current
+    val omniboxImeVisible = WindowInsets.ime.getBottom(omniboxDensity) >
+        WindowInsets.navigationBars.getBottom(omniboxDensity)
+    val omniboxFocused = addressFocused || (isHome && homeOmniboxFocused)
 
     BackHandler(enabled = browserBackEnabled) {
         when {
@@ -1745,7 +1755,13 @@ private fun BrowserScreen(
             showProtection -> showProtection = false
             showTranslation -> showTranslation = false
             showFindInPage -> showFindInPage = false
-            addressFocused -> focusManager.clearFocus()
+                omniboxFocused -> {
+                when (nextOmniboxBackAction(isFocused = true, imeVisible = omniboxImeVisible)) {
+                    OmniboxBackAction.HIDE_KEYBOARD -> omniboxKeyboardController?.hide()
+                    OmniboxBackAction.CLOSE_SUGGESTIONS -> focusManager.clearFocus(force = true)
+                    OmniboxBackAction.NONE -> Unit
+                }
+            }
             readerModeActive -> activeTab.exitReaderMode()
             activeTab.canGoBack -> activeTab.session.goBack()
             !isHome -> openHome()
@@ -1890,7 +1906,8 @@ private fun BrowserScreen(
                                 onSettingsChange(settings.copy(customSearchEngineId = engine?.id))
                             },
                             onNavigate = { navigateInput(it) },
-                            onlineSearchSuggestionsEnabled = settings.onlineSearchSuggestionsEnabled
+                            onlineSearchSuggestionsEnabled = settings.onlineSearchSuggestionsEnabled,
+                            onOmniboxFocusChanged = { homeOmniboxFocused = it }
                         )
                     } else if (readerModeActive) {
                         ReaderModeView(

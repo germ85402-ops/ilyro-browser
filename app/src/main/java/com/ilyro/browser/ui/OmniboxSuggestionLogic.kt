@@ -1,7 +1,10 @@
 package com.ilyro.browser.ui
 
 import java.net.URI
+import java.net.URLDecoder
+import java.nio.charset.StandardCharsets
 import java.util.Locale
+import kotlin.math.roundToInt
 
 internal enum class OmniboxSuggestionKind { HISTORY, BOOKMARK, QUICK_LINK, ADDRESS, SEARCH }
 
@@ -11,6 +14,79 @@ internal data class OmniboxSuggestion(
     val title: String,
     val subtitle: String
 )
+
+internal enum class OmniboxBackAction { HIDE_KEYBOARD, CLOSE_SUGGESTIONS, NONE }
+
+internal fun nextOmniboxBackAction(isFocused: Boolean, imeVisible: Boolean): OmniboxBackAction = when {
+    !isFocused -> OmniboxBackAction.NONE
+    imeVisible -> OmniboxBackAction.HIDE_KEYBOARD
+    else -> OmniboxBackAction.CLOSE_SUGGESTIONS
+}
+
+internal fun shouldDismissOmniboxOnOutsideTap(smallestScreenWidthDp: Int): Boolean =
+    smallestScreenWidthDp >= 600
+
+internal fun calculateOmniboxPopupWidthPx(
+    viewportWidthPx: Int,
+    wideLayout: Boolean,
+    maxWideWidthPx: Int,
+    phoneSideMarginPx: Int,
+    wideSideMarginPx: Int
+): Int {
+    if (!wideLayout) return (viewportWidthPx - 2 * phoneSideMarginPx).coerceAtLeast(1)
+    val available = (viewportWidthPx - 2 * wideSideMarginPx).coerceAtLeast(1)
+    return (viewportWidthPx * 0.78f).roundToInt()
+        .coerceAtMost(maxWideWidthPx)
+        .coerceAtMost(available)
+        .coerceAtLeast(1)
+}
+
+/** Search terms are recovered from the browser's recorded search URL for the blank-field view. */
+internal fun buildRecentSearchSuggestions(
+    history: List<HistoryItem>,
+    limit: Int = 10
+): List<OmniboxSuggestion> = history.asSequence()
+    .mapNotNull { item ->
+        val query = item.recentSearchQuery() ?: return@mapNotNull null
+        OmniboxSuggestion(
+            kind = OmniboxSuggestionKind.HISTORY,
+            value = item.url,
+            title = query,
+            subtitle = ""
+        )
+    }
+    .distinctBy { it.title.lowercase(Locale.ROOT) }
+    .take(limit.coerceAtLeast(0))
+    .toList()
+
+private fun HistoryItem.recentSearchQuery(): String? {
+    val uri = runCatching { URI(url) }.getOrNull() ?: return null
+    val host = uri.host.orEmpty().lowercase(Locale.ROOT)
+    val titleSuggestsSearch = title.contains("search", ignoreCase = true) ||
+        title.contains("поиск", ignoreCase = true) ||
+        title.contains("recherche", ignoreCase = true)
+    val knownSearchHost = listOf(
+        "google.", "bing.", "duckduckgo.com", "yandex.", "search.brave.com",
+        "search.yahoo.com", "ecosia.org", "startpage.com"
+    ).any(host::contains)
+    if (!knownSearchHost && !titleSuggestsSearch) return null
+
+    val query = uri.rawQuery.orEmpty()
+        .split('&')
+        .asSequence()
+        .mapNotNull { part ->
+            val key = part.substringBefore('=').lowercase(Locale.ROOT)
+            if (key !in setOf("q", "query", "text", "p", "wd", "term")) return@mapNotNull null
+            part.substringAfter('=', "").let { encoded ->
+                runCatching { URLDecoder.decode(encoded, StandardCharsets.UTF_8.name()) }
+                    .getOrDefault(encoded)
+            }
+        }
+        .firstOrNull { it.isNotBlank() }
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+    return query
+}
 
 private data class OmniboxSiteCandidate(
     val suggestion: OmniboxSuggestion,
@@ -122,7 +198,7 @@ private fun HistoryItem.toSuggestion(kind: OmniboxSuggestionKind): OmniboxSugges
     OmniboxSuggestion(
         kind = kind,
         value = url,
-        title = title.ifBlank { suggestionHost(url).ifBlank { url } },
+        title = recentSearchQuery() ?: title.ifBlank { suggestionHost(url).ifBlank { url } },
         subtitle = suggestionHost(url).ifBlank { url }
     )
 
@@ -160,5 +236,10 @@ private fun OmniboxSuggestion.matchingScore(query: String): Int? {
 private fun suggestionHost(url: String): String =
     runCatching { URI(url).host.orEmpty().lowercase(Locale.ROOT).removePrefix("www.") }
         .getOrDefault("")
+
+internal fun omniboxHostLabel(url: String): String = suggestionHost(url)
+
+internal fun samePageAddress(first: String, second: String): Boolean =
+    first.trimEnd('/').equals(second.trimEnd('/'), ignoreCase = true)
 
 private fun historyRecencyBonus(index: Int): Int = 50 - index.coerceAtMost(50)
