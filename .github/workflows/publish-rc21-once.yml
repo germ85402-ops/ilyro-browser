@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   release:
-    if: contains(github.event.head_commit.added, '.github/workflows/publish-rc21-once.yml')
+    if: github.event.head_commit.message == 'Enable rc21 publisher'
     runs-on: ubuntu-latest
     steps:
       - name: Create rc21 tag and dispatch signed release
@@ -20,8 +20,7 @@ jobs:
           RELEASE_TAG: v0.26.0-rc21
         run: |
           set -euo pipefail
-          release_sha=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq '.parents[0].sha')
-          test -n "$release_sha"
+          release_sha='69ba591a4e834c159ac05227f22b1a86847ec4db'
           ref="refs/tags/$RELEASE_TAG"
           existing_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha' 2>/dev/null || true)
           if [ -z "$existing_sha" ]; then
