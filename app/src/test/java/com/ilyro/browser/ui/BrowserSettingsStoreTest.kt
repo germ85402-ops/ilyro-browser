@@ -15,6 +15,7 @@ class BrowserSettingsStoreTest {
             language = AppLanguage.RUSSIAN,
             preferredSiteLanguages = listOf("ru", "en"),
             searchEngine = SearchEngine.DUCKDUCKGO,
+            onlineSearchSuggestionsEnabled = false,
             customSearchEngines = listOf(
                 CustomSearchEngine(
                     id = "kagi",
@@ -103,6 +104,7 @@ class BrowserSettingsStoreTest {
     fun emptyPreferencesUseStandardInterfaceDensity() {
         val restored = BrowserSettingsStore.restore(MemorySharedPreferences())
         assertEquals(UiDensity.STANDARD, restored.uiDensity)
+        assertTrue(restored.onlineSearchSuggestionsEnabled)
     }
 
     @Test

@@ -1,0 +1,38 @@
+name: Publish rc22 once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-rc22-once.yml"
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  release:
+    if: startsWith(github.event.head_commit.message, 'Retry rc22 publication')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create rc22 tag and dispatch signed release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag_name='v0.26.0-rc22'
+          if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag_name" >/dev/null 2>&1; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$tag_name" -f "sha=$GITHUB_SHA"
+          fi
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$tag_name"
+      - name: Remove the one-time publisher
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLISHER_PATH: .github/workflows/publish-rc22-once.yml
+        run: |
+          set -euo pipefail
+          file_sha=$(gh api "repos/$GITHUB_REPOSITORY/contents/$PUBLISHER_PATH?ref=main" --jq '.sha')
+          gh api --method DELETE "repos/$GITHUB_REPOSITORY/contents/$PUBLISHER_PATH" \
+            -f "message=Remove one-time rc22 publisher" \
+            -f "sha=$file_sha" \
+            -f "branch=main"

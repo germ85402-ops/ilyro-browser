@@ -199,6 +199,20 @@ internal fun SearchEngineSettingsSection(
             Spacer(modifier = Modifier.width(6.dp))
             Text(tr("Add search engine", "Добавить поисковик"))
         }
+
+        SettingsRowDivider()
+        ToggleRow(
+            title = tr(settings.language, "Search suggestions", "Подсказки поисковика"),
+            subtitle = tr(
+                settings.language,
+                "Send text to the selected built-in search provider while typing. Private tabs never send it.",
+                "Текст отправляется выбранному встроенному поисковику при вводе. В приватных вкладках не отправляется."
+            ),
+            checked = settings.onlineSearchSuggestionsEnabled,
+            onCheckedChange = { enabled ->
+                onSettingsChange(settings.copy(onlineSearchSuggestionsEnabled = enabled))
+            }
+        )
     }
 
     if (editorVisible) {

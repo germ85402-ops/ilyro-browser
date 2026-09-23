@@ -34,4 +34,30 @@ class OmniboxLayoutTest {
 
         assertEquals(98, y)
     }
+
+    @Test
+    fun popupExpandsToTheAvailableSpaceOnEitherSideOfTheField() {
+        assertEquals(
+            272,
+            calculateOmniboxPopupAvailableHeight(
+                placeAbove = true,
+                anchorTop = 280,
+                anchorBottom = 336,
+                windowHeight = 900,
+                imeBottom = 360,
+                verticalGap = 8
+            )
+        )
+        assertEquals(
+            196,
+            calculateOmniboxPopupAvailableHeight(
+                placeAbove = false,
+                anchorTop = 280,
+                anchorBottom = 336,
+                windowHeight = 900,
+                imeBottom = 360,
+                verticalGap = 8
+            )
+        )
+    }
 }

@@ -32,7 +32,10 @@ import kotlinx.coroutines.withContext
 private const val MAX_CUSTOM_WALLPAPER_PIXELS = 3_145_728L
 
 @Composable
-internal fun HomeWallpaper(settings: BrowserSettings) {
+internal fun HomeWallpaper(
+    settings: BrowserSettings,
+    builtInContentScale: ContentScale = ContentScale.Crop
+) {
     val darkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val background = if (darkTheme && settings.useSeparateDarkBackground) {
         settings.darkHomeBackground
@@ -82,7 +85,7 @@ internal fun HomeWallpaper(settings: BrowserSettings) {
             if (background == HomeBackground.CUSTOM) {
                 CustomWallpaperImage(customUri, settings.wallpaperFit)
             } else {
-                BuiltInWallpaper(background)
+                BuiltInWallpaper(background, builtInContentScale)
             }
         }
 
@@ -161,8 +164,12 @@ private fun decodeCustomWallpaper(context: Context, uriString: String?): Bitmap?
 }
 
 @Composable
-private fun BuiltInWallpaper(background: HomeBackground) {
-    BuiltInWallpaperPreview(background = background, modifier = Modifier.fillMaxSize())
+private fun BuiltInWallpaper(background: HomeBackground, contentScale: ContentScale) {
+    BuiltInWallpaperPreview(
+        background = background,
+        modifier = Modifier.fillMaxSize(),
+        contentScale = contentScale
+    )
 }
 
 internal fun builtInWallpaperResource(background: HomeBackground, isTablet: Boolean): Int? =
@@ -208,7 +215,8 @@ internal fun builtInWallpaperResource(background: HomeBackground, isTablet: Bool
 @Composable
 internal fun BuiltInWallpaperPreview(
     background: HomeBackground,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop
 ) {
     if (background == HomeBackground.NONE) {
         Box(modifier.background(MaterialTheme.colorScheme.background))
@@ -224,7 +232,7 @@ internal fun BuiltInWallpaperPreview(
             contentDescription = null,
             modifier = modifier,
             alignment = Alignment.Center,
-            contentScale = ContentScale.Crop
+            contentScale = contentScale
         )
         return
     }

@@ -2,7 +2,13 @@ package com.ilyro.browser.ui
 
 import android.content.Context
 import android.graphics.Bitmap
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateDpAsState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image as ComposeImage
@@ -41,7 +47,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -81,20 +86,21 @@ internal fun IlyroHomePage(
     settings: BrowserSettings,
     searchEngine: SearchEngine,
     history: List<HistoryItem>,
+    bookmarks: List<BookmarkItem>,
+    quickLinks: MutableList<QuickLink>,
     isPrivate: Boolean,
     onSearchEngineChange: (SearchEngine) -> Unit,
     onNavigate: (String) -> Unit,
     customSearchEngine: CustomSearchEngine? = null,
     customSearchEngines: List<CustomSearchEngine> = emptyList(),
-    onCustomSearchEngineChange: (CustomSearchEngine?) -> Unit = {}
+    onCustomSearchEngineChange: (CustomSearchEngine?) -> Unit = {},
+    onlineSearchSuggestionsEnabled: Boolean = true
 ) {
     val metrics = rememberIlyroLayoutMetrics()
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("ilyro_browser", Context.MODE_PRIVATE) }
-    val quickLinks = remember {
-        mutableStateListOf<QuickLink>().apply { addAll(QuickLinkStore.restore(prefs)) }
-    }
     var query by remember { mutableStateOf("") }
+    var omniboxFocused by remember { mutableStateOf(false) }
     var editMode by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(false) }
     var editingQuickLink by remember { mutableStateOf<QuickLink?>(null) }
@@ -129,6 +135,14 @@ internal fun IlyroHomePage(
         settings.uiDensity == UiDensity.COMFORTABLE -> 42.dp
         else -> 36.dp
     }
+    val animatedTopSpacing by animateDpAsState(
+        targetValue = if (omniboxFocused) 10.dp else topSpacing,
+        animationSpec = tween(
+            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+            easing = IlyroVisualTokens.MotionEnterEasing
+        ),
+        label = "home-search-top-spacing"
+    )
 
     fun persistLinks() = QuickLinkStore.save(prefs, quickLinks)
 
@@ -149,14 +163,23 @@ internal fun IlyroHomePage(
                 .padding(horizontal = horizontalPadding),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(topSpacing))
+            Spacer(modifier = Modifier.height(animatedTopSpacing))
 
-            HomeBrandBlock(
-                isPrivate = isPrivate,
-                wallpaperActive = wallpaperActive
-            )
-
-            Spacer(modifier = Modifier.height(if (metrics.isNarrowPhone) 12.dp else 18.dp))
+            AnimatedVisibility(
+                visible = !omniboxFocused,
+                enter = fadeIn(tween(IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs))) +
+                    expandVertically(tween(IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs))),
+                exit = fadeOut(tween(IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs))) +
+                    shrinkVertically(tween(IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs)))
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    HomeBrandBlock(
+                        isPrivate = isPrivate,
+                        wallpaperActive = wallpaperActive
+                    )
+                    Spacer(modifier = Modifier.height(if (metrics.isNarrowPhone) 12.dp else 18.dp))
+                }
+            }
 
             IlyroHomeOmnibox(
                 value = query,
@@ -168,6 +191,10 @@ internal fun IlyroHomePage(
                 customSearchEngine = customSearchEngine,
                 customSearchEngines = customSearchEngines,
                 onCustomSearchEngineChange = onCustomSearchEngineChange,
+                bookmarks = bookmarks,
+                quickLinks = quickLinks,
+                onlineSearchSuggestionsEnabled = onlineSearchSuggestionsEnabled,
+                onFocusChanged = { omniboxFocused = it },
                 onNavigate = { input ->
                     if (input.isNotBlank()) {
                         query = input
@@ -179,12 +206,12 @@ internal fun IlyroHomePage(
                     .fillMaxWidth()
             )
 
-            if (isPrivate) {
+            if (isPrivate && !omniboxFocused) {
                 Spacer(modifier = Modifier.height(9.dp))
                 PrivateHomeNotice()
             }
 
-            if (settings.showQuickAccess) {
+            if (settings.showQuickAccess && !omniboxFocused) {
                 Spacer(
                     modifier = Modifier.height(
                         if (metrics.isNarrowPhone) 14.dp else metrics.sectionGap

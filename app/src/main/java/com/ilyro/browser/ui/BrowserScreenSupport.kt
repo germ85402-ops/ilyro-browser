@@ -41,10 +41,12 @@ internal fun normalizeAddress(
     val value = input.trim()
 
     if (value.isEmpty()) return HOME_URL
-    if (value.startsWith("https://") || value.startsWith("http://")) return value
-
-    val looksLikeHost = !value.contains(' ') && value.contains('.')
-    if (looksLikeHost) return "https://$value"
+    val explicitWebScheme = Regex("^(https?)://", RegexOption.IGNORE_CASE).find(value)
+    if (explicitWebScheme != null) {
+        val scheme = explicitWebScheme.groupValues[1].lowercase()
+        return scheme + "://" + value.substring(explicitWebScheme.range.last + 1)
+    }
+    if (looksLikeNavigation(value)) return "https://$value"
 
     val query = URLEncoder.encode(value, StandardCharsets.UTF_8.toString())
     val queryTemplate = customSearchEngine?.queryUrlTemplate
