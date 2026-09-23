@@ -334,6 +334,14 @@ internal fun IlyroAddressOmnibox(
     val keyboardController = LocalSoftwareKeyboardController.current
     val secure = value.text.startsWith("https://", ignoreCase = true)
     var fieldBounds by remember { mutableStateOf(Rect.Zero) }
+    val suggestionQuery = if (
+        focused && value.text.isNotBlank() &&
+        value.selection.start == 0 && value.selection.end == value.text.length
+    ) {
+        ""
+    } else {
+        value.text
+    }
 
     val dismissEditing: () -> Unit = {
         focused = false
@@ -426,7 +434,7 @@ internal fun IlyroAddressOmnibox(
 
         OmniboxSuggestionsMenu(
             expanded = focused,
-            query = value.text,
+            query = suggestionQuery,
             searchEngine = searchEngine,
             history = history,
             bookmarks = bookmarks,
