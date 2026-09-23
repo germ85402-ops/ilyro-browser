@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.26.0-rc19 — release candidate
+
+- Replace the six previous built-in wallpapers with three ILYRO landscapes, each with portrait phone and wide tablet artwork selected automatically by device size.
+- Preserve custom wallpapers and migrate saved selections of removed presets to the new Stillwater default.
+- Keep only the three newest prereleases and their tags when publishing future releases.
+
 ## 0.26.0-rc18 — release candidate
 
 - Choose readable foreground colors for accent controls based on actual contrast, including wallpaper-derived accents in dark mode.

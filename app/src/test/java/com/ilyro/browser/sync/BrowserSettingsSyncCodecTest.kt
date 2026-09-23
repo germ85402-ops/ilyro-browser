@@ -5,6 +5,7 @@ import com.ilyro.browser.ui.AppLanguage
 import com.ilyro.browser.ui.BrowserSettings
 import com.ilyro.browser.ui.BrowserTheme
 import com.ilyro.browser.ui.CustomSearchEngine
+import com.ilyro.browser.ui.HomeBackground
 import com.ilyro.browser.ui.SearchEngine
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -71,6 +72,8 @@ class BrowserSettingsSyncCodecTest {
                 "language": "UNKNOWN",
                 "searchEngine": "UNKNOWN",
                 "theme": "UNKNOWN",
+                "homeBackground": "MOUNTAIN_DUSK",
+                "darkHomeBackground": "AURORA",
                 "desktopMode": true,
                 "textScale": 9.0
             }""".trimIndent()
@@ -79,6 +82,8 @@ class BrowserSettingsSyncCodecTest {
         assertEquals(AppLanguage.SYSTEM, restored.language)
         assertEquals(SearchEngine.GOOGLE, restored.searchEngine)
         assertEquals(BrowserTheme.SYSTEM, restored.theme)
+        assertEquals(HomeBackground.STILLWATER, restored.homeBackground)
+        assertEquals(HomeBackground.STILLWATER, restored.darkHomeBackground)
         assertTrue(restored.desktopMode)
         assertEquals(1.30f, restored.textScale)
         assertTrue(restored.adBlockingEnabled)

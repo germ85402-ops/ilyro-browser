@@ -263,7 +263,7 @@ internal fun AppearancePersonalizationSettings(
                         settings.copy(
                             customWallpaperUri = null,
                             homeBackground = if (settings.homeBackground == HomeBackground.CUSTOM) {
-                                HomeBackground.CLEAN
+                                HomeBackground.STILLWATER
                             } else {
                                 settings.homeBackground
                             }
@@ -314,7 +314,7 @@ internal fun AppearancePersonalizationSettings(
                             settings.copy(
                                 darkCustomWallpaperUri = null,
                                 darkHomeBackground = if (settings.darkHomeBackground == HomeBackground.CUSTOM) {
-                                    HomeBackground.NIGHT_WAVES
+                                    HomeBackground.STILLWATER
                                 } else {
                                     settings.darkHomeBackground
                                 }
@@ -606,24 +606,9 @@ internal fun WallpaperPresetGrid(
 @Composable
 private fun wallpaperPreviewBrush(background: HomeBackground): Brush = when (background) {
     HomeBackground.NONE -> Brush.linearGradient(listOf(MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.background))
-    HomeBackground.CLEAN -> Brush.linearGradient(
-        listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f))
-    )
-    HomeBackground.SOFT_GRADIENT -> Brush.linearGradient(
-        listOf(MaterialTheme.colorScheme.primary.copy(alpha = 0.42f), MaterialTheme.colorScheme.background)
-    )
-    HomeBackground.MOUNTAIN_DUSK -> Brush.linearGradient(
-        listOf(Color(0xFF274060), Color(0xFF6D597A), Color(0xFFE5989B))
-    )
-    HomeBackground.BLUE_HORIZON -> Brush.linearGradient(
-        listOf(Color(0xFF0B3D91), Color(0xFF3D8BFF), Color(0xFFB8E1FF))
-    )
-    HomeBackground.NIGHT_WAVES -> Brush.linearGradient(
-        listOf(Color(0xFF090A1A), Color(0xFF243B6B))
-    )
-    HomeBackground.AURORA -> Brush.linearGradient(
-        listOf(Color(0xFF071A24), Color(0xFF31D6A4), Color(0xFF5A54D6))
-    )
+    HomeBackground.STILLWATER -> Brush.linearGradient(listOf(Color(0xFF0B111B), Color(0xFF243958)))
+    HomeBackground.PINE_DUSK -> Brush.linearGradient(listOf(Color(0xFF0A151C), Color(0xFF263F56)))
+    HomeBackground.ALPINE_DAWN -> Brush.linearGradient(listOf(Color(0xFF111A27), Color(0xFF34455D)))
     HomeBackground.CUSTOM -> Brush.linearGradient(
         listOf(Color(0xFF42464E), Color(0xFF727984), Color(0xFF343941))
     )
@@ -698,12 +683,9 @@ private fun shortcutSizeLabel(size: HomeShortcutSize): String = when (size) {
 @Composable
 internal fun homeBackgroundLabel(background: HomeBackground): String = when (background) {
     HomeBackground.NONE -> tr("No wallpaper", "Без обоев")
-    HomeBackground.CLEAN -> tr("Space nebula", "Космическая туманность")
-    HomeBackground.SOFT_GRADIENT -> tr("Mountain sunrise", "Рассвет в горах")
-    HomeBackground.MOUNTAIN_DUSK -> tr("Aurora lake", "Озеро и сияние")
-    HomeBackground.BLUE_HORIZON -> tr("Forest waterfall", "Лесной водопад")
-    HomeBackground.NIGHT_WAVES -> tr("Moonlit valley", "Лунная долина")
-    HomeBackground.AURORA -> tr("Desert sunset", "Закат в пустыне")
+    HomeBackground.STILLWATER -> tr("Stillwater", "Тихая вода")
+    HomeBackground.PINE_DUSK -> tr("Pine dusk", "Сумеречный лес")
+    HomeBackground.ALPINE_DAWN -> tr("Alpine dawn", "Горный рассвет")
     HomeBackground.CUSTOM -> tr("Your image", "Своё фото")
 }
 

@@ -53,12 +53,9 @@ internal enum class HomeShortcutSize { SMALL, STANDARD, LARGE }
 
 internal enum class HomeBackground {
     NONE,
-    CLEAN,
-    SOFT_GRADIENT,
-    MOUNTAIN_DUSK,
-    BLUE_HORIZON,
-    NIGHT_WAVES,
-    AURORA,
+    STILLWATER,
+    PINE_DUSK,
+    ALPINE_DAWN,
     CUSTOM
 }
 
@@ -92,10 +89,10 @@ internal data class BrowserSettings(
     val showQuickAccess: Boolean = true,
     val shortcutSize: HomeShortcutSize = HomeShortcutSize.STANDARD,
     val showShortcutLabels: Boolean = true,
-    val homeBackground: HomeBackground = HomeBackground.MOUNTAIN_DUSK,
+    val homeBackground: HomeBackground = HomeBackground.STILLWATER,
     val customWallpaperUri: String? = null,
     val useSeparateDarkBackground: Boolean = false,
-    val darkHomeBackground: HomeBackground = HomeBackground.MOUNTAIN_DUSK,
+    val darkHomeBackground: HomeBackground = HomeBackground.STILLWATER,
     val darkCustomWallpaperUri: String? = null,
     val wallpaperFit: WallpaperFit = WallpaperFit.FILL,
     val wallpaperDim: WallpaperDim = WallpaperDim.MEDIUM,
@@ -273,12 +270,12 @@ internal object BrowserSettingsStore {
         showQuickAccess = prefs.getBoolean(KEY_SHOW_QUICK_ACCESS, true),
         shortcutSize = enumValueOrDefault(prefs.getString(KEY_SHORTCUT_SIZE, null), HomeShortcutSize.STANDARD),
         showShortcutLabels = prefs.getBoolean(KEY_SHOW_SHORTCUT_LABELS, true),
-        homeBackground = enumValueOrDefault(prefs.getString(KEY_HOME_BACKGROUND, null), HomeBackground.MOUNTAIN_DUSK),
+        homeBackground = enumValueOrDefault(prefs.getString(KEY_HOME_BACKGROUND, null), HomeBackground.STILLWATER),
         customWallpaperUri = prefs.getString(KEY_CUSTOM_WALLPAPER_URI, null),
         useSeparateDarkBackground = prefs.getBoolean(KEY_SEPARATE_DARK_BACKGROUND, false),
         darkHomeBackground = enumValueOrDefault(
             prefs.getString(KEY_DARK_HOME_BACKGROUND, null),
-            HomeBackground.MOUNTAIN_DUSK
+            HomeBackground.STILLWATER
         ),
         darkCustomWallpaperUri = prefs.getString(KEY_DARK_CUSTOM_WALLPAPER_URI, null),
         wallpaperFit = enumValueOrDefault(prefs.getString(KEY_WALLPAPER_FIT, null), WallpaperFit.FILL),

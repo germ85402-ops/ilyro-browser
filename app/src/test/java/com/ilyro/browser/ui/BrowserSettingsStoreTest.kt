@@ -33,7 +33,7 @@ class BrowserSettingsStoreTest {
             showShortcutLabels = false,
             homeBackground = HomeBackground.NONE,
             useSeparateDarkBackground = true,
-            darkHomeBackground = HomeBackground.AURORA,
+            darkHomeBackground = HomeBackground.ALPINE_DAWN,
             wallpaperFit = WallpaperFit.FIT,
             wallpaperDim = WallpaperDim.MEDIUM,
             wallpaperBlur = WallpaperBlur.SOFT,
@@ -103,6 +103,21 @@ class BrowserSettingsStoreTest {
     fun emptyPreferencesUseStandardInterfaceDensity() {
         val restored = BrowserSettingsStore.restore(MemorySharedPreferences())
         assertEquals(UiDensity.STANDARD, restored.uiDensity)
+    }
+
+    @Test
+    fun removedWallpaperPresetsMigrateToTheNewDefault() {
+        val prefs = MemorySharedPreferences(
+            mutableMapOf(
+                "settings_home_background" to "MOUNTAIN_DUSK",
+                "settings_dark_home_background" to "AURORA"
+            )
+        )
+
+        val restored = BrowserSettingsStore.restore(prefs)
+
+        assertEquals(HomeBackground.STILLWATER, restored.homeBackground)
+        assertEquals(HomeBackground.STILLWATER, restored.darkHomeBackground)
     }
 
     @Test
