@@ -39,7 +39,7 @@
     'hero.syncTag': 'Синхронизация',
     'hero.artLabel': 'Главный экран браузера ILYRO',
     'hero.artAlt': 'Главный экран браузера ILYRO на фоне водопада',
-    'hero.note': 'Больше, чем браузер.<br /><span>Свобода в каждом открытии.</span>',
+    'hero.note': 'БРАУЗЕР<br /><span>БЕЗ ГРАНИЦ</span>',
     'benefits.label': 'Ключевые возможности',
     'benefits.shield.title': 'Защита',
     'benefits.shield.copy': 'Встроенный uBlock Origin<br />блокирует рекламу и трекеры',
@@ -64,9 +64,8 @@
     'features.sync.alt': 'Аккаунт и синхронизация ILYRO',
     'features.sync.title': 'Всегда с вами',
     'features.sync.copy': 'Синхронизация через Google: закладки, настройки и история на всех устройствах.',
-    'screenshots.title': 'Реальные скриншоты',
-    'screenshots.intro': 'Настоящий интерфейс. Никаких постановочных кадров — только скриншоты из приложения.',
-    'screenshots.localeNote': 'Интерфейс приложения на скриншотах показан на русском языке.',
+    'screenshots.title': 'Скриншоты приложения',
+    'screenshots.intro': 'Посмотрите интерфейс ILYRO — скриншоты переведены на английский язык.',
     'screenshots.link': 'Смотреть все скриншоты',
     'screenshots.newTab.alt': 'Новая вкладка ILYRO',
     'screenshots.newTab.title': 'Новая вкладка',
@@ -187,6 +186,12 @@
     const label = labels[language][themeMode];
     themeToggle?.setAttribute('aria-label', label);
     themeToggle?.setAttribute('title', label);
+    const modeLabels = {
+      en: { system: 'System', light: 'Light', dark: 'Dark' },
+      ru: { system: 'Система', light: 'Светлая', dark: 'Тёмная' }
+    };
+    const modeLabel = document.querySelector('[data-theme-mode-label]');
+    if (modeLabel) modeLabel.textContent = modeLabels[language][themeMode];
   };
 
   const updateMenuLabel = () => {
