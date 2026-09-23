@@ -2,8 +2,6 @@ package com.ilyro.browser.ui
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image as ComposeImage
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -16,7 +14,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -62,6 +62,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
@@ -648,18 +649,21 @@ internal fun calculateOmniboxPopupY(
     popupHeight: Int,
     windowHeight: Int,
     imeBottom: Int,
-    verticalGap: Int
+    verticalGap: Int,
+    safeTopInset: Int = 0,
+    navigationBarBottomInset: Int = 0
 ): Int {
-    // Popup is rendered in a separate window from the IME. windowHeight alone therefore includes
-    // the keyboard area; cap the popup's bottom at the IME top so landscape keyboards cannot cover
-    // the last suggestions.
-    val safeBottom = (windowHeight - imeBottom).coerceIn(0, windowHeight)
-    val maxY = (safeBottom - popupHeight).coerceAtLeast(0)
+    val safeTop = safeTopInset.coerceIn(0, windowHeight)
+    // The IME inset already reaches the keyboard edge; use the larger bottom inset instead of
+    // adding the navigation bar again when Android places the keyboard above gesture navigation.
+    val safeBottomInset = maxOf(imeBottom, navigationBarBottomInset)
+    val safeBottom = (windowHeight - safeBottomInset).coerceIn(safeTop, windowHeight)
+    val maxY = (safeBottom - popupHeight).coerceAtLeast(safeTop)
     val aboveY = anchorTop - popupHeight - verticalGap
     val belowY = anchorBottom + verticalGap
     val preferredY = if (placeAbove) aboveY else belowY
     val alternateY = if (placeAbove) belowY else aboveY
-    return if (preferredY in 0..maxY) preferredY else alternateY.coerceIn(0, maxY)
+    return if (preferredY in safeTop..maxY) preferredY else alternateY.coerceIn(safeTop, maxY)
 }
 
 internal fun calculateOmniboxPopupAvailableHeight(
@@ -668,11 +672,15 @@ internal fun calculateOmniboxPopupAvailableHeight(
     anchorBottom: Int,
     windowHeight: Int,
     imeBottom: Int,
-    verticalGap: Int
+    verticalGap: Int,
+    safeTopInset: Int = 0,
+    navigationBarBottomInset: Int = 0
 ): Int {
-    val safeBottom = (windowHeight - imeBottom).coerceIn(0, windowHeight)
+    val safeTop = safeTopInset.coerceIn(0, windowHeight)
+    val safeBottomInset = maxOf(imeBottom, navigationBarBottomInset)
+    val safeBottom = (windowHeight - safeBottomInset).coerceIn(safeTop, windowHeight)
     return if (placeAbove) {
-        (anchorTop - verticalGap).coerceAtLeast(0)
+        (anchorTop - verticalGap - safeTop).coerceAtLeast(0)
     } else {
         (safeBottom - anchorBottom - verticalGap).coerceAtLeast(0)
     }
@@ -681,7 +689,10 @@ internal fun calculateOmniboxPopupAvailableHeight(
 private class OmniboxPopupPositionProvider(
     private val placeAbove: Boolean,
     private val verticalGapPx: Int,
-    private val imeBottomPx: Int
+    private val imeBottomPx: Int,
+    private val safeTopInsetPx: Int,
+    private val navigationBarBottomInsetPx: Int,
+    private val hostWindowHeightPx: Int
 ) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
@@ -696,9 +707,11 @@ private class OmniboxPopupPositionProvider(
             anchorTop = anchorBounds.top,
             anchorBottom = anchorBounds.bottom,
             popupHeight = popupContentSize.height,
-            windowHeight = windowSize.height,
+            windowHeight = hostWindowHeightPx.takeIf { it > 0 } ?: windowSize.height,
             imeBottom = imeBottomPx,
-            verticalGap = verticalGapPx
+            verticalGap = verticalGapPx,
+            safeTopInset = safeTopInsetPx,
+            navigationBarBottomInset = navigationBarBottomInsetPx
         )
         return IntOffset(x, y)
     }
@@ -734,32 +747,51 @@ private fun OmniboxSuggestionsMenu(
 
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
+    val hostView = LocalView.current
+    val hostRoot = hostView.rootView
+    // Popup content lives in another Android window. Measure against the Activity root that owns
+    // the text field so anchor coordinates, status bars, navigation bars, and IME share a basis.
+    val hostWindowHeightPx = hostRoot.height.takeIf { it > 0 }
+        ?: hostView.height.takeIf { it > 0 }
+        ?: with(density) { configuration.screenHeightDp.dp.roundToPx() }
+    val hostWindowWidthPx = hostRoot.width.takeIf { it > 0 }
+        ?: hostView.width.takeIf { it > 0 }
+        ?: with(density) { configuration.screenWidthDp.dp.roundToPx() }
+    val safeTopInsetPx = WindowInsets.statusBars.getTop(density)
+    val navigationBarBottomInsetPx = WindowInsets.navigationBars.getBottom(density)
     val imeBottomPx = WindowInsets.ime.getBottom(density)
     val gapPx = with(density) { 8.dp.roundToPx() }
-    val windowHeightPx = with(density) { configuration.screenHeightDp.dp.roundToPx() }
     val availableHeightPx = calculateOmniboxPopupAvailableHeight(
         placeAbove = placeAbove,
         anchorTop = anchorBounds.top.toInt(),
         anchorBottom = anchorBounds.bottom.toInt(),
-        windowHeight = windowHeightPx,
+        windowHeight = hostWindowHeightPx,
         imeBottom = imeBottomPx,
-        verticalGap = gapPx
+        verticalGap = gapPx,
+        safeTopInset = safeTopInsetPx,
+        navigationBarBottomInset = navigationBarBottomInsetPx
     )
     val maxPanelHeight = with(density) { availableHeightPx.coerceAtLeast(1).toDp() }
-    val panelHeight by animateDpAsState(
-        targetValue = if (expanded && suggestions.isNotEmpty()) maxPanelHeight else 0.dp,
-        animationSpec = tween(
-            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
-            easing = IlyroVisualTokens.MotionEnterEasing
-        ),
-        label = "omnibox-suggestions-height"
-    )
-    val popupWidth = (configuration.screenWidthDp.dp - 16.dp).coerceAtLeast(1.dp)
-    val positionProvider = remember(placeAbove, gapPx, imeBottomPx) {
-        OmniboxPopupPositionProvider(placeAbove, gapPx, imeBottomPx)
+    val popupWidth = with(density) { hostWindowWidthPx.toDp() }.minus(16.dp).coerceAtLeast(1.dp)
+    val positionProvider = remember(
+        placeAbove,
+        gapPx,
+        imeBottomPx,
+        safeTopInsetPx,
+        navigationBarBottomInsetPx,
+        hostWindowHeightPx
+    ) {
+        OmniboxPopupPositionProvider(
+            placeAbove = placeAbove,
+            verticalGapPx = gapPx,
+            imeBottomPx = imeBottomPx,
+            safeTopInsetPx = safeTopInsetPx,
+            navigationBarBottomInsetPx = navigationBarBottomInsetPx,
+            hostWindowHeightPx = hostWindowHeightPx
+        )
     }
 
-    if (panelHeight <= 0.dp || anchorBounds == Rect.Zero) return
+    if (maxPanelHeight <= 0.dp || anchorBounds == Rect.Zero) return
 
     Popup(
         popupPositionProvider = positionProvider,
@@ -775,7 +807,7 @@ private fun OmniboxSuggestionsMenu(
         Surface(
             modifier = Modifier
                 .width(popupWidth)
-                .height(panelHeight)
+                .height(maxPanelHeight)
                 .onGloballyPositioned { onBoundsChanged(it.boundsInWindow()) },
             shape = RoundedCornerShape(IlyroVisualTokens.CardRadius),
             color = MaterialTheme.colorScheme.surface,
