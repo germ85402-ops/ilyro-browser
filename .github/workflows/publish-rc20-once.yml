@@ -1,0 +1,25 @@
+name: Publish rc20 tag once
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-rc20-once.yml"]
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create rc20 tag and dispatch signed release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag_name='v0.26.0-rc20'
+          if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag_name" >/dev/null 2>&1; then
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$tag_name" -f "sha=$GITHUB_SHA"
+          fi
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$tag_name"

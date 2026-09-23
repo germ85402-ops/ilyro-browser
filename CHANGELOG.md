@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.26.0-rc20 — release candidate
+
+- Add four distinct built-in wallpaper styles, each with dedicated phone and tablet artwork selected automatically by device size.
+
 ## 0.26.0-rc19 — release candidate
 
 - Replace the six previous built-in wallpapers with three ILYRO landscapes, each with portrait phone and wide tablet artwork selected automatically by device size.

@@ -609,6 +609,10 @@ private fun wallpaperPreviewBrush(background: HomeBackground): Brush = when (bac
     HomeBackground.STILLWATER -> Brush.linearGradient(listOf(Color(0xFF0B111B), Color(0xFF243958)))
     HomeBackground.PINE_DUSK -> Brush.linearGradient(listOf(Color(0xFF0A151C), Color(0xFF263F56)))
     HomeBackground.ALPINE_DAWN -> Brush.linearGradient(listOf(Color(0xFF111A27), Color(0xFF34455D)))
+    HomeBackground.OBSIDIAN -> Brush.linearGradient(listOf(Color(0xFF080A0F), Color(0xFF18345D)))
+    HomeBackground.INK_WASH -> Brush.linearGradient(listOf(Color(0xFF101724), Color(0xFF344052)))
+    HomeBackground.EMBER_DUNES -> Brush.linearGradient(listOf(Color(0xFF1D1425), Color(0xFF9B422E)))
+    HomeBackground.PRISM_FLOW -> Brush.linearGradient(listOf(Color(0xFF080912), Color(0xFF27364F)))
     HomeBackground.CUSTOM -> Brush.linearGradient(
         listOf(Color(0xFF42464E), Color(0xFF727984), Color(0xFF343941))
     )
@@ -686,6 +690,10 @@ internal fun homeBackgroundLabel(background: HomeBackground): String = when (bac
     HomeBackground.STILLWATER -> tr("Stillwater", "Тихая вода")
     HomeBackground.PINE_DUSK -> tr("Pine dusk", "Сумеречный лес")
     HomeBackground.ALPINE_DAWN -> tr("Alpine dawn", "Горный рассвет")
+    HomeBackground.OBSIDIAN -> tr("Obsidian", "Обсидиан")
+    HomeBackground.INK_WASH -> tr("Ink wash", "Суми-э")
+    HomeBackground.EMBER_DUNES -> tr("Ember dunes", "Янтарные дюны")
+    HomeBackground.PRISM_FLOW -> tr("Prism flow", "Поток призмы")
     HomeBackground.CUSTOM -> tr("Your image", "Своё фото")
 }
 

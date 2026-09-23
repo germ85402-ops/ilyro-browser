@@ -183,6 +183,26 @@ internal fun builtInWallpaperResource(background: HomeBackground, isTablet: Bool
         } else {
             R.drawable.wallpaper_phone_alpine_dawn
         }
+        HomeBackground.OBSIDIAN -> if (isTablet) {
+            R.drawable.wallpaper_tablet_obsidian
+        } else {
+            R.drawable.wallpaper_phone_obsidian
+        }
+        HomeBackground.INK_WASH -> if (isTablet) {
+            R.drawable.wallpaper_tablet_ink_wash
+        } else {
+            R.drawable.wallpaper_phone_ink_wash
+        }
+        HomeBackground.EMBER_DUNES -> if (isTablet) {
+            R.drawable.wallpaper_tablet_ember_dunes
+        } else {
+            R.drawable.wallpaper_phone_ember_dunes
+        }
+        HomeBackground.PRISM_FLOW -> if (isTablet) {
+            R.drawable.wallpaper_tablet_prism_flow
+        } else {
+            R.drawable.wallpaper_phone_prism_flow
+        }
     }
 
 @Composable
@@ -214,6 +234,10 @@ internal fun BuiltInWallpaperPreview(
         HomeBackground.STILLWATER -> listOf(Color(0xFF0B111B), Color(0xFF243958))
         HomeBackground.PINE_DUSK -> listOf(Color(0xFF0A151C), Color(0xFF263F56))
         HomeBackground.ALPINE_DAWN -> listOf(Color(0xFF111A27), Color(0xFF34455D))
+        HomeBackground.OBSIDIAN -> listOf(Color(0xFF080A0F), Color(0xFF18345D))
+        HomeBackground.INK_WASH -> listOf(Color(0xFF101724), Color(0xFF344052))
+        HomeBackground.EMBER_DUNES -> listOf(Color(0xFF1D1425), Color(0xFF9B422E))
+        HomeBackground.PRISM_FLOW -> listOf(Color(0xFF080912), Color(0xFF27364F))
         HomeBackground.CUSTOM -> listOf(Color(0xFF343941), Color(0xFF59616D))
     }
     Box(modifier.background(Brush.verticalGradient(fallbackColors)))

@@ -49,6 +49,10 @@ internal fun HomeBackground.wallpaperAccentPreset(): BrowserAccent = when (this)
     HomeBackground.STILLWATER -> BrowserAccent.BLUE
     HomeBackground.PINE_DUSK -> BrowserAccent.FOREST
     HomeBackground.ALPINE_DAWN -> BrowserAccent.BLUE
+    HomeBackground.OBSIDIAN -> BrowserAccent.BLUE
+    HomeBackground.INK_WASH -> BrowserAccent.BLUE
+    HomeBackground.EMBER_DUNES -> BrowserAccent.VIOLET
+    HomeBackground.PRISM_FLOW -> BrowserAccent.VIOLET
     HomeBackground.CUSTOM -> BrowserAccent.BLUE
 }
 

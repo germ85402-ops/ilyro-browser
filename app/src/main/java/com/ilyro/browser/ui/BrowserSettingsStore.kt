@@ -56,6 +56,10 @@ internal enum class HomeBackground {
     STILLWATER,
     PINE_DUSK,
     ALPINE_DAWN,
+    OBSIDIAN,
+    INK_WASH,
+    EMBER_DUNES,
+    PRISM_FLOW,
     CUSTOM
 }
 
