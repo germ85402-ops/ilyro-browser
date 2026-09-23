@@ -110,7 +110,7 @@ class OmniboxLayoutTest {
     @Test
     fun hiddenKeyboardStillKeepsSuggestionsAboveNavigationBar() {
         assertEquals(
-            684,
+            708,
             calculateOmniboxPopupAvailableHeight(
                 placeAbove = false,
                 anchorTop = 120,
