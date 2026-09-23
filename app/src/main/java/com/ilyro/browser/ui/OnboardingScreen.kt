@@ -95,13 +95,29 @@ internal fun OnboardingScreen(
                 transitionSpec = {
                     val forward = targetState > initialState
                     (slideInHorizontally(
-                        animationSpec = tween(IlyroVisualTokens.MotionStandardMs),
+                        animationSpec = tween(
+                            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+                            easing = IlyroVisualTokens.MotionEnterEasing
+                        ),
                         initialOffsetX = { width -> if (forward) width / 6 else -width / 6 }
-                    ) + fadeIn(tween(IlyroVisualTokens.MotionFastMs))) togetherWith
+                    ) + fadeIn(
+                        tween(
+                            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                            easing = IlyroVisualTokens.MotionEnterEasing
+                        )
+                    )) togetherWith
                         (slideOutHorizontally(
-                            animationSpec = tween(IlyroVisualTokens.MotionFastMs),
+                            animationSpec = tween(
+                                durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                                easing = IlyroVisualTokens.MotionExitEasing
+                            ),
                             targetOffsetX = { width -> if (forward) -width / 7 else width / 7 }
-                        ) + fadeOut(tween(130)))
+                        ) + fadeOut(
+                            tween(
+                                durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                                easing = IlyroVisualTokens.MotionExitEasing
+                            )
+                        ))
                 },
                 label = "ilyro-onboarding-step"
             ) { currentStep ->

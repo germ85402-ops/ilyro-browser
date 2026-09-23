@@ -542,13 +542,28 @@ private fun SignedOutAccountContent(
         enabled = configured && !busy,
         modifier = Modifier
             .fillMaxWidth()
-            .animateContentSize(animationSpec = tween(durationMillis = 180))
+            .animateContentSize(
+                animationSpec = tween(
+                    durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+                    easing = IlyroVisualTokens.MotionEnterEasing
+                )
+            )
     ) {
         AnimatedContent(
             targetState = busy,
             transitionSpec = {
-                fadeIn(animationSpec = tween(160)) togetherWith
-                    fadeOut(animationSpec = tween(100))
+                fadeIn(
+                    animationSpec = tween(
+                        durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                        easing = IlyroVisualTokens.MotionEnterEasing
+                    )
+                ) togetherWith
+                    fadeOut(
+                        animationSpec = tween(
+                            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionMicroMs),
+                            easing = IlyroVisualTokens.MotionExitEasing
+                        )
+                    )
             },
             label = "google-sign-in-button"
         ) { signingIn ->

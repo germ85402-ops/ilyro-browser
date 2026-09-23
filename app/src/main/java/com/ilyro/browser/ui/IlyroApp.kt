@@ -546,7 +546,7 @@ private fun BrowserScreen(
     LaunchedEffect(topNotice?.id) {
         val notice = topNotice
         if (notice == null) {
-            delay(220L)
+            delay(IlyroVisualTokens.motionDelay(IlyroVisualTokens.MotionStandardMs))
             renderedTopNotice = null
         } else {
             renderedTopNotice = notice
@@ -1919,14 +1919,58 @@ private fun BrowserScreen(
                     androidx.compose.animation.AnimatedVisibility(
                         visible = topNotice != null,
                         enter = if (noticeAtBottom) {
-                            slideInVertically(initialOffsetY = { it }) + fadeIn()
+                            slideInVertically(
+                                initialOffsetY = { it },
+                                animationSpec = tween(
+                                    durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+                                    easing = IlyroVisualTokens.MotionEnterEasing
+                                )
+                            ) + fadeIn(
+                                tween(
+                                    durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                                    easing = IlyroVisualTokens.MotionEnterEasing
+                                )
+                            )
                         } else {
-                            slideInVertically(initialOffsetY = { -it }) + fadeIn()
+                            slideInVertically(
+                                initialOffsetY = { -it },
+                                animationSpec = tween(
+                                    durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+                                    easing = IlyroVisualTokens.MotionEnterEasing
+                                )
+                            ) + fadeIn(
+                                tween(
+                                    durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                                    easing = IlyroVisualTokens.MotionEnterEasing
+                                )
+                            )
                         },
                         exit = if (noticeAtBottom) {
-                            slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                            slideOutVertically(
+                                targetOffsetY = { it },
+                                animationSpec = tween(
+                                    durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+                                    easing = IlyroVisualTokens.MotionExitEasing
+                                )
+                            ) + fadeOut(
+                                tween(
+                                    durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                                    easing = IlyroVisualTokens.MotionExitEasing
+                                )
+                            )
                         } else {
-                            slideOutVertically(targetOffsetY = { -it }) + fadeOut()
+                            slideOutVertically(
+                                targetOffsetY = { -it },
+                                animationSpec = tween(
+                                    durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+                                    easing = IlyroVisualTokens.MotionExitEasing
+                                )
+                            ) + fadeOut(
+                                tween(
+                                    durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                                    easing = IlyroVisualTokens.MotionExitEasing
+                                )
+                            )
                         },
                         modifier = Modifier
                             .align(
@@ -2658,8 +2702,18 @@ private fun BrowserScreen(
 
                         AnimatedVisibility(
                             visible = menuMoreExpanded,
-                            enter = fadeIn(tween(120)),
-                            exit = fadeOut(tween(90))
+                            enter = fadeIn(
+                                tween(
+                                    durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionMicroMs),
+                                    easing = IlyroVisualTokens.MotionEnterEasing
+                                )
+                            ),
+                            exit = fadeOut(
+                                tween(
+                                    durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionMicroMs),
+                                    easing = IlyroVisualTokens.MotionExitEasing
+                                )
+                            )
                         ) {
                             Column(
                                 modifier = Modifier.fillMaxWidth(),
@@ -2912,7 +2966,7 @@ private fun BrowserPageLoadingLine(
             targetProgress = (progress.coerceIn(0, 100) / 100f).coerceAtLeast(0.035f)
         } else if (indicatorVisible) {
             targetProgress = 1f
-            delay(150L)
+            delay(IlyroVisualTokens.motionDelay(IlyroVisualTokens.MotionMicroMs))
             indicatorVisible = false
             targetProgress = 0f
         }
@@ -2920,7 +2974,10 @@ private fun BrowserPageLoadingLine(
 
     val animatedProgress by animateFloatAsState(
         targetValue = targetProgress,
-        animationSpec = tween(durationMillis = 170),
+        animationSpec = tween(
+            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+            easing = IlyroVisualTokens.MotionEnterEasing
+        ),
         label = "browser-page-loading-progress"
     )
     val lineColor = if (isPrivate) Color(0xFF8B5CF6) else MaterialTheme.colorScheme.primary
@@ -2932,8 +2989,18 @@ private fun BrowserPageLoadingLine(
     ) {
         AnimatedVisibility(
             visible = indicatorVisible,
-            enter = fadeIn(tween(70)),
-            exit = fadeOut(tween(120)),
+            enter = fadeIn(
+                tween(
+                    durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionMicroMs),
+                    easing = IlyroVisualTokens.MotionEnterEasing
+                )
+            ),
+            exit = fadeOut(
+                tween(
+                    durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionMicroMs),
+                    easing = IlyroVisualTokens.MotionExitEasing
+                )
+            ),
             modifier = Modifier.fillMaxSize()
         ) {
             Box(

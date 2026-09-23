@@ -1,5 +1,9 @@
 package com.ilyro.browser.ui
 
+import android.animation.ValueAnimator
+import androidx.compose.animation.core.Easing
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -46,9 +50,23 @@ internal object IlyroVisualTokens {
     const val SubtleBorderAlpha = 0.18f
     const val SelectedBorderAlpha = 0.24f
 
-    // One motion vocabulary for service UI.
+    // Shared motion vocabulary. Keep entry, exit, and control feedback distinct.
+    const val MotionMicroMs = 120
     const val MotionFastMs = 160
     const val MotionStandardMs = 220
+    const val MotionScreenMs = 240
+
+    val MotionEnterEasing: Easing = FastOutSlowInEasing
+    val MotionExitEasing: Easing = FastOutLinearInEasing
+
+    /** Respect Android's global animation switch, including accessibility "Remove animations". */
+    fun motionDuration(durationMillis: Int): Int =
+        if (ValueAnimator.areAnimatorsEnabled()) durationMillis else 0
+
+    /** Keep choreography delays in step with the corresponding Compose animation. */
+    fun motionDelay(durationMillis: Int): Long = motionDuration(durationMillis).toLong()
+
+    fun systemMotionEnabled(): Boolean = ValueAnimator.areAnimatorsEnabled()
 
     val LightCanvasTop = Color(0xFFFCFDFF)
     val LightCanvasBottom = Color(0xFFF4F7FB)

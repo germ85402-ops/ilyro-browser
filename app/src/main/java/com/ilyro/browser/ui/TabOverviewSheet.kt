@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -58,6 +59,8 @@ import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.key
@@ -146,7 +149,7 @@ internal fun TabOverviewSheet(
     LaunchedEffect(sheetVisible, pendingExitAction) {
         if (!sheetVisible) {
             val action = pendingExitAction ?: return@LaunchedEffect
-            delay(260L)
+            delay(IlyroVisualTokens.motionDelay(IlyroVisualTokens.MotionScreenMs))
             if (!sheetVisible && pendingExitAction != null) {
                 action()
             }
@@ -214,8 +217,7 @@ internal fun TabOverviewSheet(
 
     LaunchedEffect(openingTabId) {
         val id = openingTabId ?: return@LaunchedEffect
-        delay(IlyroVisualTokens.MotionFastMs.toLong())
-        openingTabId = null
+        delay(IlyroVisualTokens.motionDelay(IlyroVisualTokens.MotionFastMs))
         requestSheetDismiss { onSelect(id) }
     }
 
@@ -234,12 +236,28 @@ internal fun TabOverviewSheet(
                 visible = sheetVisible,
                 enter = slideInVertically(
                     initialOffsetY = { it },
-                    animationSpec = tween(IlyroVisualTokens.MotionStandardMs)
-                ) + fadeIn(tween(130)),
+                    animationSpec = tween(
+                        durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+                        easing = IlyroVisualTokens.MotionEnterEasing
+                    )
+                ) + fadeIn(
+                    tween(
+                        durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                        easing = IlyroVisualTokens.MotionEnterEasing
+                    )
+                ),
                 exit = slideOutVertically(
                     targetOffsetY = { it },
-                    animationSpec = tween(IlyroVisualTokens.MotionStandardMs)
-                ) + fadeOut(tween(170)),
+                    animationSpec = tween(
+                        durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+                        easing = IlyroVisualTokens.MotionExitEasing
+                    )
+                ) + fadeOut(
+                    tween(
+                        durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                        easing = IlyroVisualTokens.MotionExitEasing
+                    )
+                ),
                 modifier = Modifier.fillMaxSize()
             ) {
                 Surface(
@@ -335,12 +353,19 @@ internal fun TabOverviewSheet(
                                 items(visibleTabs, key = { it.id }) { tab ->
                                     Box(
                                         modifier = Modifier.animateItem(
-                                            fadeInSpec = tween(150),
-                                            placementSpec = spring(
-                                                dampingRatio = 0.90f,
-                                                stiffness = 420f
+                                            fadeInSpec = tween(
+                                                durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                                                easing = IlyroVisualTokens.MotionEnterEasing
                                             ),
-                                            fadeOutSpec = tween(190)
+                                            placementSpec = if (IlyroVisualTokens.systemMotionEnabled()) {
+                                                spring(dampingRatio = 0.90f, stiffness = 420f)
+                                            } else {
+                                                snap()
+                                            },
+                                            fadeOutSpec = tween(
+                                                durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+                                                easing = IlyroVisualTokens.MotionExitEasing
+                                            )
                                         )
                                     ) {
                                         val restoreKey = if (tab.id == restoredTabId) restoreGeneration else 0L
@@ -773,6 +798,7 @@ private fun ModernTabCard(
     onEditGroup: () -> Unit
 ) {
     val dismissState = rememberSwipeToDismissBoxState(positionalThreshold = { it * 0.30f })
+    val hapticFeedback = LocalHapticFeedback.current
     var removing by remember(tab.id) { mutableStateOf(false) }
     val darkScheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val privateAccent = if (darkScheme) Color(0xFFC4B5FD) else Color(0xFF7048D8)
@@ -793,21 +819,22 @@ private fun ModernTabCard(
 
     val scale by animateFloatAsState(
         targetValue = when {
-            removing -> 0.91f
             opening -> 1.035f
             dimmedForOpening -> 0.99f
             else -> 1f
         },
-        animationSpec = tween(if (removing) 190 else IlyroVisualTokens.MotionFastMs),
+        animationSpec = tween(
+            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+            easing = IlyroVisualTokens.MotionEnterEasing
+        ),
         label = "tab-open-scale"
     )
     val alpha by animateFloatAsState(
-        targetValue = when {
-            removing -> 0f
-            dimmedForOpening -> 0.30f
-            else -> 1f
-        },
-        animationSpec = tween(if (removing) 180 else 140),
+        targetValue = if (dimmedForOpening) 0.30f else 1f,
+        animationSpec = tween(
+            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionMicroMs),
+            easing = IlyroVisualTokens.MotionEnterEasing
+        ),
         label = "tab-open-alpha"
     )
 
@@ -819,15 +846,35 @@ private fun ModernTabCard(
 
     LaunchedEffect(removing) {
         if (removing) {
-            delay(210)
+            delay(IlyroVisualTokens.motionDelay(IlyroVisualTokens.MotionScreenMs))
             onClose()
         }
     }
 
     AnimatedVisibility(
         visible = !removing,
-        enter = fadeIn(tween(150)) + expandVertically(tween(180)),
-        exit = fadeOut(tween(180)) + shrinkVertically(tween(210))
+        enter = fadeIn(
+            tween(
+                durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                easing = IlyroVisualTokens.MotionEnterEasing
+            )
+        ) + expandVertically(
+            tween(
+                durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+                easing = IlyroVisualTokens.MotionEnterEasing
+            )
+        ),
+        exit = fadeOut(
+            tween(
+                durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                easing = IlyroVisualTokens.MotionExitEasing
+            )
+        ) + shrinkVertically(
+            tween(
+                durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+                easing = IlyroVisualTokens.MotionExitEasing
+            )
+        )
     ) {
         SwipeToDismissBox(
             state = dismissState,
@@ -837,20 +884,27 @@ private fun ModernTabCard(
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
-                    translationX = if (removing) 26f else 0f
                     this.alpha = alpha
                 },
             enableDismissFromStartToEnd = true,
             enableDismissFromEndToStart = true,
             onDismiss = { value ->
-                if (value != SwipeToDismissBoxValue.Settled) removing = true
+                if (value != SwipeToDismissBoxValue.Settled && !removing) {
+                    hapticFeedback.performHapticFeedback(HapticFeedbackType.Confirm)
+                    removing = true
+                }
             },
             backgroundContent = { Box(Modifier.fillMaxSize()) }
         ) {
             Surface(
                 modifier = Modifier
                     .fillMaxSize()
-                    .animateContentSize()
+                    .animateContentSize(
+                        animationSpec = tween(
+                            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                            easing = IlyroVisualTokens.MotionEnterEasing
+                        )
+                    )
                     .semantics(mergeDescendants = true) {
                         role = Role.Button
                         selected = tab.selected
@@ -967,8 +1021,28 @@ private fun ModernTabCard(
 
                     AnimatedVisibility(
                         visible = actionsVisible,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
+                        enter = fadeIn(
+                            tween(
+                                durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                                easing = IlyroVisualTokens.MotionEnterEasing
+                            )
+                        ) + expandVertically(
+                            tween(
+                                durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+                                easing = IlyroVisualTokens.MotionEnterEasing
+                            )
+                        ),
+                        exit = fadeOut(
+                            tween(
+                                durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionMicroMs),
+                                easing = IlyroVisualTokens.MotionExitEasing
+                            )
+                        ) + shrinkVertically(
+                            tween(
+                                durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                                easing = IlyroVisualTokens.MotionExitEasing
+                            )
+                        )
                     ) {
                         Row(
                             modifier = Modifier

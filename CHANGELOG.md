@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.26.0-rc17 — release candidate
+
+- Unify animation timing and easing across onboarding, toolbar feedback, notices, tab cards, and loading indicators.
+- Honor Android's system animation setting, including reduced or removed animations.
+- Add directional transitions between mobile Settings categories and a subtle cross-fade on larger screens.
+- Align tab-sheet and tab-dismissal timing, remove compounded close motion, and add a light haptic when a swipe closes a tab.
+
 ## 0.26.0-rc16 — release candidate
 
 - Require screen-lock confirmation before Autofill releases a saved password, fail closed if the confirmation flow cannot launch, and match credentials to the domain of the field being filled.

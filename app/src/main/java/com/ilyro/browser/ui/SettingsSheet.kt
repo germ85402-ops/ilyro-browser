@@ -4,6 +4,13 @@ import android.content.Intent
 import android.net.Uri
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -147,86 +154,110 @@ internal fun SettingsSheet(
                         onBack = back
                     )
 
-                    Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                        if (wide || selected == null) {
+                    if (!wide) {
+                        AnimatedContent(
+                            targetState = selectedName,
+                            modifier = Modifier.fillMaxWidth().weight(1f),
+                            transitionSpec = {
+                                val openingCategory = targetState != null
+                                val enterDirection = if (openingCategory) 1 else -1
+                                (slideInHorizontally(
+                                    animationSpec = tween(
+                                        durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+                                        easing = IlyroVisualTokens.MotionEnterEasing
+                                    ),
+                                    initialOffsetX = { width -> width * enterDirection / 5 }
+                                ) + fadeIn(
+                                    tween(
+                                        durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                                        easing = IlyroVisualTokens.MotionEnterEasing
+                                    )
+                                )) togetherWith (slideOutHorizontally(
+                                    animationSpec = tween(
+                                        durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                                        easing = IlyroVisualTokens.MotionExitEasing
+                                    ),
+                                    targetOffsetX = { width -> -width * enterDirection / 8 }
+                                ) + fadeOut(
+                                    tween(
+                                        durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionMicroMs),
+                                        easing = IlyroVisualTokens.MotionExitEasing
+                                    )
+                                ))
+                            },
+                            label = "settings-category-navigation"
+                        ) { targetName ->
+                            val targetCategory = targetName?.let(SettingsCategory::valueOf)
+                            if (targetCategory == null) {
+                                SettingsSidebar(
+                                    current = SettingsCategory.GENERAL,
+                                    wide = false,
+                                    onSelect = { selectedName = it.name },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                SettingsCategoryPanel(
+                                    category = targetCategory,
+                                    settings = settings,
+                                    versionName = versionName,
+                                    wide = false,
+                                    modifier = Modifier.fillMaxSize(),
+                                    onSettingsChange = onSettingsChange,
+                                    onClearAction = { clearAction = it },
+                                    onClearHistory = onClearHistory,
+                                    onClearBookmarks = onClearBookmarks,
+                                    onClearDownloads = onClearDownloads,
+                                    onClearSiteData = onClearSiteData
+                                )
+                            }
+                        }
+                    } else {
+                        Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
                             SettingsSidebar(
                                 current = category,
-                                wide = wide,
+                                wide = true,
                                 onSelect = { selectedName = it.name },
-                                modifier = if (wide) {
-                                    Modifier.width(224.dp).fillMaxHeight()
-                                } else {
-                                    Modifier.fillMaxWidth().fillMaxHeight()
-                                }
+                                modifier = Modifier.width(224.dp).fillMaxHeight()
                             )
-                        }
 
-                        if (wide) {
                             Box(
                                 modifier = Modifier
                                     .width(1.dp)
                                     .fillMaxHeight()
                                     .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
                             )
-                        }
 
-                        if (wide || selected != null) {
-                            val scroll = rememberScrollState()
-                            LaunchedEffect(category) { scroll.scrollTo(0) }
-
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .fillMaxHeight(),
-                                contentAlignment = Alignment.TopCenter
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .widthIn(max = 880.dp)
-                                        .fillMaxWidth()
-                                        .verticalScroll(scroll)
-                                        .padding(
-                                            start = if (wide) 28.dp else 16.dp,
-                                            end = if (wide) 28.dp else 16.dp,
-                                            top = if (wide) 18.dp else 6.dp,
-                                            bottom = if (wide) 28.dp else 22.dp
+                            AnimatedContent(
+                                targetState = category,
+                                modifier = Modifier.weight(1f).fillMaxHeight(),
+                                transitionSpec = {
+                                    fadeIn(
+                                        tween(
+                                            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                                            easing = IlyroVisualTokens.MotionEnterEasing
                                         )
-                                ) {
-                                    SettingsCategoryContent(
-                                        category = category,
-                                        settings = settings,
-                                        versionName = versionName,
-                                        onSettingsChange = onSettingsChange,
-                                        onClearHistory = {
-                                            clearAction = ClearAction(
-                                                tr(settings.language, "Clear history?", "Очистить историю?"),
-                                                tr(settings.language, "All saved visits will be removed.", "Вся история посещений будет удалена."),
-                                                onClearHistory
-                                            )
-                                        },
-                                        onClearBookmarks = {
-                                            clearAction = ClearAction(
-                                                tr(settings.language, "Clear bookmarks?", "Удалить закладки?"),
-                                                tr(settings.language, "All bookmarks will be removed.", "Все закладки будут удалены."),
-                                                onClearBookmarks
-                                            )
-                                        },
-                                        onClearDownloads = {
-                                            clearAction = ClearAction(
-                                                tr(settings.language, "Delete downloads?", "Удалить загрузки?"),
-                                                tr(settings.language, "Downloaded files and records will be removed.", "Загруженные файлы и записи о них будут удалены."),
-                                                onClearDownloads
-                                            )
-                                        },
-                                        onClearSiteData = {
-                                            clearAction = ClearAction(
-                                                tr(settings.language, "Clear site data?", "Очистить данные сайтов?"),
-                                                tr(settings.language, "Cookies, sessions, cache and permissions will be removed.", "Cookie, сеансы, кэш и разрешения сайтов будут удалены."),
-                                                onClearSiteData
-                                            )
-                                        }
+                                    ) togetherWith fadeOut(
+                                        tween(
+                                            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionMicroMs),
+                                            easing = IlyroVisualTokens.MotionExitEasing
+                                        )
                                     )
-                                }
+                                },
+                                label = "settings-detail-category"
+                            ) { targetCategory ->
+                                SettingsCategoryPanel(
+                                    category = targetCategory,
+                                    settings = settings,
+                                    versionName = versionName,
+                                    wide = true,
+                                    modifier = Modifier.fillMaxSize(),
+                                    onSettingsChange = onSettingsChange,
+                                    onClearAction = { clearAction = it },
+                                    onClearHistory = onClearHistory,
+                                    onClearBookmarks = onClearBookmarks,
+                                    onClearDownloads = onClearDownloads,
+                                    onClearSiteData = onClearSiteData
+                                )
                             }
                         }
                     }
@@ -253,6 +284,85 @@ internal fun SettingsSheet(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SettingsCategoryPanel(
+    category: SettingsCategory,
+    settings: BrowserSettings,
+    versionName: String,
+    wide: Boolean,
+    modifier: Modifier,
+    onSettingsChange: (BrowserSettings) -> Unit,
+    onClearAction: (ClearAction) -> Unit,
+    onClearHistory: () -> Unit,
+    onClearBookmarks: () -> Unit,
+    onClearDownloads: () -> Unit,
+    onClearSiteData: () -> Unit
+) {
+    val scroll = rememberScrollState()
+    LaunchedEffect(category) { scroll.scrollTo(0) }
+
+    Box(
+        modifier = modifier,
+        contentAlignment = Alignment.TopCenter
+    ) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = 880.dp)
+                .fillMaxWidth()
+                .verticalScroll(scroll)
+                .padding(
+                    start = if (wide) 28.dp else 16.dp,
+                    end = if (wide) 28.dp else 16.dp,
+                    top = if (wide) 18.dp else 6.dp,
+                    bottom = if (wide) 28.dp else 22.dp
+                )
+        ) {
+            SettingsCategoryContent(
+                category = category,
+                settings = settings,
+                versionName = versionName,
+                onSettingsChange = onSettingsChange,
+                onClearHistory = {
+                    onClearAction(
+                        ClearAction(
+                            tr(settings.language, "Clear history?", "Очистить историю?"),
+                            tr(settings.language, "All saved visits will be removed.", "Вся история посещений будет удалена."),
+                            onClearHistory
+                        )
+                    )
+                },
+                onClearBookmarks = {
+                    onClearAction(
+                        ClearAction(
+                            tr(settings.language, "Clear bookmarks?", "Удалить закладки?"),
+                            tr(settings.language, "All bookmarks will be removed.", "Все закладки будут удалены."),
+                            onClearBookmarks
+                        )
+                    )
+                },
+                onClearDownloads = {
+                    onClearAction(
+                        ClearAction(
+                            tr(settings.language, "Delete downloads?", "Удалить загрузки?"),
+                            tr(settings.language, "Downloaded files and records will be removed.", "Загруженные файлы и записи о них будут удалены."),
+                            onClearDownloads
+                        )
+                    )
+                },
+                onClearSiteData = {
+                    onClearAction(
+                        ClearAction(
+                            tr(settings.language, "Clear site data?", "Очистить данные сайтов?"),
+                            tr(settings.language, "Cookies, sessions, cache and permissions will be removed.", "Cookie, сеансы, кэш и разрешения сайтов будут удалены."),
+                            onClearSiteData
+                        )
+                    )
+                }
+            )
         }
     }
 }
@@ -288,18 +398,38 @@ private fun ModernSettingsHeader(
             }
         }
 
+        val title = category?.title() ?: tr("Settings", "Настройки")
+
         Column(
             modifier = Modifier
                 .weight(1f)
                 .padding(start = if (metrics.isCompact) 10.dp else 14.dp)
         ) {
-            Text(
-                text = category?.title() ?: tr("Settings", "Настройки"),
-                style = if (metrics.isCompact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            AnimatedContent(
+                targetState = title,
+                transitionSpec = {
+                    fadeIn(
+                        tween(
+                            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionFastMs),
+                            easing = IlyroVisualTokens.MotionEnterEasing
+                        )
+                    ) togetherWith fadeOut(
+                        tween(
+                            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionMicroMs),
+                            easing = IlyroVisualTokens.MotionExitEasing
+                        )
+                    )
+                },
+                label = "settings-header-title"
+            ) { currentTitle ->
+                Text(
+                    text = currentTitle,
+                    style = if (metrics.isCompact) MaterialTheme.typography.headlineSmall else MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             Text(
                 text = if (category == null) {
                     tr("Make ILYRO yours", "Сделайте ILYRO своим")

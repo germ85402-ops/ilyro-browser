@@ -181,8 +181,12 @@ internal fun TabletTabStrip(
     LaunchedEffect(activeTabId, tabs.size) {
         val activeIndex = tabs.indexOfFirst { it.id == activeTabId }
         if (activeIndex >= 0) {
-            delay(48L)
-            listState.animateScrollToItem(activeIndex)
+            if (IlyroVisualTokens.systemMotionEnabled()) {
+                delay(48L)
+                listState.animateScrollToItem(activeIndex)
+            } else {
+                listState.scrollToItem(activeIndex)
+            }
         }
     }
 
@@ -416,7 +420,10 @@ internal fun BrowserBottomBar(
     val privateBarTarget = if (darkTheme) Color(0xFF17131F) else Color(0xFFF8F5FC)
     val barColor by animateColorAsState(
         targetValue = if (isPrivate) privateBarTarget else MaterialTheme.colorScheme.surface,
-        animationSpec = tween(durationMillis = IlyroVisualTokens.MotionStandardMs),
+        animationSpec = tween(
+            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+            easing = IlyroVisualTokens.MotionEnterEasing
+        ),
         label = "browser-mode-bar"
     )
     val density = LocalDensity.current
@@ -707,12 +714,18 @@ private fun TabCountButton(
     }
     val background by animateColorAsState(
         targetValue = targetBackground,
-        animationSpec = tween(durationMillis = IlyroVisualTokens.MotionStandardMs),
+        animationSpec = tween(
+            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+            easing = IlyroVisualTokens.MotionEnterEasing
+        ),
         label = "tab-count-background"
     )
     val content by animateColorAsState(
         targetValue = if (isPrivate) privateAccent else MaterialTheme.colorScheme.onSurface,
-        animationSpec = tween(durationMillis = IlyroVisualTokens.MotionStandardMs),
+        animationSpec = tween(
+            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+            easing = IlyroVisualTokens.MotionEnterEasing
+        ),
         label = "tab-count-content"
     )
 

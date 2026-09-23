@@ -108,7 +108,10 @@ internal fun IlyroHomePage(
     val wallpaperActive = activeBackground != HomeBackground.NONE
     val privateHomeTint by animateColorAsState(
         targetValue = if (isPrivate) Color(0xFF8B5CF6).copy(alpha = 0.045f) else Color.Transparent,
-        animationSpec = tween(IlyroVisualTokens.MotionStandardMs),
+        animationSpec = tween(
+            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+            easing = IlyroVisualTokens.MotionEnterEasing
+        ),
         label = "private-home-tint"
     )
 
