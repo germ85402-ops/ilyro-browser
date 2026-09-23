@@ -34,6 +34,7 @@ internal object BrowserSettingsSyncCodec {
         .put("language", settings.language.name)
         .put("preferredSiteLanguages", settings.preferredSiteLanguages.joinToString(","))
         .put("searchEngine", settings.searchEngine.name)
+        .put("onlineSearchSuggestionsEnabled", settings.onlineSearchSuggestionsEnabled)
         .put(
             "customSearchEngines",
             JSONArray().apply {
@@ -102,6 +103,10 @@ internal object BrowserSettingsSyncCodec {
                 .takeIf { it.isNotEmpty() }
                 ?: defaults.preferredSiteLanguages,
             searchEngine = enumOrDefault(json.optString("searchEngine"), defaults.searchEngine),
+            onlineSearchSuggestionsEnabled = json.optBoolean(
+                "onlineSearchSuggestionsEnabled",
+                defaults.onlineSearchSuggestionsEnabled
+            ),
             customSearchEngines = customSearchEngines,
             customSearchEngineId = customSearchEngineId,
             theme = enumOrDefault(json.optString("theme"), defaults.theme),

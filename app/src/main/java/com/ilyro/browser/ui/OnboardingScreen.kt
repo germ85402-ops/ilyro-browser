@@ -53,6 +53,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -696,12 +697,20 @@ private fun WallpaperMiniCard(
     compact: Boolean,
     onClick: () -> Unit
 ) {
+    val isTablet = LocalConfiguration.current.smallestScreenWidthDp >= 600
+    val cardWidth = when {
+        isTablet -> 168.dp
+        compact -> 122.dp
+        else -> 132.dp
+    }
+    val cardHeight = when {
+        isTablet -> 116.dp
+        compact -> 160.dp
+        else -> 172.dp
+    }
     Surface(
         onClick = onClick,
-        modifier = Modifier.size(
-            width = if (compact) 112.dp else 122.dp,
-            height = if (compact) 80.dp else 86.dp
-        ),
+        modifier = Modifier.size(width = cardWidth, height = cardHeight),
         shape = RoundedCornerShape(IlyroVisualTokens.ControlRadius),
         color = MaterialTheme.colorScheme.surface,
         border = BorderStroke(
@@ -720,9 +729,11 @@ private fun WallpaperMiniCard(
                 settings.copy(
                     homeBackground = background,
                     useSeparateDarkBackground = false,
+                    wallpaperFit = WallpaperFit.FIT,
                     wallpaperDim = WallpaperDim.OFF,
                     wallpaperBlur = WallpaperBlur.OFF
-                )
+                ),
+                builtInContentScale = androidx.compose.ui.layout.ContentScale.Fit
             )
             Box(
                 modifier = Modifier

@@ -753,6 +753,11 @@ private fun BrowserScreen(
             addAll(restoredHistory)
         }
     }
+    val quickLinks = remember {
+        mutableStateListOf<QuickLink>().apply {
+            addAll(QuickLinkStore.restore(prefs))
+        }
+    }
 
     var activeTabId by remember {
         mutableStateOf(tabs[restoredSession.activeIndex].id)
@@ -1807,6 +1812,9 @@ private fun BrowserScreen(
                         searchEngine = settings.searchEngine,
                         customSearchEngine = settings.selectedCustomSearchEngine(),
                         history = if (activeTab.isPrivate) emptyList() else history,
+                        bookmarks = bookmarks,
+                        quickLinks = quickLinks,
+                        onlineSearchSuggestionsEnabled = settings.onlineSearchSuggestionsEnabled,
                         canGoBack = activeTab.canGoBack,
                         canGoForward = activeTab.canGoForward,
                         onBack = {
@@ -1867,6 +1875,8 @@ private fun BrowserScreen(
                             customSearchEngine = settings.selectedCustomSearchEngine(),
                             customSearchEngines = settings.customSearchEngines,
                             history = if (activeTab.isPrivate) emptyList() else history,
+                            bookmarks = bookmarks,
+                            quickLinks = quickLinks,
                             isPrivate = activeTab.isPrivate,
                             onSearchEngineChange = { engine ->
                                 onSettingsChange(
@@ -1879,7 +1889,8 @@ private fun BrowserScreen(
                             onCustomSearchEngineChange = { engine ->
                                 onSettingsChange(settings.copy(customSearchEngineId = engine?.id))
                             },
-                            onNavigate = { navigateInput(it) }
+                            onNavigate = { navigateInput(it) },
+                            onlineSearchSuggestionsEnabled = settings.onlineSearchSuggestionsEnabled
                         )
                     } else if (readerModeActive) {
                         ReaderModeView(
@@ -2031,6 +2042,9 @@ private fun BrowserScreen(
                         searchEngine = settings.searchEngine,
                         customSearchEngine = settings.selectedCustomSearchEngine(),
                         history = if (activeTab.isPrivate) emptyList() else history,
+                        bookmarks = bookmarks,
+                        quickLinks = quickLinks,
+                        onlineSearchSuggestionsEnabled = settings.onlineSearchSuggestionsEnabled,
                         canGoBack = activeTab.canGoBack,
                         canGoForward = activeTab.canGoForward,
                         onBack = {

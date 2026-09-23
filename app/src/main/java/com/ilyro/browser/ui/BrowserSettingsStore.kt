@@ -83,6 +83,7 @@ internal data class BrowserSettings(
     val language: AppLanguage = AppLanguage.SYSTEM,
     val preferredSiteLanguages: List<String> = defaultPreferredSiteLanguages(),
     val searchEngine: SearchEngine = SearchEngine.GOOGLE,
+    val onlineSearchSuggestionsEnabled: Boolean = true,
     val customSearchEngines: List<CustomSearchEngine> = emptyList(),
     val customSearchEngineId: String? = null,
     val theme: BrowserTheme = BrowserTheme.SYSTEM,
@@ -149,6 +150,7 @@ internal object BrowserSettingsStore {
     private const val KEY_LANGUAGE = "settings_language"
     private const val KEY_SITE_LANGUAGES = "settings_site_languages"
     private const val KEY_SEARCH_ENGINE = "settings_search_engine"
+    private const val KEY_ONLINE_SEARCH_SUGGESTIONS = "settings_online_search_suggestions"
     private const val KEY_CUSTOM_SEARCH_ENGINES = "settings_custom_search_engines"
     private const val KEY_CUSTOM_SEARCH_ENGINE_ID = "settings_custom_search_engine_id"
     private const val KEY_THEME = "settings_theme"
@@ -264,6 +266,7 @@ internal object BrowserSettingsStore {
             ?.takeIf { it.isNotEmpty() }
             ?: defaultPreferredSiteLanguages(),
         searchEngine = enumValueOrDefault(prefs.getString(KEY_SEARCH_ENGINE, null), SearchEngine.GOOGLE),
+        onlineSearchSuggestionsEnabled = prefs.getBoolean(KEY_ONLINE_SEARCH_SUGGESTIONS, true),
         customSearchEngines = customSearchEngines,
         customSearchEngineId = customSearchEngineId,
         theme = enumValueOrDefault(prefs.getString(KEY_THEME, null), BrowserTheme.SYSTEM),
@@ -307,6 +310,7 @@ internal object BrowserSettingsStore {
             .putString(KEY_LANGUAGE, settings.language.name)
             .putString(KEY_SITE_LANGUAGES, settings.preferredSiteLanguages.joinToString("|"))
             .putString(KEY_SEARCH_ENGINE, settings.searchEngine.name)
+            .putBoolean(KEY_ONLINE_SEARCH_SUGGESTIONS, settings.onlineSearchSuggestionsEnabled)
             .putString(KEY_CUSTOM_SEARCH_ENGINES, serializeCustomSearchEngines(settings.customSearchEngines))
             .putString(KEY_CUSTOM_SEARCH_ENGINE_ID, settings.customSearchEngineId)
             .putString(KEY_THEME, settings.theme.name)

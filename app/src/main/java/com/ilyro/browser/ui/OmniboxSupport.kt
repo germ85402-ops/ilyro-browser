@@ -2,7 +2,8 @@ package com.ilyro.browser.ui
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.net.Uri
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image as ComposeImage
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -11,21 +12,23 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Bookmark
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.DropdownMenu
@@ -86,15 +89,6 @@ import java.net.URL
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
-private enum class OmniboxSuggestionKind { HISTORY, SEARCH }
-
-private data class OmniboxSuggestion(
-    val kind: OmniboxSuggestionKind,
-    val value: String,
-    val title: String,
-    val subtitle: String
-)
-
 /**
  * Activity-level touch routing for the focused home omnibox.
  *
@@ -154,6 +148,7 @@ internal object AddressOmniboxTouchCoordinator {
     private var owner: Any? = null
     private var active = false
     private var fieldBounds = Rect.Zero
+    private var suggestionBounds = Rect.Zero
     private var dismissAction: (() -> Unit)? = null
 
     fun bind(ownerToken: Any, onDismiss: () -> Unit) {
@@ -166,6 +161,7 @@ internal object AddressOmniboxTouchCoordinator {
         owner = null
         active = false
         fieldBounds = Rect.Zero
+        suggestionBounds = Rect.Zero
         dismissAction = null
     }
 
@@ -178,11 +174,16 @@ internal object AddressOmniboxTouchCoordinator {
         if (owner === ownerToken) fieldBounds = bounds
     }
 
+    fun setSuggestionBounds(ownerToken: Any, bounds: Rect) {
+        if (owner === ownerToken) suggestionBounds = bounds
+    }
+
     fun onWindowTouchDown(x: Float, y: Float) {
         if (!active || owner == null) return
         val point = Offset(x, y)
         val insideField = fieldBounds != Rect.Zero && fieldBounds.contains(point)
-        if (!insideField) dismissAction?.invoke()
+        val insideSuggestions = suggestionBounds != Rect.Zero && suggestionBounds.contains(point)
+        if (!insideField && !insideSuggestions) dismissAction?.invoke()
     }
 }
 
@@ -198,12 +199,17 @@ internal fun IlyroHomeOmnibox(
     modifier: Modifier = Modifier,
     customSearchEngine: CustomSearchEngine? = null,
     customSearchEngines: List<CustomSearchEngine> = emptyList(),
-    onCustomSearchEngineChange: (CustomSearchEngine?) -> Unit = {}
+    onCustomSearchEngineChange: (CustomSearchEngine?) -> Unit = {},
+    bookmarks: List<BookmarkItem> = emptyList(),
+    quickLinks: List<QuickLink> = emptyList(),
+    onlineSearchSuggestionsEnabled: Boolean = true,
+    onFocusChanged: (Boolean) -> Unit = {}
 ) {
     var focused by remember { mutableStateOf(false) }
     val ownerToken = remember { Any() }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    var fieldBounds by remember { mutableStateOf(Rect.Zero) }
     DisposableEffect(ownerToken, focusManager, keyboardController) {
         HomeOmniboxTouchCoordinator.bind(ownerToken) {
             focusManager.clearFocus(force = true)
@@ -231,12 +237,15 @@ internal fun IlyroHomeOmnibox(
                     .height(56.dp)
                     .clip(RoundedCornerShape(IlyroVisualTokens.PillRadius))
                     .onGloballyPositioned {
-                        HomeOmniboxTouchCoordinator.setFieldBounds(ownerToken, it.boundsInWindow())
+                        fieldBounds = it.boundsInWindow()
+                        HomeOmniboxTouchCoordinator.setFieldBounds(ownerToken, fieldBounds)
                     }
                     .onFocusChanged { state ->
                         focused = state.isFocused
+                        onFocusChanged(state.isFocused)
                         HomeOmniboxTouchCoordinator.setActive(ownerToken, state.isFocused)
                         if (!state.isFocused) {
+                            fieldBounds = Rect.Zero
                             HomeOmniboxTouchCoordinator.setSuggestionBounds(ownerToken, Rect.Zero)
                         }
                     },
@@ -277,25 +286,25 @@ internal fun IlyroHomeOmnibox(
                 )
             )
 
-            if (focused) {
-                OmniboxSuggestionsMenu(
-                    expanded = true,
-                    query = value,
-                    searchEngine = searchEngine,
-                    history = history,
-                    allowRemote = !isPrivate && customSearchEngine == null,
-                    placeAbove = false,
-                    onDismiss = { },
-                    onSelect = { selected ->
-                        focusManager.clearFocus(force = true)
-                        keyboardController?.hide()
-                        onNavigate(selected)
-                    },
-                    onBoundsChanged = {
-                        HomeOmniboxTouchCoordinator.setSuggestionBounds(ownerToken, it)
-                    }
-                )
-            }
+            OmniboxSuggestionsMenu(
+                expanded = focused,
+                query = value,
+                searchEngine = searchEngine,
+                history = history,
+                bookmarks = bookmarks,
+                quickLinks = quickLinks,
+                allowRemote = onlineSearchSuggestionsEnabled && !isPrivate && customSearchEngine == null,
+                placeAbove = false,
+                anchorBounds = fieldBounds,
+                onSelect = { selected ->
+                    focusManager.clearFocus(force = true)
+                    keyboardController?.hide()
+                    onNavigate(selected)
+                },
+                onBoundsChanged = {
+                    HomeOmniboxTouchCoordinator.setSuggestionBounds(ownerToken, it)
+                }
+            )
         }
     }
 }
@@ -314,19 +323,32 @@ internal fun IlyroAddressOmnibox(
     suggestionsAbove: Boolean = false,
     trailingIcon: (@Composable () -> Unit)? = null,
     modifier: Modifier = Modifier,
-    customSearchEngine: CustomSearchEngine? = null
+    customSearchEngine: CustomSearchEngine? = null,
+    bookmarks: List<BookmarkItem> = emptyList(),
+    quickLinks: List<QuickLink> = emptyList(),
+    onlineSearchSuggestionsEnabled: Boolean = true
 ) {
     var focused by remember { mutableStateOf(false) }
     val ownerToken = remember { Any() }
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val secure = value.text.startsWith("https://", ignoreCase = true)
+    var fieldBounds by remember { mutableStateOf(Rect.Zero) }
+    val suggestionQuery = if (
+        focused && value.text.isNotBlank() &&
+        value.selection.start == 0 && value.selection.end == value.text.length
+    ) {
+        ""
+    } else {
+        value.text
+    }
 
     val dismissEditing: () -> Unit = {
         focused = false
         onFocusChanged(false)
         focusManager.clearFocus(force = true)
         keyboardController?.hide()
+        AddressOmniboxTouchCoordinator.setSuggestionBounds(ownerToken, Rect.Zero)
     }
 
     DisposableEffect(ownerToken, focusManager, keyboardController, onFocusChanged) {
@@ -345,11 +367,16 @@ internal fun IlyroAddressOmnibox(
                 .height(fieldHeight)
                 .clip(RoundedCornerShape(IlyroVisualTokens.PillRadius))
                 .onGloballyPositioned {
-                    AddressOmniboxTouchCoordinator.setFieldBounds(ownerToken, it.boundsInWindow())
+                    fieldBounds = it.boundsInWindow()
+                    AddressOmniboxTouchCoordinator.setFieldBounds(ownerToken, fieldBounds)
                 }
                 .onFocusChanged { state ->
                     focused = state.isFocused
                     AddressOmniboxTouchCoordinator.setActive(ownerToken, state.isFocused)
+                    if (!state.isFocused) {
+                        fieldBounds = Rect.Zero
+                        AddressOmniboxTouchCoordinator.setSuggestionBounds(ownerToken, Rect.Zero)
+                    }
                     onFocusChanged(state.isFocused)
                 },
             singleLine = true,
@@ -407,12 +434,17 @@ internal fun IlyroAddressOmnibox(
 
         OmniboxSuggestionsMenu(
             expanded = focused,
-            query = value.text,
+            query = suggestionQuery,
             searchEngine = searchEngine,
             history = history,
-            allowRemote = !isPrivate && customSearchEngine == null,
+            bookmarks = bookmarks,
+            quickLinks = quickLinks,
+            allowRemote = onlineSearchSuggestionsEnabled && !isPrivate && customSearchEngine == null,
             placeAbove = suggestionsAbove,
-            onDismiss = dismissEditing,
+            anchorBounds = fieldBounds,
+            onBoundsChanged = {
+                AddressOmniboxTouchCoordinator.setSuggestionBounds(ownerToken, it)
+            },
             onSelect = { selected ->
                 dismissEditing()
                 onNavigate(selected)
@@ -609,68 +641,6 @@ private object SearchEngineIconCache {
     }
 }
 
-@Composable
-private fun OmniboxSuggestionsInline(
-    expanded: Boolean,
-    query: String,
-    searchEngine: SearchEngine,
-    history: List<HistoryItem>,
-    allowRemote: Boolean,
-    onSelect: (String) -> Unit,
-    onBoundsChanged: (Rect) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val suggestions = rememberOmniboxSuggestions(
-        expanded = expanded,
-        query = query,
-        searchEngine = searchEngine,
-        history = history,
-        allowRemote = allowRemote
-    )
-
-    LaunchedEffect(expanded, suggestions.isEmpty()) {
-        if (!expanded || suggestions.isEmpty()) onBoundsChanged(Rect.Zero)
-    }
-    if (!expanded || suggestions.isEmpty()) return
-
-    val density = LocalDensity.current
-    val configuration = LocalConfiguration.current
-    val imeBottomPx = WindowInsets.ime.getBottom(density)
-    val imeBottom = with(density) { imeBottomPx.toDp() }
-    val safeListHeight = (configuration.screenHeightDp.dp - imeBottom - 142.dp)
-        .coerceIn(132.dp, 340.dp)
-
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp)
-            .onGloballyPositioned { onBoundsChanged(it.boundsInWindow()) },
-        shape = RoundedCornerShape(IlyroVisualTokens.CardRadius),
-        color = MaterialTheme.colorScheme.surface,
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.28f)
-        ),
-        tonalElevation = 0.dp,
-        shadowElevation = 3.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(max = safeListHeight)
-                .verticalScroll(rememberScrollState())
-                .padding(vertical = 4.dp)
-        ) {
-            suggestions.take(8).forEach { suggestion ->
-                OmniboxSuggestionRow(
-                    suggestion = suggestion,
-                    onClick = { onSelect(suggestion.value) }
-                )
-            }
-        }
-    }
-}
-
 internal fun calculateOmniboxPopupY(
     placeAbove: Boolean,
     anchorTop: Int,
@@ -692,6 +662,22 @@ internal fun calculateOmniboxPopupY(
     return if (preferredY in 0..maxY) preferredY else alternateY.coerceIn(0, maxY)
 }
 
+internal fun calculateOmniboxPopupAvailableHeight(
+    placeAbove: Boolean,
+    anchorTop: Int,
+    anchorBottom: Int,
+    windowHeight: Int,
+    imeBottom: Int,
+    verticalGap: Int
+): Int {
+    val safeBottom = (windowHeight - imeBottom).coerceIn(0, windowHeight)
+    return if (placeAbove) {
+        (anchorTop - verticalGap).coerceAtLeast(0)
+    } else {
+        (safeBottom - anchorBottom - verticalGap).coerceAtLeast(0)
+    }
+}
+
 private class OmniboxPopupPositionProvider(
     private val placeAbove: Boolean,
     private val verticalGapPx: Int,
@@ -704,7 +690,7 @@ private class OmniboxPopupPositionProvider(
         popupContentSize: IntSize
     ): IntOffset {
         val maxX = (windowSize.width - popupContentSize.width).coerceAtLeast(0)
-        val x = anchorBounds.left.coerceIn(0, maxX)
+        val x = ((windowSize.width - popupContentSize.width) / 2).coerceIn(0, maxX)
         val y = calculateOmniboxPopupY(
             placeAbove = placeAbove,
             anchorTop = anchorBounds.top,
@@ -724,10 +710,12 @@ private fun OmniboxSuggestionsMenu(
     query: String,
     searchEngine: SearchEngine,
     history: List<HistoryItem>,
+    bookmarks: List<BookmarkItem>,
+    quickLinks: List<QuickLink>,
     allowRemote: Boolean,
     placeAbove: Boolean,
+    anchorBounds: Rect,
     onBoundsChanged: (Rect) -> Unit = { },
-    onDismiss: () -> Unit,
     onSelect: (String) -> Unit
 ) {
     val suggestions = rememberOmniboxSuggestions(
@@ -735,6 +723,8 @@ private fun OmniboxSuggestionsMenu(
         query = query,
         searchEngine = searchEngine,
         history = history,
+        bookmarks = bookmarks,
+        quickLinks = quickLinks,
         allowRemote = allowRemote
     )
     LaunchedEffect(expanded, suggestions.isEmpty()) {
@@ -745,16 +735,31 @@ private fun OmniboxSuggestionsMenu(
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
     val imeBottomPx = WindowInsets.ime.getBottom(density)
-    val imeBottom = with(density) { imeBottomPx.toDp() }
-    val availableListHeight = (configuration.screenHeightDp.dp - imeBottom - 16.dp)
-        .coerceAtLeast(1.dp)
-    val maxListHeight = minOf(availableListHeight, 220.dp)
-    val popupWidth = (configuration.screenWidthDp.dp * 0.72f)
-        .coerceIn(260.dp, 560.dp)
     val gapPx = with(density) { 8.dp.roundToPx() }
+    val windowHeightPx = with(density) { configuration.screenHeightDp.dp.roundToPx() }
+    val availableHeightPx = calculateOmniboxPopupAvailableHeight(
+        placeAbove = placeAbove,
+        anchorTop = anchorBounds.top.toInt(),
+        anchorBottom = anchorBounds.bottom.toInt(),
+        windowHeight = windowHeightPx,
+        imeBottom = imeBottomPx,
+        verticalGap = gapPx
+    )
+    val maxPanelHeight = with(density) { availableHeightPx.coerceAtLeast(1).toDp() }
+    val panelHeight by animateDpAsState(
+        targetValue = if (expanded && suggestions.isNotEmpty()) maxPanelHeight else 0.dp,
+        animationSpec = tween(
+            durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
+            easing = IlyroVisualTokens.MotionEnterEasing
+        ),
+        label = "omnibox-suggestions-height"
+    )
+    val popupWidth = (configuration.screenWidthDp.dp - 16.dp).coerceAtLeast(1.dp)
     val positionProvider = remember(placeAbove, gapPx, imeBottomPx) {
         OmniboxPopupPositionProvider(placeAbove, gapPx, imeBottomPx)
     }
+
+    if (panelHeight <= 0.dp || anchorBounds == Rect.Zero) return
 
     Popup(
         popupPositionProvider = positionProvider,
@@ -769,8 +774,8 @@ private fun OmniboxSuggestionsMenu(
     ) {
         Surface(
             modifier = Modifier
-                .widthIn(min = popupWidth, max = popupWidth)
-                .heightIn(max = maxListHeight)
+                .width(popupWidth)
+                .height(panelHeight)
                 .onGloballyPositioned { onBoundsChanged(it.boundsInWindow()) },
             shape = RoundedCornerShape(IlyroVisualTokens.CardRadius),
             color = MaterialTheme.colorScheme.surface,
@@ -783,7 +788,7 @@ private fun OmniboxSuggestionsMenu(
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .fillMaxSize()
                     .verticalScroll(rememberScrollState())
                     .padding(vertical = 4.dp)
             ) {
@@ -803,6 +808,13 @@ private fun OmniboxSuggestionRow(
     suggestion: OmniboxSuggestion,
     onClick: () -> Unit
 ) {
+    val subtitle = suggestion.subtitle.ifBlank {
+        if (suggestion.kind == OmniboxSuggestionKind.ADDRESS) {
+            tr("Go to address", "Перейти по адресу")
+        } else {
+            ""
+        }
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -817,10 +829,12 @@ private fun OmniboxSuggestionRow(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
-                    imageVector = if (suggestion.kind == OmniboxSuggestionKind.HISTORY) {
-                        Icons.Rounded.History
-                    } else {
-                        Icons.Rounded.Search
+                    imageVector = when (suggestion.kind) {
+                        OmniboxSuggestionKind.HISTORY -> Icons.Rounded.History
+                        OmniboxSuggestionKind.BOOKMARK -> Icons.Rounded.Bookmark
+                        OmniboxSuggestionKind.QUICK_LINK -> Icons.Rounded.Link
+                        OmniboxSuggestionKind.ADDRESS -> Icons.Rounded.Link
+                        OmniboxSuggestionKind.SEARCH -> Icons.Rounded.Search
                     },
                     contentDescription = null,
                     modifier = Modifier.size(15.dp),
@@ -836,9 +850,9 @@ private fun OmniboxSuggestionRow(
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium
             )
-            if (suggestion.subtitle.isNotBlank()) {
+            if (subtitle.isNotBlank()) {
                 Text(
-                    text = suggestion.subtitle,
+                    text = subtitle,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.bodySmall,
@@ -855,6 +869,8 @@ private fun rememberOmniboxSuggestions(
     query: String,
     searchEngine: SearchEngine,
     history: List<HistoryItem>,
+    bookmarks: List<BookmarkItem>,
+    quickLinks: List<QuickLink>,
     allowRemote: Boolean
 ): List<OmniboxSuggestion> {
     var remoteSuggestions by remember(searchEngine) { mutableStateOf<List<String>>(emptyList()) }
@@ -873,88 +889,10 @@ private fun rememberOmniboxSuggestions(
         query = trimmed,
         engine = searchEngine,
         history = history,
+        bookmarks = bookmarks,
+        quickLinks = quickLinks,
         remote = remoteSuggestions
     )
-}
-
-private fun buildOmniboxSuggestions(
-    query: String,
-    engine: SearchEngine,
-    history: List<HistoryItem>,
-    remote: List<String>
-): List<OmniboxSuggestion> {
-    val normalized = query.lowercase()
-    val uniqueHistory = history.distinctBy { it.url }.take(300)
-    val historyMatches = if (query.isBlank()) {
-        uniqueHistory.take(6)
-    } else {
-        uniqueHistory
-            .mapNotNull { item ->
-                val host = runCatching { Uri.parse(item.url).host.orEmpty().removePrefix("www.") }
-                    .getOrDefault("")
-                val title = item.title.lowercase()
-                val url = item.url.lowercase()
-                val hostLower = host.lowercase()
-                if (normalized !in title && normalized !in url && normalized !in hostLower) return@mapNotNull null
-                val score = when {
-                    hostLower.startsWith(normalized) -> 400
-                    title.startsWith(normalized) -> 300
-                    url.startsWith(normalized) -> 250
-                    normalized in hostLower -> 180
-                    normalized in title -> 140
-                    else -> 100
-                } + (100 - uniqueHistory.indexOf(item).coerceAtMost(100))
-                item to score
-            }
-            .sortedByDescending { it.second }
-            .take(5)
-            .map { it.first }
-    }
-
-    val result = mutableListOf<OmniboxSuggestion>()
-    historyMatches.forEach { item ->
-        val host = runCatching { Uri.parse(item.url).host.orEmpty().removePrefix("www.") }
-            .getOrDefault("")
-        result += OmniboxSuggestion(
-            kind = OmniboxSuggestionKind.HISTORY,
-            value = item.url,
-            title = item.title.ifBlank { host.ifBlank { item.url } },
-            subtitle = host.ifBlank { item.url }
-        )
-    }
-
-    if (query.isNotBlank() && !looksLikeNavigation(query)) {
-        remote.asSequence()
-            .map { it.trim() }
-            .filter { it.isNotBlank() && it.lowercase() != normalized }
-            .distinctBy { it.lowercase() }
-            .take(5)
-            .forEach { suggestion ->
-                result += OmniboxSuggestion(
-                    kind = OmniboxSuggestionKind.SEARCH,
-                    value = suggestion,
-                    title = suggestion,
-                    subtitle = engine.displayName
-                )
-            }
-
-        if (result.none { it.kind == OmniboxSuggestionKind.SEARCH && it.value.equals(query, true) }) {
-            result += OmniboxSuggestion(
-                kind = OmniboxSuggestionKind.SEARCH,
-                value = query,
-                title = query,
-                subtitle = engine.displayName
-            )
-        }
-    }
-
-    return result.distinctBy { "${it.kind}|${it.value.lowercase()}" }.take(8)
-}
-
-private fun looksLikeNavigation(value: String): Boolean {
-    val text = value.trim()
-    if (text.startsWith("http://", true) || text.startsWith("https://", true)) return true
-    return !text.contains(' ') && (text.contains('.') || text.startsWith("localhost", true))
 }
 
 private suspend fun fetchSearchEngineIcon(engine: SearchEngine): Bitmap? =

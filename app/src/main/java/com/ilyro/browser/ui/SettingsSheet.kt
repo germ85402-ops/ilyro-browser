@@ -968,7 +968,7 @@ internal fun ChoiceRow(title: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ToggleRow(
+internal fun ToggleRow(
     title: String,
     subtitle: String,
     checked: Boolean,

@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.26.0-rc22 — release candidate
+
+- Expand address suggestions into a full-width panel that fills the safe area above or below the focused field, follows the toolbar position, and keeps the keyboard usable.
+- Show matching history, bookmarks, quick links, remote search results, and a direct open-address action with consistent address detection.
+- Add a setting to disable remote search suggestions; private tabs continue to use neither local history nor remote suggestions.
+- Enlarge onboarding wallpaper previews, match their proportions to phone or tablet artwork, and show the complete image.
+
 ## 0.26.0-rc21 — release candidate
 
 - Use neutral graphite system bars and dark surfaces so the browser chrome fits every built-in and custom wallpaper while keeping wallpaper-based accent colors.

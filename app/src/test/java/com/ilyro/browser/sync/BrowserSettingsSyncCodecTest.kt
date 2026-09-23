@@ -19,6 +19,7 @@ class BrowserSettingsSyncCodecTest {
             language = AppLanguage.RUSSIAN,
             preferredSiteLanguages = listOf("ru", "en", "hy"),
             searchEngine = SearchEngine.DUCKDUCKGO,
+            onlineSearchSuggestionsEnabled = false,
             customSearchEngines = listOf(
                 CustomSearchEngine(
                     id = "kagi",
@@ -87,6 +88,7 @@ class BrowserSettingsSyncCodecTest {
         assertTrue(restored.desktopMode)
         assertEquals(1.30f, restored.textScale)
         assertTrue(restored.adBlockingEnabled)
+        assertTrue(restored.onlineSearchSuggestionsEnabled)
         assertFalse(restored.darkWebsitesEnabled)
         assertTrue(restored.historyEnabled)
         assertTrue(restored.restoreTabs)
