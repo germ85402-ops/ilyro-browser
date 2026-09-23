@@ -1,0 +1,42 @@
+name: Start signed rc24 release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-rc24-once.yml"
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  create-tag-and-dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Create version tag and start the signed release workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: 0.26.0-rc24
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          declared_version=$(grep -oP 'versionName = "\K[^"]+' app/build.gradle.kts)
+          test "$declared_version" = "$RELEASE_VERSION"
+
+          target_sha=$(git rev-parse "$GITHUB_SHA^")
+          target_version=$(git show "$target_sha:app/build.gradle.kts" | grep -oP 'versionName = "\K[^"]+')
+          test "$target_version" = "$RELEASE_VERSION"
+
+          tag="v$RELEASE_VERSION"
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f "ref=refs/tags/$tag" \
+            -f "sha=$target_sha"
+
+          gh workflow run release.yml --ref "$tag"
