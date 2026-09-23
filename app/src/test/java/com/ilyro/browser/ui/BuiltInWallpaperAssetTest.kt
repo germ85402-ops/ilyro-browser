@@ -2,6 +2,7 @@ package com.ilyro.browser.ui
 
 import com.ilyro.browser.R
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -23,6 +24,18 @@ class BuiltInWallpaperAssetTest {
         assertEquals(R.drawable.wallpaper_tablet_ember_dunes, builtInWallpaperResource(HomeBackground.EMBER_DUNES, true))
         assertEquals(R.drawable.wallpaper_phone_prism_flow, builtInWallpaperResource(HomeBackground.PRISM_FLOW, false))
         assertEquals(R.drawable.wallpaper_tablet_prism_flow, builtInWallpaperResource(HomeBackground.PRISM_FLOW, true))
+        assertEquals(R.drawable.wallpaper_light_dawn_lake, builtInWallpaperResource(HomeBackground.LIGHT_DAWN_LAKE, false))
+        assertEquals(R.drawable.wallpaper_light_dawn_lake, builtInWallpaperResource(HomeBackground.LIGHT_DAWN_LAKE, true))
+        assertEquals(R.drawable.wallpaper_light_olive_grove, builtInWallpaperResource(HomeBackground.LIGHT_OLIVE_GROVE, false))
+        assertEquals(R.drawable.wallpaper_light_olive_grove, builtInWallpaperResource(HomeBackground.LIGHT_OLIVE_GROVE, true))
+        assertEquals(R.drawable.wallpaper_light_mediterranean, builtInWallpaperResource(HomeBackground.LIGHT_MEDITERRANEAN, false))
+        assertEquals(R.drawable.wallpaper_light_mediterranean, builtInWallpaperResource(HomeBackground.LIGHT_MEDITERRANEAN, true))
+        assertEquals(R.drawable.wallpaper_light_ivory_dunes, builtInWallpaperResource(HomeBackground.LIGHT_IVORY_DUNES, false))
+        assertEquals(R.drawable.wallpaper_light_ivory_dunes, builtInWallpaperResource(HomeBackground.LIGHT_IVORY_DUNES, true))
+        assertEquals(R.drawable.wallpaper_light_spring_lake, builtInWallpaperResource(HomeBackground.LIGHT_SPRING_LAKE, false))
+        assertEquals(R.drawable.wallpaper_light_spring_lake, builtInWallpaperResource(HomeBackground.LIGHT_SPRING_LAKE, true))
+        assertEquals(R.drawable.wallpaper_light_limestone, builtInWallpaperResource(HomeBackground.LIGHT_LIMESTONE, false))
+        assertEquals(R.drawable.wallpaper_light_limestone, builtInWallpaperResource(HomeBackground.LIGHT_LIMESTONE, true))
     }
 
     @Test
@@ -37,11 +50,32 @@ class BuiltInWallpaperAssetTest {
                 HomeBackground.INK_WASH,
                 HomeBackground.EMBER_DUNES,
                 HomeBackground.PRISM_FLOW,
+                HomeBackground.LIGHT_DAWN_LAKE,
+                HomeBackground.LIGHT_OLIVE_GROVE,
+                HomeBackground.LIGHT_MEDITERRANEAN,
+                HomeBackground.LIGHT_IVORY_DUNES,
+                HomeBackground.LIGHT_SPRING_LAKE,
+                HomeBackground.LIGHT_LIMESTONE,
                 HomeBackground.CUSTOM
             ),
             HomeBackground.entries.toSet()
         )
         assertNull(builtInWallpaperResource(HomeBackground.NONE, false))
         assertNull(builtInWallpaperResource(HomeBackground.CUSTOM, true))
+    }
+
+    @Test
+    fun lightAndDarkPickersEachOfferSixWallpapersPlusNoWallpaperAndCustom() {
+        val lightOptions = wallpaperPresetOptions(darkTheme = false)
+        val darkOptions = wallpaperPresetOptions(darkTheme = true)
+
+        assertEquals(6, lightOptions.count { it in LIGHT_WALLPAPER_PRESETS })
+        assertEquals(6, darkOptions.count { it in DARK_WALLPAPER_PRESETS })
+        assertEquals(HomeBackground.NONE, lightOptions.first())
+        assertEquals(HomeBackground.CUSTOM, lightOptions.last())
+        assertEquals(HomeBackground.NONE, darkOptions.first())
+        assertEquals(HomeBackground.CUSTOM, darkOptions.last())
+        assertFalse(HomeBackground.LIGHT_DAWN_LAKE in darkOptions)
+        assertFalse(HomeBackground.STILLWATER in lightOptions)
     }
 }

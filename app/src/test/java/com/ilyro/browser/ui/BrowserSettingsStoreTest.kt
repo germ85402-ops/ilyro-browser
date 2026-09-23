@@ -105,6 +105,8 @@ class BrowserSettingsStoreTest {
         val restored = BrowserSettingsStore.restore(MemorySharedPreferences())
         assertEquals(UiDensity.STANDARD, restored.uiDensity)
         assertTrue(restored.onlineSearchSuggestionsEnabled)
+        assertTrue(restored.useSeparateDarkBackground)
+        assertEquals(HomeBackground.LIGHT_DAWN_LAKE, restored.homeBackground)
     }
 
     @Test
@@ -118,8 +120,25 @@ class BrowserSettingsStoreTest {
 
         val restored = BrowserSettingsStore.restore(prefs)
 
-        assertEquals(HomeBackground.STILLWATER, restored.homeBackground)
+        assertEquals(HomeBackground.LIGHT_DAWN_LAKE, restored.homeBackground)
         assertEquals(HomeBackground.STILLWATER, restored.darkHomeBackground)
+    }
+
+    @Test
+    fun restoresSeparateThemeWallpapersEvenWhenPreviousPreferenceDisabledIt() {
+        val prefs = MemorySharedPreferences(
+            mutableMapOf(
+                "settings_separate_dark_background" to false,
+                "settings_home_background" to HomeBackground.LIGHT_OLIVE_GROVE.name,
+                "settings_dark_home_background" to HomeBackground.PINE_DUSK.name
+            )
+        )
+
+        val restored = BrowserSettingsStore.restore(prefs)
+
+        assertTrue(restored.useSeparateDarkBackground)
+        assertEquals(HomeBackground.LIGHT_OLIVE_GROVE, restored.homeBackground)
+        assertEquals(HomeBackground.PINE_DUSK, restored.darkHomeBackground)
     }
 
     @Test
