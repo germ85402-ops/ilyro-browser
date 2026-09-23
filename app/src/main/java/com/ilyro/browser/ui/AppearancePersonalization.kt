@@ -335,8 +335,7 @@ internal fun AppearancePersonalizationSettings(
             options = WallpaperDim.entries,
             selected = settings.wallpaperDim,
             label = { wallpaperDimLabel(it) },
-            onSelect = { onSettingsChange(settings.copy(wallpaperDim = it)) },
-            dense = true
+            onSelect = { onSettingsChange(settings.copy(wallpaperDim = it)) }
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(tr("Blur", "Размытие"), style = MaterialTheme.typography.labelLarge)
@@ -345,8 +344,7 @@ internal fun AppearancePersonalizationSettings(
             options = WallpaperBlur.entries,
             selected = settings.wallpaperBlur,
             label = { wallpaperBlurLabel(it) },
-            onSelect = { onSettingsChange(settings.copy(wallpaperBlur = it)) },
-            dense = true
+            onSelect = { onSettingsChange(settings.copy(wallpaperBlur = it)) }
         )
     }
 

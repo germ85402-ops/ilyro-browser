@@ -598,7 +598,7 @@ private fun WallpaperStep(
                         homeBackground = HomeBackground.CUSTOM,
                         customWallpaperUri = uri.toString()
                     )
-                )
+                }
             )
         }
     }
