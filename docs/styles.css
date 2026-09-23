@@ -2860,7 +2860,7 @@ button {
   background:
     linear-gradient(90deg, rgba(3, 20, 31, 0.94) 0%, rgba(3, 20, 31, 0.63) 42%, rgba(3, 20, 31, 0.78) 100%),
     linear-gradient(180deg, rgba(4, 29, 44, 0.48), rgba(4, 20, 31, 0.96)),
-    url("assets/ilyro-site-backdrop.jpg") center top / cover;
+    url("assets/ilyro-obsidian-wallpaper.webp") center top / cover;
   content: "";
   opacity: 0.78;
   transform: translateX(-50%);
@@ -3387,7 +3387,7 @@ button {
   inset: 0;
   background:
     linear-gradient(90deg, rgba(4, 25, 38, 0.82), rgba(5, 32, 44, 0.4) 55%, rgba(4, 28, 39, 0.8)),
-    url("assets/ilyro-site-backdrop.jpg") center 72% / cover;
+    url("assets/ilyro-obsidian-wallpaper.webp") center 72% / cover;
   opacity: 0.84;
 }
 
@@ -3875,7 +3875,7 @@ button {
     background:
       linear-gradient(90deg, rgba(235, 247, 245, 0.94) 0%, rgba(235, 247, 245, 0.64) 42%, rgba(235, 247, 245, 0.78) 100%),
       linear-gradient(180deg, rgba(226, 245, 242, 0.44), rgba(235, 247, 245, 0.94)),
-      url("assets/ilyro-site-backdrop.jpg") center top / cover;
+      url("assets/ilyro-obsidian-wallpaper.webp") center top / cover;
     opacity: 0.72;
   }
 
@@ -4249,32 +4249,32 @@ button {
   }
 }
 
-/* Graphite and coral landing page */
+/* Obsidian and cobalt landing page */
 body.home-page {
   --max-width: 1360px;
-  --home-bg: #111318;
-  --home-bg-deep: #0d0f13;
-  --home-surface: #191c22;
-  --home-surface-soft: #15181e;
-  --home-line: rgba(238, 232, 221, 0.14);
-  --home-line-strong: rgba(255, 112, 83, 0.54);
-  --home-text: #f4efe6;
-  --home-muted: #aaa49b;
-  --home-green: #ff7053;
-  --home-green-soft: #ff9a7e;
+  --home-bg: #080d14;
+  --home-bg-deep: #06090f;
+  --home-surface: #111b27;
+  --home-surface-soft: #0d1621;
+  --home-line: rgba(197, 219, 246, 0.12);
+  --home-line-strong: rgba(82, 150, 255, 0.56);
+  --home-text: #f1f6fc;
+  --home-muted: #a7b5c8;
+  --home-green: #579bff;
+  --home-green-soft: #97caff;
   --bg: var(--home-bg);
-  --bg-soft: #191c22;
-  --surface: rgba(25, 28, 34, 0.92);
-  --surface-strong: #191c22;
+  --bg-soft: #111b27;
+  --surface: rgba(17, 27, 39, 0.94);
+  --surface-strong: #111b27;
   --line: var(--home-line);
   --line-strong: var(--home-line-strong);
   --text: var(--home-text);
   --muted: var(--home-muted);
-  --muted-strong: #d1c9be;
-  --blue: #ff7053;
-  --blue-bright: #ff9277;
+  --muted-strong: #d0dbe8;
+  --blue: #579bff;
+  --blue-bright: #97caff;
   background:
-    radial-gradient(ellipse at 83% 8%, rgba(255, 112, 83, 0.075), transparent 28rem),
+    radial-gradient(ellipse at 83% 8%, rgba(82, 150, 255, 0.12), transparent 30rem),
     var(--home-bg);
   color: var(--home-text);
   font-family: Inter, "Helvetica Neue", Arial, sans-serif;
@@ -4302,8 +4302,8 @@ body.home-page {
 }
 
 .home-page .site-header {
-  border-bottom-color: rgba(238, 232, 221, 0.09);
-  background: rgba(17, 19, 24, 0.86);
+  border-bottom-color: rgba(197, 219, 246, 0.1);
+  background: rgba(8, 13, 20, 0.88);
 }
 
 .home-page .header-inner,
@@ -4330,7 +4330,7 @@ body.home-page {
 
 .home-page .main-nav {
   gap: 31px;
-  color: #c3bdb4;
+  color: #b7c6d9;
   font-size: 13px;
 }
 
@@ -4372,7 +4372,7 @@ body.home-page {
 }
 
 .home-page .language-switcher button[aria-pressed='true'] {
-  background: #25282e;
+  background: #182638;
   color: var(--home-text);
 }
 
@@ -4380,7 +4380,7 @@ body.home-page {
 .home-page .button-primary {
   border-color: transparent;
   background: var(--home-green);
-  color: #181411;
+  color: #07111d;
 }
 
 .home-page .header-cta {
@@ -4395,9 +4395,9 @@ body.home-page {
 .home-page .header-cta:focus-visible,
 .home-page .button-primary:hover,
 .home-page .button-primary:focus-visible {
-  background: #ff886b;
-  color: #16110f;
-  box-shadow: 0 10px 28px rgba(255, 112, 83, 0.2);
+  background: #7ab7ff;
+  color: #07111d;
+  box-shadow: 0 10px 28px rgba(82, 150, 255, 0.24);
 }
 
 .home-page .menu-toggle {
@@ -4427,7 +4427,7 @@ body.home-page {
 
 .reference-overline,
 .reference-kicker {
-  color: #c1aaa0;
+  color: #b7c8de;
   font-size: 10px;
   font-weight: 750;
   letter-spacing: 0.22em;
@@ -4450,7 +4450,7 @@ body.home-page {
 .reference-lead {
   max-width: 430px;
   margin-top: 19px;
-  color: #aaa49b;
+  color: #a7b5c8;
   font-size: 14px;
   line-height: 1.58;
 }
@@ -4469,22 +4469,22 @@ body.home-page {
 }
 
 .home-page .button-outline {
-  border-color: rgba(238, 232, 221, 0.22);
+  border-color: rgba(197, 219, 246, 0.22);
   background: rgba(255, 255, 255, 0.025);
-  color: #e8e2d9;
+  color: #e3edf8;
 }
 
 .home-page .button-outline:hover,
 .home-page .button-outline:focus-visible {
   border-color: var(--home-green);
-  background: rgba(255, 112, 83, 0.08);
+  background: rgba(82, 150, 255, 0.1);
   color: var(--home-text);
 }
 
 .release-pill {
-  border-color: rgba(255, 112, 83, 0.3);
-  background: rgba(255, 112, 83, 0.08);
-  color: #e8b2a2;
+  border-color: rgba(82, 150, 255, 0.32);
+  background: rgba(82, 150, 255, 0.1);
+  color: #b9d9ff;
 }
 
 .download-meta,
@@ -4513,7 +4513,7 @@ body.home-page {
   border-radius: 999px;
   padding: 0 10px;
   background: rgba(255, 255, 255, 0.025);
-  color: #c4bdb3;
+  color: #c7d5e6;
   font-size: 10px;
 }
 
@@ -4531,7 +4531,7 @@ body.home-page {
 
 .reference-hero-art img {
   aspect-ratio: 760 / 520;
-  border-color: rgba(238, 232, 221, 0.16);
+  border-color: rgba(197, 219, 246, 0.16);
   border-radius: 15px;
   object-fit: cover;
   box-shadow: 0 28px 64px rgba(0, 0, 0, 0.34);
@@ -4573,7 +4573,7 @@ body.home-page {
 
 .benefit-card:hover {
   border-color: var(--home-line-strong);
-  background: #1d2026;
+  background: #172638;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.16);
 }
 
@@ -4581,9 +4581,9 @@ body.home-page {
   width: 42px;
   height: 42px;
   flex-basis: 42px;
-  border-color: rgba(255, 112, 83, 0.22);
+  border-color: rgba(82, 150, 255, 0.22);
   border-radius: 12px;
-  background: rgba(255, 112, 83, 0.08);
+  background: rgba(82, 150, 255, 0.08);
   color: var(--home-green);
 }
 
@@ -4644,7 +4644,7 @@ body.home-page {
 .why-card img {
   height: 178px;
   border-bottom-color: var(--home-line);
-  background: #111318;
+  background: #0a111a;
   object-fit: contain;
   object-position: center;
   padding: 4px;
@@ -4687,7 +4687,7 @@ body.home-page {
   aspect-ratio: 1.5 / 1;
   border-color: var(--home-line);
   border-radius: 11px;
-  background: #0c0e12;
+  background: #0a111a;
   object-fit: contain;
   box-shadow: none;
 }
@@ -4773,7 +4773,7 @@ body.home-page {
 .footer-social a:hover,
 .footer-social a:focus-visible {
   border-color: var(--home-green);
-  background: rgba(255, 112, 83, 0.1);
+  background: rgba(82, 150, 255, 0.1);
 }
 
 .home-page .js .reveal,
@@ -4783,25 +4783,25 @@ body.home-page {
 }
 
 :root[data-theme='light'] body.home-page {
-  --home-bg: #f1ede5;
-  --home-bg-deep: #f1ede5;
-  --home-surface: #faf8f3;
-  --home-surface-soft: #e9e4db;
-  --home-line: rgba(28, 28, 30, 0.13);
-  --home-line-strong: rgba(211, 80, 54, 0.5);
-  --home-text: #18191c;
-  --home-muted: #625e58;
-  --home-green: #d9563b;
-  --home-green-soft: #b7452e;
+  --home-bg: #edf3fa;
+  --home-bg-deep: #edf3fa;
+  --home-surface: #f8fbff;
+  --home-surface-soft: #e4edf7;
+  --home-line: rgba(20, 45, 80, 0.14);
+  --home-line-strong: rgba(44, 113, 214, 0.42);
+  --home-text: #111f32;
+  --home-muted: #58697e;
+  --home-green: #276ed0;
+  --home-green-soft: #1e5ba9;
   --bg: var(--home-bg);
   --bg-soft: var(--home-surface-soft);
-  --surface: rgba(250, 248, 243, 0.95);
-  --surface-strong: #faf8f3;
+  --surface: rgba(248, 251, 255, 0.96);
+  --surface-strong: #f8fbff;
   --line: var(--home-line);
   --line-strong: var(--home-line-strong);
   --text: var(--home-text);
   --muted: var(--home-muted);
-  --muted-strong: #393735;
+  --muted-strong: #33445b;
   background: var(--home-bg);
 }
 
@@ -4834,30 +4834,30 @@ body.home-page {
 
 :root[data-theme='light'] .home-page .why-card img,
 :root[data-theme='light'] .home-page .reference-shot img {
-  background: #e9e4db;
+  background: #e4edf7;
 }
 
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) body.home-page {
-    --home-bg: #f1ede5;
-    --home-bg-deep: #f1ede5;
-    --home-surface: #faf8f3;
-    --home-surface-soft: #e9e4db;
-    --home-line: rgba(28, 28, 30, 0.13);
-    --home-line-strong: rgba(211, 80, 54, 0.5);
-    --home-text: #18191c;
-    --home-muted: #625e58;
-    --home-green: #d9563b;
-    --home-green-soft: #b7452e;
+    --home-bg: #edf3fa;
+    --home-bg-deep: #edf3fa;
+    --home-surface: #f8fbff;
+    --home-surface-soft: #e4edf7;
+    --home-line: rgba(20, 45, 80, 0.14);
+    --home-line-strong: rgba(44, 113, 214, 0.42);
+    --home-text: #111f32;
+    --home-muted: #58697e;
+    --home-green: #276ed0;
+    --home-green-soft: #1e5ba9;
     --bg: var(--home-bg);
     --bg-soft: var(--home-surface-soft);
-    --surface: rgba(250, 248, 243, 0.95);
-    --surface-strong: #faf8f3;
+    --surface: rgba(248, 251, 255, 0.96);
+    --surface-strong: #f8fbff;
     --line: var(--home-line);
     --line-strong: var(--home-line-strong);
     --text: var(--home-text);
     --muted: var(--home-muted);
-    --muted-strong: #393735;
+    --muted-strong: #33445b;
     background: var(--home-bg);
   }
 
@@ -4886,7 +4886,7 @@ body.home-page {
 
   :root:not([data-theme]) .home-page .why-card img,
   :root:not([data-theme]) .home-page .reference-shot img {
-    background: #e9e4db;
+    background: #e4edf7;
   }
 }
 
@@ -5144,8 +5144,8 @@ body.home-page {
   }
 
   :root:not([data-theme]) .home-page .benefit-icon {
-    border-color: rgba(217, 86, 59, 0.2);
-    background: rgba(217, 86, 59, 0.08);
+    border-color: rgba(39, 110, 208, 0.2);
+    background: rgba(39, 110, 208, 0.08);
     color: var(--home-green);
   }
 
@@ -5176,5 +5176,164 @@ body.home-page {
   :root:not([data-theme]) .home-page .reference-download {
     border-color: var(--home-line);
     background: var(--home-surface);
+  }
+}
+
+/* New wallpaper-led hero and cleaner screenshot framing */
+.home-page .reference-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  margin-top: 28px;
+  border: 1px solid var(--home-line);
+  border-radius: 28px;
+  padding-right: clamp(24px, 3vw, 42px);
+  padding-left: clamp(24px, 3vw, 42px);
+}
+
+.home-page .reference-hero::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  display: block;
+  border: 0;
+  border-radius: inherit;
+  background-color: #080d14;
+  background-image:
+    linear-gradient(90deg, rgba(7, 11, 17, 0.97) 0%, rgba(7, 11, 17, 0.9) 43%, rgba(7, 11, 17, 0.55) 100%),
+    url("assets/ilyro-obsidian-wallpaper.webp");
+  background-repeat: no-repeat;
+  background-position: center, 84% 48%;
+  background-size: cover, auto 165%;
+  content: "";
+}
+
+.home-page .reference-hero h1 span,
+.home-page .section-link,
+.home-page .tag-icon,
+.home-page .download-note span,
+.home-page .download-copy small {
+  color: var(--home-green);
+}
+
+.home-page .reference-hero-art img {
+  border-color: rgba(197, 219, 246, 0.18);
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.42);
+}
+
+.home-page .reference-shot-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 22px 18px;
+}
+
+.home-page .reference-shot {
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid var(--home-line);
+  border-radius: 16px;
+  padding: 10px;
+  background: var(--home-surface);
+  transition: border-color 180ms ease, transform 180ms ease;
+}
+
+.home-page .reference-shot:hover {
+  transform: translateY(-3px);
+  border-color: var(--home-line-strong);
+}
+
+.home-page .reference-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 10px;
+  background: #0a111a;
+  object-fit: contain;
+}
+
+.home-page .reference-shot figcaption {
+  padding: 12px 3px 3px;
+}
+
+.home-page .reference-shot figcaption strong {
+  font-size: 13px;
+}
+
+.home-page .reference-shot figcaption span {
+  font-size: 11px;
+}
+
+:root[data-theme='light'] .home-page .reference-hero::before {
+  display: block;
+  background-color: #edf3fa;
+  background-image:
+    linear-gradient(90deg, rgba(237, 243, 250, 0.97) 0%, rgba(237, 243, 250, 0.9) 46%, rgba(237, 243, 250, 0.58) 100%),
+    url("assets/ilyro-obsidian-wallpaper.webp");
+}
+
+:root[data-theme='light'] .home-page .header-cta,
+:root[data-theme='light'] .home-page .button-primary {
+  color: #fff;
+}
+
+:root[data-theme='light'] .home-page .benefit-icon {
+  border-color: rgba(39, 110, 208, 0.2);
+  background: rgba(39, 110, 208, 0.08);
+  color: var(--home-green);
+}
+
+:root[data-theme='light'] .home-page .benefit-card:hover {
+  background: #fff;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .home-page .reference-hero::before {
+    display: block;
+    background-color: #edf3fa;
+    background-image:
+      linear-gradient(90deg, rgba(237, 243, 250, 0.97) 0%, rgba(237, 243, 250, 0.9) 46%, rgba(237, 243, 250, 0.58) 100%),
+      url("assets/ilyro-obsidian-wallpaper.webp");
+  }
+
+  :root:not([data-theme]) .home-page .header-cta,
+  :root:not([data-theme]) .home-page .button-primary {
+    color: #fff;
+  }
+
+  :root:not([data-theme]) .home-page .benefit-icon {
+    border-color: rgba(39, 110, 208, 0.2);
+    background: rgba(39, 110, 208, 0.08);
+    color: var(--home-green);
+  }
+}
+
+@media (max-width: 860px) {
+  .home-page .reference-hero {
+    margin-top: 18px;
+    border-radius: 22px;
+    padding-right: 23px;
+    padding-left: 23px;
+  }
+
+  .home-page .reference-hero::before {
+    background-position: center, 92% 24%;
+    background-size: cover, auto 620px;
+  }
+
+  :root[data-theme='light'] .home-page .reference-hero::before {
+    background-position: center, 92% 24%;
+  }
+
+  .home-page .reference-shot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 12px;
+  }
+}
+
+@media (max-width: 380px) {
+  .home-page .reference-shot-grid {
+    grid-template-columns: 1fr;
   }
 }
