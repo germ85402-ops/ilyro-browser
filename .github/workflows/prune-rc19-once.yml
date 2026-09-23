@@ -15,6 +15,7 @@ jobs:
       - name: Keep only the three newest prereleases
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           stale_tags=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" | jq -sr 'add | [.[] | select(.prerelease == true)] | sort_by(.created_at) | reverse | .[3:] | .[].tag_name')
