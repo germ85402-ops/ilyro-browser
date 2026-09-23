@@ -790,10 +790,12 @@ private fun OmniboxSuggestionsMenu(
         quickLinks = quickLinks,
         allowRemote = allowRemote
     )
+    val configuration = LocalConfiguration.current
+    val wideLayout = shouldDismissOmniboxOnOutsideTap(configuration.smallestScreenWidthDp)
     val recentSearches = buildRecentSearchSuggestions(history)
     val displayRecentItems = if (query.isBlank()) {
         recentSearches.ifEmpty { suggestions.filter { it.kind != OmniboxSuggestionKind.QUICK_LINK } }
-            .take(10)
+            .take(if (wideLayout) 7 else 10)
     } else {
         emptyList()
     }
@@ -806,8 +808,6 @@ private fun OmniboxSuggestionsMenu(
     if (!expanded || !hasContent) return
 
     val density = LocalDensity.current
-    val configuration = LocalConfiguration.current
-    val wideLayout = shouldDismissOmniboxOnOutsideTap(configuration.smallestScreenWidthDp)
     val hostView = LocalView.current
     val hostRoot = hostView.rootView
     // Popup content lives in another Android window. Measure against the Activity root that owns

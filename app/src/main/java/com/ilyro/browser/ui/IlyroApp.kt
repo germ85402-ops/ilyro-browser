@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 34239)
-Total output lines: 3057
-
 @file:OptIn(org.mozilla.geckoview.ExperimentalGeckoViewApi::class)
 
 package com.ilyro.browser.ui
@@ -1370,7 +1367,455 @@ private fun BrowserScreen(
         val notice = topNotice ?: return
         topNotice = null
         if (notice.kind == BrowserTopNoticeKind.TAB_CLOSED) {
-            // Swiping away the undo s…4239 tokens truncated…veTab.isPrivate
+            // Swiping away the undo snackbar confirms the close immediately,
+            // matching the usual browser snackbar behavior.
+            finalizePendingClosedAllTabs()
+            finalizePendingClosedTab()
+        }
+    }
+
+    fun closeTab(tab: BrowserTab) {
+        val index = tabs.indexOf(tab)
+        if (index < 0) return
+
+        // Starting a new close operation commits any older undo window first.
+        finalizePendingClosedAllTabs()
+        finalizePendingClosedTab()
+
+        val wasActive = tab.id == activeTabId
+        if (wasActive) {
+            NativeBrowserHostCoordinator.prepareForSessionSwitch()
+        }
+        tab.applyActiveState(false)
+        tabs.removeAt(index)
+
+        var replacementTabId: String? = null
+        if (tabs.isEmpty()) {
+            val replacement = BrowserTab(
+                runtime = runtime,
+                initialUrl = HOME_URL,
+                settings = settings,
+                desktopModeForUrl = { target -> SiteDesktopModeStore.effective(prefs, target, currentSettings.desktopMode) },
+                onDownload = onDownloadResponse,
+                onDownloadNavigation = onDownloadNavigation,
+                onNewTabRequest = handleNewTabRequest,
+                onLinkContextMenu = handleLinkContextMenu
+            )
+            tabs.add(replacement)
+            replacementTabId = replacement.id
+            activeTabId = replacement.id
+            applyActiveState(replacement.id)
+            addressText = ""
+        } else if (wasActive) {
+            val next = tabs[index.coerceAtMost(tabs.lastIndex)]
+            activeTabId = next.id
+            applyActiveState(next.id)
+            addressText = if (next.url == HOME_URL) "" else next.url
+        }
+
+        pendingClosedTab = tab
+        pendingClosedIndex = index
+        pendingClosedWasActive = wasActive
+        pendingClosedReplacementId = replacementTabId
+        pendingClosedClearPrivateData = settings.clearPrivateDataOnExit
+
+        val closeToken = System.nanoTime()
+        pendingClosedToken = closeToken
+        pushTopNotice(
+            kind = BrowserTopNoticeKind.TAB_CLOSED,
+            title = tr(settings.language, "Tab closed", "Вкладка закрыта"),
+            message = if (tab.url == HOME_URL) {
+                tr(settings.language, "New tab", "Новая вкладка")
+            } else {
+                tab.title.ifBlank { hostLabel(tab.url) }
+            },
+            actionLabel = tr(settings.language, "Undo", "Отменить")
+        )
+
+        browserScope.launch {
+            delay(4_200L)
+            if (pendingClosedToken == closeToken && pendingClosedTab?.id == tab.id) {
+                finalizePendingClosedTab()
+            }
+        }
+    }
+
+    fun closeAllTabs() {
+        val closedTabs = tabs.toList()
+        if (closedTabs.isEmpty()) return
+
+        finalizePendingClosedTab()
+        finalizePendingClosedAllTabs()
+
+        val previouslyActiveId = activeTabId
+        NativeBrowserHostCoordinator.prepareForSessionSwitch()
+        closedTabs.forEach { tab ->
+            tab.applyActiveState(false)
+        }
+        tabs.clear()
+
+        val replacement = BrowserTab(
+            runtime = runtime,
+            initialUrl = HOME_URL,
+            settings = settings,
+            desktopModeForUrl = { target ->
+                SiteDesktopModeStore.effective(prefs, target, currentSettings.desktopMode)
+            },
+            onDownload = onDownloadResponse,
+            onDownloadNavigation = onDownloadNavigation,
+            onNewTabRequest = handleNewTabRequest,
+            onLinkContextMenu = handleLinkContextMenu
+        )
+        tabs.add(replacement)
+        activeTabId = replacement.id
+        applyActiveState(replacement.id)
+        addressText = ""
+
+        pendingClosedAllTabs = closedTabs
+        pendingClosedAllActiveId = previouslyActiveId
+        pendingClosedAllReplacementId = replacement.id
+        pendingClosedAllClearPrivateData = settings.clearPrivateDataOnExit
+
+        val closeToken = System.nanoTime()
+        pendingClosedAllToken = closeToken
+        pushTopNotice(
+            kind = BrowserTopNoticeKind.TAB_CLOSED,
+            title = tr(settings.language, "Tabs closed", "Вкладки закрыты"),
+            message = tr(
+                settings.language,
+                "${closedTabs.size} tabs closed",
+                "Закрыто вкладок: ${closedTabs.size}"
+            ),
+            actionLabel = tr(settings.language, "Undo", "Отменить")
+        )
+
+        browserScope.launch {
+            delay(4_200L)
+            if (pendingClosedAllToken == closeToken && pendingClosedAllTabs === closedTabs) {
+                finalizePendingClosedAllTabs()
+            }
+        }
+    }
+
+    fun navigateInput(input: String) {
+        val target = normalizeAddress(
+            input,
+            settings.searchEngine,
+            settings.selectedCustomSearchEngine()
+        )
+        addressText = if (target == HOME_URL) "" else target
+        BrowserEngine.applyPreferredColorScheme(settings.theme)
+        runCatching { activeTab.session.compositorController.setClearColor(pageTransitionColor) }
+        NativeBrowserHostCoordinator.coverUntilFirstPaint(activeTab.session)
+        activeTab.session.loadUri(target)
+        focusManager.clearFocus()
+        showFindInPage = false
+        showTranslation = false
+    }
+
+    fun openHome() {
+        addressText = ""
+        activeTab.preview = null
+        activeTab.previewRecency = 0
+        activeTab.session.loadUri(HOME_URL)
+        focusManager.clearFocus()
+        showFindInPage = false
+        showTranslation = false
+    }
+
+    fun refreshSitePermissions() {
+        if (isHome || activeHost.isBlank()) {
+            sitePermissions = emptyList()
+            return
+        }
+        runtime.storageController
+            .getPermissions(effectivePageUrl, activeTab.storageContextId, activeTab.isPrivate)
+            .accept(
+                { permissions -> sitePermissions = permissions?.toList().orEmpty() },
+                { _ -> sitePermissions = emptyList() }
+            )
+    }
+
+    fun openProtectionPanel() {
+        sitePermissions = emptyList()
+        if (!isHome && activeHost.isNotBlank()) {
+            refreshSitePermissions()
+        }
+        showProtection = true
+    }
+
+    fun toggleBookmark() {
+        if (activeTab.url == HOME_URL) return
+        val bookmarkUrl = activeTab.url
+
+        val existingIndex = bookmarks.indexOfFirst { it.url == bookmarkUrl }
+        if (existingIndex >= 0) {
+            bookmarks.removeAt(existingIndex)
+        } else {
+            bookmarks.add(
+                0,
+                BookmarkItem(
+                    url = bookmarkUrl,
+                    title = activeTab.title.ifBlank { hostLabel(bookmarkUrl) }
+                )
+            )
+        }
+        BookmarkStore.save(prefs, bookmarks)
+    }
+
+    fun openBookmark(bookmark: BookmarkItem) {
+        showBookmarks = false
+        addressText = bookmark.url
+        BrowserEngine.applyPreferredColorScheme(settings.theme)
+        runCatching { activeTab.session.compositorController.setClearColor(pageTransitionColor) }
+        NativeBrowserHostCoordinator.coverUntilFirstPaint(activeTab.session)
+        activeTab.session.loadUri(bookmark.url)
+        focusManager.clearFocus()
+    }
+
+    fun removeBookmark(bookmark: BookmarkItem) {
+        bookmarks.removeAll { it.url == bookmark.url }
+        BookmarkStore.save(prefs, bookmarks)
+    }
+
+    fun editBookmark(bookmark: BookmarkItem, title: String, folder: String?) {
+        val index = bookmarks.indexOfFirst { it.url == bookmark.url }
+        if (index < 0) return
+        bookmarks[index] = bookmark.copy(
+            title = title.trim().ifBlank { bookmark.url },
+            folder = folder?.trim()?.takeIf { it.isNotBlank() }
+        )
+        BookmarkStore.save(prefs, bookmarks)
+    }
+
+    fun openHistoryEntry(entry: HistoryItem) {
+        showHistory = false
+        addressText = entry.url
+        BrowserEngine.applyPreferredColorScheme(settings.theme)
+        runCatching { activeTab.session.compositorController.setClearColor(pageTransitionColor) }
+        NativeBrowserHostCoordinator.coverUntilFirstPaint(activeTab.session)
+        activeTab.session.loadUri(entry.url)
+        focusManager.clearFocus()
+    }
+
+    fun removeHistoryEntry(entry: HistoryItem) {
+        history.remove(entry)
+        HistoryStore.save(prefs, history)
+    }
+
+    val externalNavigationHandler by rememberUpdatedState<(String) -> Unit> { target ->
+        createTab(isPrivate = false, initialUrl = target)
+    }
+
+    DisposableEffect(Unit) {
+        // Apply the selected browser theme before the initial/restored tab is opened.
+        BrowserEngine.applyPreferredColorScheme(settings.theme)
+        applyActiveState(activeTabId)
+        val unbindExternalNavigation = ExternalNavigationCoordinator.bind { target ->
+            externalNavigationHandler(target)
+        }
+
+        onDispose {
+            unbindExternalNavigation()
+            tabs.forEach { it.close(currentSettings.clearPrivateDataOnExit) }
+        }
+    }
+
+    LaunchedEffect(activeTab.id, activeTab.url, addressFocused) {
+        if (!addressFocused) {
+            addressText = if (activeTab.url == HOME_URL) "" else activeTab.url
+        }
+        if (!activeTab.isPrivate) {
+            prefs.edit().putString(PREF_LAST_URL, activeTab.url).apply()
+        }
+    }
+
+    LaunchedEffect(activeTab.id, readerModeActive) {
+        if (readerModeActive) {
+            fun dismissReaderOmnibox() {
+                focusManager.clearFocus(force = true)
+                addressFocused = false
+                context.findActivity()?.let { activity ->
+                    activity.currentFocus?.clearFocus()
+                    WindowInsetsControllerCompat(
+                        activity.window,
+                        activity.window.decorView
+                    ).hide(WindowInsetsCompat.Type.ime())
+                    (context.getSystemService(Context.INPUT_METHOD_SERVICE) as?
+                        android.view.inputmethod.InputMethodManager)
+                        ?.hideSoftInputFromWindow(
+                            activity.window.decorView.windowToken,
+                            0
+                        )
+                }
+            }
+
+            dismissReaderOmnibox()
+            delay(64L)
+            dismissReaderOmnibox()
+            delay(160L)
+            dismissReaderOmnibox()
+        }
+    }
+
+    LaunchedEffect(restorableTabUrls, restorableTabStates, restorableTabMetadata, activeTabId) {
+        delay(250L)
+        val activeIndex = restorableTabIds.indexOf(activeTabId)
+            .coerceAtLeast(0)
+        TabSessionStore.save(
+            prefs = prefs,
+            urls = restorableTabUrls.ifEmpty { listOf(HOME_URL) },
+            states = restorableTabStates.ifEmpty { listOf(null) },
+            metadata = restorableTabMetadata.ifEmpty { listOf(TabSessionMetadata()) },
+            activeIndex = activeIndex
+        )
+    }
+
+    LaunchedEffect(settings.desktopMode, siteDesktopRevision) {
+        tabs.forEach { tab ->
+            val desired = SiteDesktopModeStore.effective(prefs, tab.url, settings.desktopMode)
+            if (tab.isDesktopModeEnabled() != desired) {
+                tab.applyDesktopMode(desired, reload = true)
+            }
+        }
+    }
+
+    LaunchedEffect(activeTab.id, activeTab.loadSequence) {
+        if (
+            settings.historyEnabled &&
+            !activeTab.isPrivate &&
+            activeTab.loadSequence > 0 &&
+            activeTab.url != HOME_URL
+        ) {
+            history.add(
+                0,
+                HistoryItem(
+                    url = activeTab.url,
+                    title = activeTab.title.ifBlank { hostLabel(activeTab.url) },
+                    visitedAt = System.currentTimeMillis()
+                )
+            )
+            while (history.size > 1000) {
+                history.removeAt(history.lastIndex)
+            }
+            HistoryStore.saveAsync(prefs, history)
+        }
+    }
+
+    SideEffect {
+        NativeBrowserHostCoordinator.setInputEnabled(
+            !isHome &&
+                !readerModeActive &&
+                !addressFocused &&
+                !showTabs &&
+                !showMenu &&
+                !showBookmarks &&
+                !showHistory &&
+                !showDownloads &&
+                !showMedia &&
+                !showSettings &&
+                !showProtection &&
+                !showFindInPage &&
+                !showTranslation &&
+                pendingNewTabRequest == null &&
+                linkContextMenu == null &&
+                extensionPopupSession == null
+        )
+    }
+
+    val browserBackEnabled =
+        isFullScreen || extensionPopupSession != null || pendingNewTabRequest != null || linkContextMenu != null || addressFocused || (isHome && homeOmniboxFocused) ||
+            showTabs || showMenu || showBookmarks || showHistory || showDownloads || showMedia ||
+            showSettings || showProtection || showFindInPage || showTranslation || readerModeActive || activeTab.canGoBack || !isHome
+
+    val omniboxKeyboardController = LocalSoftwareKeyboardController.current
+    val omniboxDensity = LocalDensity.current
+    val omniboxImeVisible = WindowInsets.ime.getBottom(omniboxDensity) >
+        WindowInsets.navigationBars.getBottom(omniboxDensity)
+    val omniboxFocused = addressFocused || (isHome && homeOmniboxFocused)
+
+    BackHandler(enabled = browserBackEnabled) {
+        when {
+            isFullScreen -> activeTab.session.exitFullScreen()
+            extensionPopupSession != null -> ExtensionHostBridge.closePopup()
+            pendingNewTabRequest != null -> {
+                pendingNewTabRequest?.let { pending ->
+                    runCatching { pending.result.complete(null) }
+                }
+                pendingNewTabRequest = null
+            }
+            linkContextMenu != null -> linkContextMenu = null
+            showMenu -> showMenu = false
+            showTabs -> showTabs = false
+            showBookmarks -> showBookmarks = false
+            showHistory -> showHistory = false
+            showDownloads -> showDownloads = false
+            showMedia -> showMedia = false
+            showSettings -> showSettings = false
+            showProtection -> showProtection = false
+            showTranslation -> showTranslation = false
+            showFindInPage -> showFindInPage = false
+                omniboxFocused -> {
+                when (nextOmniboxBackAction(isFocused = true, imeVisible = omniboxImeVisible)) {
+                    OmniboxBackAction.HIDE_KEYBOARD -> omniboxKeyboardController?.hide()
+                    OmniboxBackAction.CLOSE_SUGGESTIONS -> focusManager.clearFocus(force = true)
+                    OmniboxBackAction.NONE -> Unit
+                }
+            }
+            readerModeActive -> activeTab.exitReaderMode()
+            activeTab.canGoBack -> activeTab.session.goBack()
+            !isHome -> openHome()
+        }
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = Color.Transparent
+    ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (!isFullScreen) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .windowInsetsTopHeight(WindowInsets.statusBars)
+                        .align(Alignment.TopCenter),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 0.dp
+                ) {}
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .windowInsetsBottomHeight(WindowInsets.navigationBars)
+                        .align(Alignment.BottomCenter),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 0.dp
+                ) {}
+            }
+
+            Column(
+                modifier = if (isFullScreen) {
+                    Modifier.fillMaxSize()
+                } else {
+                    Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding()
+                }
+            ) {
+                if (!isFullScreen && !chromeHiddenByOverlay && showTabletTabStrip) {
+                    TabletTabStrip(
+                        tabs = tabs,
+                        activeTabId = activeTabId,
+                        onSelect = { tab -> selectTab(tab) },
+                        onClose = { tab -> closeTab(tab) },
+                        onNewTab = { createTab() }
+                    )
+                }
+
+                if (!isFullScreen && settings.toolbarPosition == ToolbarPosition.BOTTOM) {
+                    BrowserPageLoadingLine(
+                        loading = activeTab.isLoading,
+                        progress = activeTab.loadProgress,
+                        isPrivate = activeTab.isPrivate
                     )
                 }
 
