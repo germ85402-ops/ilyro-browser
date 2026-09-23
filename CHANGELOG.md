@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.26.0-rc18 — release candidate
+
+- Choose readable foreground colors for accent controls based on actual contrast, including wallpaper-derived accents in dark mode.
+- Unify private-browsing accents across the home page, address bar, toolbar, loading indicator, and tab overview; use a matching readable icon color on the private new-tab button.
+- Bring dark surfaces closer to neutral graphite while retaining ILYRO's cool blue accent, and align utility-screen backdrops with the shared dark palette.
+- Set a shared system sans-serif type scale for headings, body text, and labels without adding bundled font files.
+
 ## 0.26.0-rc17 — release candidate
 
 - Unify animation timing and easing across onboarding, toolbar feedback, notices, tab cards, and loading indicators.

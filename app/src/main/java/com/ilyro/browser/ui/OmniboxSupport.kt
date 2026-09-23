@@ -272,7 +272,7 @@ internal fun IlyroHomeOmnibox(
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedContainerColor = MaterialTheme.colorScheme.surface,
                     unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                    focusedBorderColor = if (isPrivate) Color(0xFF8B5CF6) else MaterialTheme.colorScheme.primary,
+                    focusedBorderColor = if (isPrivate) privateModeAccent() else MaterialTheme.colorScheme.primary,
                     unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.44f)
                 )
             )
@@ -368,7 +368,7 @@ internal fun IlyroAddressOmnibox(
                     modifier = Modifier.size(if (compact) 30.dp else 32.dp),
                     shape = RoundedCornerShape(50),
                     color = when {
-                        isPrivate -> Color(0xFF8B5CF6).copy(alpha = 0.12f)
+                        isPrivate -> privateModeAccent().copy(alpha = 0.12f)
                         secure -> MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
                         else -> Color.Transparent
                     }
@@ -379,7 +379,7 @@ internal fun IlyroAddressOmnibox(
                             contentDescription = null,
                             modifier = Modifier.size(if (compact) 17.dp else 18.dp),
                             tint = when {
-                                isPrivate -> Color(0xFFC4B5FD)
+                                isPrivate -> privateModeAccent()
                                 secure -> MaterialTheme.colorScheme.primary
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             }
@@ -400,7 +400,7 @@ internal fun IlyroAddressOmnibox(
             colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = MaterialTheme.colorScheme.surface,
                 unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.46f),
-                focusedBorderColor = if (isPrivate) Color(0xFF8B5CF6) else MaterialTheme.colorScheme.primary,
+                focusedBorderColor = if (isPrivate) privateModeAccent() else MaterialTheme.colorScheme.primary,
                 unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.52f)
             )
         )

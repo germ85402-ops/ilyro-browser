@@ -622,7 +622,7 @@ private fun TabSectionButton(
     val dense = LocalIlyroUiDensity.current == UiDensity.COMPACT
     val darkScheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val accent = if (privateAccent) {
-        if (darkScheme) Color(0xFFC4B5FD) else Color(0xFF7048D8)
+        privateModeAccent(darkScheme)
     } else {
         MaterialTheme.colorScheme.primary
     }
@@ -753,7 +753,7 @@ private fun NewTabFab(
 ) {
     val dense = LocalIlyroUiDensity.current == UiDensity.COMPACT
     val darkScheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val privateAccent = if (darkScheme) Color(0xFFC4B5FD) else Color(0xFF7048D8)
+    val privateAccent = privateModeAccent(darkScheme)
 
     Surface(
         onClick = onClick,
@@ -771,7 +771,7 @@ private fun NewTabFab(
                     tr("New tab", "Новая вкладка")
                 },
                 tint = if (isPrivate) {
-                    Color.Black.copy(alpha = 0.78f)
+                    privateModeOnAccent(darkScheme)
                 } else {
                     MaterialTheme.colorScheme.onPrimary
                 },
@@ -801,7 +801,7 @@ private fun ModernTabCard(
     val hapticFeedback = LocalHapticFeedback.current
     var removing by remember(tab.id) { mutableStateOf(false) }
     val darkScheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
-    val privateAccent = if (darkScheme) Color(0xFFC4B5FD) else Color(0xFF7048D8)
+    val privateAccent = privateModeAccent(darkScheme)
     val privateCardColor = if (darkScheme) Color(0xFF1B1722) else Color(0xFFF9F7FD)
     val privatePreviewColor = if (darkScheme) Color(0xFF241D31) else Color(0xFFFBFAFE)
     val regularCardColor = if (darkScheme) {

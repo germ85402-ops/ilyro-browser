@@ -224,7 +224,7 @@ internal fun TabletTabStrip(
                 ) { tab ->
                     val selected = tab.id == activeTabId
                     val accent = if (tab.isPrivate) {
-                        Color(0xFF8B5CF6)
+                        privateModeAccent()
                     } else {
                         MaterialTheme.colorScheme.primary
                     }
@@ -706,7 +706,7 @@ private fun TabCountButton(
     onClick: () -> Unit,
     sizeDp: Int
 ) {
-    val privateAccent = if (darkTheme) Color(0xFFC4B5FD) else Color(0xFF7048D8)
+    val privateAccent = privateModeAccent(darkTheme)
     val targetBackground = if (isPrivate) {
         privateAccent.copy(alpha = if (darkTheme) 0.14f else 0.10f)
     } else {

@@ -251,22 +251,22 @@ fun IlyroApp() {
             onPrimary = accentOnColor,
             primaryContainer = Color(0xFF263A70),
             onPrimaryContainer = Color(0xFFF4F4F5),
-            secondary = Color(0xFFB9C5E6),
-            onSecondary = Color(0xFF0B1326),
-            secondaryContainer = Color(0xFF1B2947),
+            secondary = Color(0xFFBEC7D2),
+            onSecondary = Color(0xFF111821),
+            secondaryContainer = Color(0xFF252E39),
             onSecondaryContainer = Color(0xFFF2F5FF),
-            tertiary = Color(0xFFB9C5E6),
-            onTertiary = Color(0xFF0B1326),
-            tertiaryContainer = Color(0xFF223253),
+            tertiary = Color(0xFFB8C5E0),
+            onTertiary = Color(0xFF111821),
+            tertiaryContainer = Color(0xFF243145),
             onTertiaryContainer = Color(0xFFF2F5FF),
-            background = Color(0xFF071225),
-            onBackground = Color(0xFFF4F4F5),
-            surface = Color(0xFF101B33),
-            onSurface = Color(0xFFF4F4F5),
-            surfaceVariant = Color(0xFF1B2947),
-            onSurfaceVariant = Color(0xFFAAB7D4),
-            outline = Color(0xFF657CA9),
-            outlineVariant = Color(0xFF334466),
+            background = Color(0xFF0C121A),
+            onBackground = Color(0xFFF1F3F6),
+            surface = Color(0xFF151C27),
+            onSurface = Color(0xFFF1F3F6),
+            surfaceVariant = Color(0xFF202A36),
+            onSurfaceVariant = Color(0xFFB3BCC8),
+            outline = Color(0xFF778392),
+            outlineVariant = Color(0xFF3B4653),
             error = Color(0xFFFFB4AB),
             onError = Color(0xFF690005),
             errorContainer = Color(0xFF93000A),
@@ -345,7 +345,7 @@ fun IlyroApp() {
         }
     }
 
-    MaterialTheme(colorScheme = colors) {
+    MaterialTheme(colorScheme = colors, typography = IlyroTypography) {
         Surface(
             modifier = Modifier.fillMaxSize(),
             color = if (onboardingComplete) Color.Transparent else MaterialTheme.colorScheme.background,
@@ -2980,7 +2980,7 @@ private fun BrowserPageLoadingLine(
         ),
         label = "browser-page-loading-progress"
     )
-    val lineColor = if (isPrivate) Color(0xFF8B5CF6) else MaterialTheme.colorScheme.primary
+    val lineColor = if (isPrivate) privateModeAccent() else MaterialTheme.colorScheme.primary
 
     Box(
         modifier = Modifier

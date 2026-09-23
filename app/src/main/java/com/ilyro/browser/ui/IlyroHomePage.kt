@@ -107,7 +107,7 @@ internal fun IlyroHomePage(
     }
     val wallpaperActive = activeBackground != HomeBackground.NONE
     val privateHomeTint by animateColorAsState(
-        targetValue = if (isPrivate) Color(0xFF8B5CF6).copy(alpha = 0.045f) else Color.Transparent,
+        targetValue = if (isPrivate) privateModeAccent(darkTheme).copy(alpha = 0.045f) else Color.Transparent,
         animationSpec = tween(
             durationMillis = IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs),
             easing = IlyroVisualTokens.MotionEnterEasing
@@ -252,7 +252,7 @@ private fun HomeBrandBlock(isPrivate: Boolean, wallpaperActive: Boolean) {
     val metrics = rememberIlyroLayoutMetrics()
     val titleColor = when {
         wallpaperActive -> Color.White
-        isPrivate -> Color(0xFF8B5CF6)
+        isPrivate -> privateModeAccent()
         else -> MaterialTheme.colorScheme.onSurface
     }
     val subtitleColor = if (wallpaperActive) {
@@ -301,13 +301,14 @@ private fun HomeBrandBlock(isPrivate: Boolean, wallpaperActive: Boolean) {
 
 @Composable
 private fun PrivateHomeNotice() {
+    val privateAccent = privateModeAccent()
     Surface(
         modifier = Modifier
             .widthIn(max = 760.dp)
             .fillMaxWidth(),
         shape = RoundedCornerShape(IlyroVisualTokens.ControlRadius),
-        color = Color(0xFF8B5CF6).copy(alpha = 0.10f),
-        border = BorderStroke(1.dp, Color(0xFF8B5CF6).copy(alpha = 0.16f)),
+        color = privateAccent.copy(alpha = 0.10f),
+        border = BorderStroke(1.dp, privateAccent.copy(alpha = 0.16f)),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp
     ) {
@@ -319,7 +320,7 @@ private fun PrivateHomeNotice() {
                 imageVector = Icons.Rounded.VisibilityOff,
                 contentDescription = null,
                 modifier = Modifier.size(IlyroVisualTokens.SmallIconSize),
-                tint = Color(0xFF8B5CF6)
+                tint = privateAccent
             )
             Text(
                 text = tr("History is not saved", "История не сохраняется"),

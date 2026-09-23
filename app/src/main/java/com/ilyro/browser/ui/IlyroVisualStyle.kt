@@ -8,12 +8,97 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+
+/** Shared system sans-serif scale for browser chrome and utility screens. */
+internal val IlyroTypography: Typography = Typography().let { base ->
+    fun TextStyle.systemSans() = copy(fontFamily = FontFamily.SansSerif)
+
+    base.copy(
+        displayLarge = base.displayLarge.systemSans(),
+        displayMedium = base.displayMedium.systemSans(),
+        displaySmall = base.displaySmall.systemSans(),
+        headlineLarge = base.headlineLarge.copy(
+            fontFamily = FontFamily.SansSerif,
+            fontSize = 32.sp,
+            lineHeight = 40.sp,
+            fontWeight = FontWeight.SemiBold
+        ),
+        headlineMedium = base.headlineMedium.copy(
+            fontFamily = FontFamily.SansSerif,
+            fontSize = 28.sp,
+            lineHeight = 36.sp,
+            fontWeight = FontWeight.SemiBold
+        ),
+        headlineSmall = base.headlineSmall.copy(
+            fontFamily = FontFamily.SansSerif,
+            fontSize = 24.sp,
+            lineHeight = 32.sp,
+            fontWeight = FontWeight.SemiBold
+        ),
+        titleLarge = base.titleLarge.copy(
+            fontFamily = FontFamily.SansSerif,
+            fontSize = 22.sp,
+            lineHeight = 28.sp,
+            fontWeight = FontWeight.SemiBold
+        ),
+        titleMedium = base.titleMedium.copy(
+            fontFamily = FontFamily.SansSerif,
+            fontSize = 16.sp,
+            lineHeight = 24.sp,
+            fontWeight = FontWeight.Medium
+        ),
+        titleSmall = base.titleSmall.copy(
+            fontFamily = FontFamily.SansSerif,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Medium
+        ),
+        bodyLarge = base.bodyLarge.copy(
+            fontFamily = FontFamily.SansSerif,
+            fontSize = 16.sp,
+            lineHeight = 24.sp
+        ),
+        bodyMedium = base.bodyMedium.copy(
+            fontFamily = FontFamily.SansSerif,
+            fontSize = 14.sp,
+            lineHeight = 20.sp
+        ),
+        bodySmall = base.bodySmall.copy(
+            fontFamily = FontFamily.SansSerif,
+            fontSize = 12.sp,
+            lineHeight = 18.sp
+        ),
+        labelLarge = base.labelLarge.copy(
+            fontFamily = FontFamily.SansSerif,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
+            fontWeight = FontWeight.Medium
+        ),
+        labelMedium = base.labelMedium.copy(
+            fontFamily = FontFamily.SansSerif,
+            fontSize = 12.sp,
+            lineHeight = 16.sp,
+            fontWeight = FontWeight.Medium
+        ),
+        labelSmall = base.labelSmall.copy(
+            fontFamily = FontFamily.SansSerif,
+            fontSize = 11.sp,
+            lineHeight = 16.sp,
+            fontWeight = FontWeight.Medium
+        )
+    )
+}
 
 /**
  * ILYRO Visual 4 tokens.
@@ -70,8 +155,8 @@ internal object IlyroVisualTokens {
 
     val LightCanvasTop = Color(0xFFFCFDFF)
     val LightCanvasBottom = Color(0xFFF4F7FB)
-    val DarkCanvasTop = Color(0xFF151922)
-    val DarkCanvasBottom = Color(0xFF0D1016)
+    val DarkCanvasTop = Color(0xFF151C27)
+    val DarkCanvasBottom = Color(0xFF0C121A)
 }
 
 @Composable

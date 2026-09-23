@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -50,9 +51,31 @@ internal fun BrowserAccent.resolveAccent(darkTheme: Boolean): Color = when (this
     BrowserAccent.FOREST -> if (darkTheme) Color(0xFF74D7A6) else Color(0xFF23845B)
 }
 
-internal fun BrowserAccent.resolveOnAccent(darkTheme: Boolean): Color = when (this) {
-    BrowserAccent.ILYRO -> Color.White
-    BrowserAccent.BLUE, BrowserAccent.VIOLET, BrowserAccent.FOREST -> Color.White
+internal fun BrowserAccent.resolveOnAccent(darkTheme: Boolean): Color =
+    readableForeground(resolveAccent(darkTheme))
+
+internal fun privateModeAccent(darkTheme: Boolean): Color =
+    if (darkTheme) Color(0xFFC4B5FD) else Color(0xFF7048D8)
+
+internal fun privateModeOnAccent(darkTheme: Boolean): Color =
+    readableForeground(privateModeAccent(darkTheme))
+
+@Composable
+internal fun privateModeAccent(): Color {
+    val darkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    return privateModeAccent(darkTheme)
+}
+
+private fun readableForeground(background: Color): Color {
+    val darkInk = Color(0xFF10151E)
+    val white = Color.White
+    return if (background.contrastRatio(darkInk) >= background.contrastRatio(white)) darkInk else white
+}
+
+private fun Color.contrastRatio(other: Color): Float {
+    val first = luminance()
+    val second = other.luminance()
+    return (maxOf(first, second) + 0.05f) / (minOf(first, second) + 0.05f)
 }
 
 @Composable
