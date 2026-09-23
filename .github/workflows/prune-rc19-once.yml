@@ -1,0 +1,24 @@
+name: Prune old prereleases after rc19
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/prune-rc19-once.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Keep only the three newest prereleases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          stale_tags=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" | jq -sr 'add | [.[] | select(.prerelease == true)] | sort_by(.created_at) | reverse | .[3:] | .[].tag_name')
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            gh release delete "$tag" --cleanup-tag --yes
+          done <<< "$stale_tags"

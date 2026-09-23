@@ -170,7 +170,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          stale_tags=$(gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq 'add | [.[] | select(.prerelease == true)] | sort_by(.created_at) | reverse | .[3:] | .[].tag_name')
+          stale_tags=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" | jq -sr 'add | [.[] | select(.prerelease == true)] | sort_by(.created_at) | reverse | .[3:] | .[].tag_name')
           while IFS= read -r tag; do
             [ -n "$tag" ] || continue
             gh release delete "$tag" --cleanup-tag --yes
