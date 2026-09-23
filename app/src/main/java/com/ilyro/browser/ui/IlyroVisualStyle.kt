@@ -155,8 +155,8 @@ internal object IlyroVisualTokens {
 
     val LightCanvasTop = Color(0xFFFCFDFF)
     val LightCanvasBottom = Color(0xFFF4F7FB)
-    val DarkCanvasTop = Color(0xFF151C27)
-    val DarkCanvasBottom = Color(0xFF0C121A)
+    val DarkCanvasTop = Color(0xFF191B1F)
+    val DarkCanvasBottom = Color(0xFF111214)
 }
 
 @Composable

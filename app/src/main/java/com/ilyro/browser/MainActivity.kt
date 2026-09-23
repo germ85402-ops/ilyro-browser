@@ -466,7 +466,8 @@ class MainActivity : ComponentActivity(), SharedPreferences.OnSharedPreferenceCh
 
     private fun applySystemChrome() {
         val dark = resolvedDarkTheme()
-        val barColor = if (dark) Color.rgb(0x10, 0x1B, 0x33) else Color.WHITE
+        // Keep Android's status and navigation areas neutral so they fit every wallpaper.
+        val barColor = if (dark) Color.rgb(0x11, 0x12, 0x14) else Color.WHITE
         val style = if (dark) {
             SystemBarStyle.dark(barColor)
         } else {

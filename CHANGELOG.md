@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.26.0-rc21 — release candidate
+
+- Use neutral graphite system bars and dark surfaces so the browser chrome fits every built-in and custom wallpaper while keeping wallpaper-based accent colors.
+
 ## 0.26.0-rc20 — release candidate
 
 - Add four distinct built-in wallpaper styles, each with dedicated phone and tablet artwork selected automatically by device size.
