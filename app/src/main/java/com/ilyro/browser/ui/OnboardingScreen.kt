@@ -568,6 +568,13 @@ private fun WallpaperStep(
     val metrics = rememberIlyroLayoutMetrics()
     val dense = LocalIlyroUiDensity.current == UiDensity.COMPACT
     val context = LocalContext.current
+    val isDarkTheme = when (settings.theme) {
+        BrowserTheme.DARK -> true
+        BrowserTheme.LIGHT -> false
+        BrowserTheme.SYSTEM -> isSystemInDarkTheme()
+    }
+    val selectedBackground = if (isDarkTheme) settings.darkHomeBackground else settings.homeBackground
+    val selectedCustomUri = if (isDarkTheme) settings.darkCustomWallpaperUri else settings.customWallpaperUri
     val wallpaperPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -579,9 +586,18 @@ private fun WallpaperStep(
                 )
             }
             onSettingsChange(
-                settings.copy(
-                    homeBackground = HomeBackground.CUSTOM,
-                    customWallpaperUri = uri.toString()
+                if (isDarkTheme) {
+                    settings.copy(
+                        useSeparateDarkBackground = true,
+                        darkHomeBackground = HomeBackground.CUSTOM,
+                        darkCustomWallpaperUri = uri.toString()
+                    )
+                } else {
+                    settings.copy(
+                        useSeparateDarkBackground = true,
+                        homeBackground = HomeBackground.CUSTOM,
+                        customWallpaperUri = uri.toString()
+                    )
                 )
             )
         }
@@ -612,7 +628,13 @@ private fun WallpaperStep(
         shadowElevation = 0.dp
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            HomeWallpaper(settings.copy(useSeparateDarkBackground = false))
+            HomeWallpaper(
+                settings.copy(
+                    homeBackground = selectedBackground,
+                    customWallpaperUri = selectedCustomUri,
+                    useSeparateDarkBackground = false
+                )
+            )
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -656,7 +678,7 @@ private fun WallpaperStep(
     }
 
     Text(
-        homeBackgroundLabel(settings.homeBackground),
+        homeBackgroundLabel(selectedBackground),
         modifier = Modifier.padding(top = 11.dp, bottom = 7.dp),
         style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -668,20 +690,32 @@ private fun WallpaperStep(
             .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(9.dp)
     ) {
-        HomeBackground.entries.forEach { background ->
+        wallpaperPresetOptions(isDarkTheme, selectedBackground).forEach { background ->
             WallpaperMiniCard(
                 background = background,
-                settings = settings,
-                selected = settings.homeBackground == background,
+                customUri = selectedCustomUri,
+                selected = selectedBackground == background,
                 compact = metrics.isCompact,
                 onClick = {
                     if (
                         background == HomeBackground.CUSTOM &&
-                        settings.customWallpaperUri.isNullOrBlank()
+                        selectedCustomUri.isNullOrBlank()
                     ) {
                         wallpaperPicker.launch(arrayOf("image/*"))
+                    } else if (isDarkTheme) {
+                        onSettingsChange(
+                            settings.copy(
+                                useSeparateDarkBackground = true,
+                                darkHomeBackground = background
+                            )
+                        )
                     } else {
-                        onSettingsChange(settings.copy(homeBackground = background))
+                        onSettingsChange(
+                            settings.copy(
+                                useSeparateDarkBackground = true,
+                                homeBackground = background
+                            )
+                        )
                     }
                 }
             )
@@ -692,21 +726,21 @@ private fun WallpaperStep(
 @Composable
 private fun WallpaperMiniCard(
     background: HomeBackground,
-    settings: BrowserSettings,
+    customUri: String?,
     selected: Boolean,
     compact: Boolean,
     onClick: () -> Unit
 ) {
     val isTablet = LocalConfiguration.current.smallestScreenWidthDp >= 600
     val cardWidth = when {
-        isTablet -> 168.dp
-        compact -> 122.dp
-        else -> 132.dp
+        isTablet -> 184.dp
+        compact -> 142.dp
+        else -> 158.dp
     }
     val cardHeight = when {
-        isTablet -> 116.dp
-        compact -> 160.dp
-        else -> 172.dp
+        isTablet -> 128.dp
+        compact -> 112.dp
+        else -> 124.dp
     }
     Surface(
         onClick = onClick,
@@ -725,31 +759,46 @@ private fun WallpaperMiniCard(
         shadowElevation = 0.dp
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            HomeWallpaper(
-                settings.copy(
-                    homeBackground = background,
-                    useSeparateDarkBackground = false,
-                    wallpaperFit = WallpaperFit.FIT,
-                    wallpaperDim = WallpaperDim.OFF,
-                    wallpaperBlur = WallpaperBlur.OFF
-                ),
-                builtInContentScale = androidx.compose.ui.layout.ContentScale.Fit
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.35f))
+            if (background == HomeBackground.CUSTOM && !customUri.isNullOrBlank()) {
+                CustomWallpaperThumbnail(
+                    uriString = customUri,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                BuiltInWallpaperPreview(
+                    background = background,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    widePreview = true
+                )
+            }
+            val lightWallpaper = background.isLightWallpaper()
+            val labelShade = when {
+                lightWallpaper -> 0.12f
+                background == HomeBackground.NONE -> 0f
+                else -> 0.35f
+            }
+            if (labelShade > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                listOf(Color.Transparent, Color.Black.copy(alpha = labelShade))
+                            )
                         )
-                    )
-            )
+                )
+            }
             Text(
                 homeBackgroundLabel(background),
                 modifier = Modifier
                     .align(Alignment.BottomStart)
                     .padding(8.dp),
-                color = Color.White,
+                color = when {
+                    lightWallpaper -> Color(0xFF18232D)
+                    background == HomeBackground.NONE -> MaterialTheme.colorScheme.onBackground
+                    else -> Color.White
+                },
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -1130,6 +1179,13 @@ private fun ExtensionsStep(
 @Composable
 private fun FinishStep(settings: BrowserSettings) {
     val metrics = rememberIlyroLayoutMetrics()
+    val darkTheme = when (settings.theme) {
+        BrowserTheme.DARK -> true
+        BrowserTheme.LIGHT -> false
+        BrowserTheme.SYSTEM -> isSystemInDarkTheme()
+    }
+    val selectedBackground = if (darkTheme) settings.darkHomeBackground else settings.homeBackground
+    val selectedCustomUri = if (darkTheme) settings.darkCustomWallpaperUri else settings.customWallpaperUri
     StepTitle(
         tr("ILYRO is ready", "ILYRO готов"),
         tr(
@@ -1153,7 +1209,13 @@ private fun FinishStep(settings: BrowserSettings) {
         shadowElevation = 0.dp
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            HomeWallpaper(settings.copy(useSeparateDarkBackground = false))
+            HomeWallpaper(
+                settings.copy(
+                    homeBackground = selectedBackground,
+                    customWallpaperUri = selectedCustomUri,
+                    useSeparateDarkBackground = false
+                )
+            )
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1199,7 +1261,7 @@ private fun FinishStep(settings: BrowserSettings) {
         leftLabel = tr("Theme", "Тема"),
         leftValue = themeLabel(settings.theme, settings.language),
         rightLabel = tr("Wallpaper", "Обои"),
-        rightValue = homeBackgroundLabel(settings.homeBackground)
+        rightValue = homeBackgroundLabel(selectedBackground)
     )
     Spacer(modifier = Modifier.height(8.dp))
     SummaryChipPair(

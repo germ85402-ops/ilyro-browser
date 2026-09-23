@@ -91,6 +91,7 @@ internal fun IlyroHomePage(
     isPrivate: Boolean,
     onSearchEngineChange: (SearchEngine) -> Unit,
     onNavigate: (String) -> Unit,
+    onSettingsChange: (BrowserSettings) -> Unit,
     customSearchEngine: CustomSearchEngine? = null,
     customSearchEngines: List<CustomSearchEngine> = emptyList(),
     onCustomSearchEngineChange: (CustomSearchEngine?) -> Unit = {},
@@ -104,6 +105,7 @@ internal fun IlyroHomePage(
     var omniboxFocused by remember { mutableStateOf(false) }
     var editMode by remember { mutableStateOf(false) }
     var showAddDialog by remember { mutableStateOf(false) }
+    var showWallpaperPicker by remember { mutableStateOf(false) }
     var editingQuickLink by remember { mutableStateOf<QuickLink?>(null) }
 
     val darkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -176,7 +178,8 @@ internal fun IlyroHomePage(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     HomeBrandBlock(
                         isPrivate = isPrivate,
-                        wallpaperActive = wallpaperActive
+                        wallpaperActive = wallpaperActive,
+                        lightWallpaper = activeBackground.isLightWallpaper()
                     )
                     Spacer(modifier = Modifier.height(if (metrics.isNarrowPhone) 12.dp else 18.dp))
                 }
@@ -240,6 +243,44 @@ internal fun IlyroHomePage(
 
             Spacer(modifier = Modifier.weight(1f))
         }
+
+        AnimatedVisibility(
+            visible = !omniboxFocused,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = horizontalPadding, bottom = 14.dp)
+                .zIndex(4f),
+            enter = fadeIn(tween(IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs))),
+            exit = fadeOut(tween(IlyroVisualTokens.motionDuration(IlyroVisualTokens.MotionStandardMs)))
+        ) {
+            Surface(
+                onClick = { showWallpaperPicker = true },
+                modifier = Modifier.size(48.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.42f)),
+                tonalElevation = 0.dp,
+                shadowElevation = 4.dp
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Rounded.Edit,
+                        contentDescription = tr("Change wallpaper", "Изменить обои"),
+                        modifier = Modifier.size(18.dp),
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.82f)
+                    )
+                }
+            }
+        }
+    }
+
+    if (showWallpaperPicker) {
+        WallpaperQuickPickerSheet(
+            settings = settings,
+            darkTheme = darkTheme,
+            onSettingsChange = onSettingsChange,
+            onDismiss = { showWallpaperPicker = false }
+        )
     }
 
     if (showAddDialog) {
@@ -279,20 +320,25 @@ internal fun IlyroHomePage(
 }
 
 @Composable
-private fun HomeBrandBlock(isPrivate: Boolean, wallpaperActive: Boolean) {
+private fun HomeBrandBlock(
+    isPrivate: Boolean,
+    wallpaperActive: Boolean,
+    lightWallpaper: Boolean
+) {
     val metrics = rememberIlyroLayoutMetrics()
+    val wallpaperTextColor = if (lightWallpaper) Color(0xFF1B2632) else Color.White
     val titleColor = when {
-        wallpaperActive -> Color.White
+        wallpaperActive -> wallpaperTextColor
         isPrivate -> privateModeAccent()
         else -> MaterialTheme.colorScheme.onSurface
     }
     val subtitleColor = if (wallpaperActive) {
-        Color.White.copy(alpha = 0.88f)
+        wallpaperTextColor.copy(alpha = 0.88f)
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.86f)
     }
     val wallpaperShadow = Shadow(
-        color = Color.Black.copy(alpha = 0.62f),
+        color = if (lightWallpaper) Color.White.copy(alpha = 0.50f) else Color.Black.copy(alpha = 0.62f),
         offset = Offset(0f, 2f),
         blurRadius = 8f
     )

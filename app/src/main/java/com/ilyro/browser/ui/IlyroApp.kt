@@ -1906,6 +1906,7 @@ private fun BrowserScreen(
                                 onSettingsChange(settings.copy(customSearchEngineId = engine?.id))
                             },
                             onNavigate = { navigateInput(it) },
+                            onSettingsChange = onSettingsChange,
                             onlineSearchSuggestionsEnabled = settings.onlineSearchSuggestionsEnabled,
                             onOmniboxFocusChanged = { homeOmniboxFocused = it }
                         )

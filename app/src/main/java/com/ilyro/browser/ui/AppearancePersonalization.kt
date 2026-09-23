@@ -104,6 +104,7 @@ internal fun AppearancePersonalizationSettings(
             } else {
                 onSettingsChange(
                     settings.copy(
+                        useSeparateDarkBackground = true,
                         homeBackground = HomeBackground.CUSTOM,
                         customWallpaperUri = uri.toString()
                     )
@@ -119,7 +120,7 @@ internal fun AppearancePersonalizationSettings(
 
     AppearancePreview(settings)
 
-    PersonalizationSection(
+        PersonalizationSection(
         title = tr("Colors", "Цвета"),
         subtitle = tr(
             "Choose the theme. ILYRO automatically matches the interface accent to your wallpaper.",
@@ -236,20 +237,21 @@ internal fun AppearancePersonalizationSettings(
             "Выберите обои ILYRO или своё изображение. Эффекты применяются только к стартовой странице."
         )
     ) {
-        Text(tr("Main background", "Основной фон"), style = MaterialTheme.typography.labelLarge)
+        Text(tr("Light-theme background", "Фон светлой темы"), style = MaterialTheme.typography.labelLarge)
         Spacer(modifier = Modifier.height(8.dp))
         WallpaperPresetGrid(
             selected = settings.homeBackground,
             customUri = settings.customWallpaperUri,
+            options = wallpaperPresetOptions(darkTheme = false, selected = settings.homeBackground),
             onSelect = { background ->
                 if (background == HomeBackground.CUSTOM) {
                     if (settings.customWallpaperUri.isNullOrBlank()) {
                         pickCustomWallpaper(false)
                     } else {
-                        onSettingsChange(settings.copy(homeBackground = HomeBackground.CUSTOM))
+                        onSettingsChange(settings.copy(useSeparateDarkBackground = true, homeBackground = HomeBackground.CUSTOM))
                     }
                 } else {
-                    onSettingsChange(settings.copy(homeBackground = background))
+                    onSettingsChange(settings.copy(useSeparateDarkBackground = true, homeBackground = background))
                 }
             }
         )
@@ -263,7 +265,7 @@ internal fun AppearancePersonalizationSettings(
                         settings.copy(
                             customWallpaperUri = null,
                             homeBackground = if (settings.homeBackground == HomeBackground.CUSTOM) {
-                                HomeBackground.STILLWATER
+                                LIGHT_WALLPAPER_PRESETS.first()
                             } else {
                                 settings.homeBackground
                             }
@@ -276,53 +278,43 @@ internal fun AppearancePersonalizationSettings(
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-        CompactToggleRow(
-            title = tr("Separate dark-theme background", "Отдельный фон для тёмной темы"),
-            subtitle = tr(
-                "Use another wallpaper whenever ILYRO is in dark mode",
-                "Использовать другие обои, когда ILYRO работает в тёмной теме"
-            ),
-            checked = settings.useSeparateDarkBackground
-        ) { onSettingsChange(settings.copy(useSeparateDarkBackground = it)) }
-
-        if (settings.useSeparateDarkBackground) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(tr("Dark-theme background", "Фон тёмной темы"), style = MaterialTheme.typography.labelLarge)
-            Spacer(modifier = Modifier.height(8.dp))
-            WallpaperPresetGrid(
-                selected = settings.darkHomeBackground,
-                customUri = settings.darkCustomWallpaperUri,
-                onSelect = { background ->
-                    if (background == HomeBackground.CUSTOM) {
-                        if (settings.darkCustomWallpaperUri.isNullOrBlank()) {
-                            pickCustomWallpaper(true)
-                        } else {
-                            onSettingsChange(settings.copy(darkHomeBackground = HomeBackground.CUSTOM))
-                        }
+        Spacer(modifier = Modifier.height(10.dp))
+        Text(tr("Dark-theme background", "Фон тёмной темы"), style = MaterialTheme.typography.labelLarge)
+        Spacer(modifier = Modifier.height(8.dp))
+        WallpaperPresetGrid(
+            selected = settings.darkHomeBackground,
+            customUri = settings.darkCustomWallpaperUri,
+            options = wallpaperPresetOptions(darkTheme = true, selected = settings.darkHomeBackground),
+            onSelect = { background ->
+                if (background == HomeBackground.CUSTOM) {
+                    if (settings.darkCustomWallpaperUri.isNullOrBlank()) {
+                        pickCustomWallpaper(true)
                     } else {
-                        onSettingsChange(settings.copy(darkHomeBackground = background))
+                        onSettingsChange(settings.copy(useSeparateDarkBackground = true, darkHomeBackground = HomeBackground.CUSTOM))
                     }
+                } else {
+                    onSettingsChange(settings.copy(useSeparateDarkBackground = true, darkHomeBackground = background))
                 }
-            )
-            if (!settings.darkCustomWallpaperUri.isNullOrBlank()) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = { pickCustomWallpaper(true) }) {
-                        Text(tr("Change image", "Сменить изображение"))
-                    }
-                    TextButton(onClick = {
-                        onSettingsChange(
-                            settings.copy(
-                                darkCustomWallpaperUri = null,
-                                darkHomeBackground = if (settings.darkHomeBackground == HomeBackground.CUSTOM) {
-                                    HomeBackground.STILLWATER
-                                } else {
-                                    settings.darkHomeBackground
-                                }
-                            )
+            }
+        )
+        if (!settings.darkCustomWallpaperUri.isNullOrBlank()) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { pickCustomWallpaper(true) }) {
+                    Text(tr("Change image", "Сменить изображение"))
+                }
+                TextButton(onClick = {
+                    onSettingsChange(
+                        settings.copy(
+                            darkCustomWallpaperUri = null,
+                            darkHomeBackground = if (settings.darkHomeBackground == HomeBackground.CUSTOM) {
+                                DARK_WALLPAPER_PRESETS.first()
+                            } else {
+                                settings.darkHomeBackground
+                            }
                         )
-                    }) {
-                        Text(tr("Remove", "Удалить"))
-                    }
+                    )
+                }) {
+                    Text(tr("Remove", "Удалить"))
                 }
             }
         }
@@ -336,17 +328,16 @@ internal fun AppearancePersonalizationSettings(
             label = { wallpaperFitLabel(it) },
             onSelect = { onSettingsChange(settings.copy(wallpaperFit = it)) }
         )
-
         Spacer(modifier = Modifier.height(12.dp))
-        Text(tr("Dimming", "Затемнение"), style = MaterialTheme.typography.labelLarge)
+        Text(tr("Dim", "Затемнение"), style = MaterialTheme.typography.labelLarge)
         Spacer(modifier = Modifier.height(7.dp))
         SegmentedChoices(
             options = WallpaperDim.entries,
             selected = settings.wallpaperDim,
             label = { wallpaperDimLabel(it) },
-            onSelect = { onSettingsChange(settings.copy(wallpaperDim = it)) }
+            onSelect = { onSettingsChange(settings.copy(wallpaperDim = it)) },
+            dense = true
         )
-
         Spacer(modifier = Modifier.height(12.dp))
         Text(tr("Blur", "Размытие"), style = MaterialTheme.typography.labelLarge)
         Spacer(modifier = Modifier.height(7.dp))
@@ -354,8 +345,19 @@ internal fun AppearancePersonalizationSettings(
             options = WallpaperBlur.entries,
             selected = settings.wallpaperBlur,
             label = { wallpaperBlurLabel(it) },
-            onSelect = { onSettingsChange(settings.copy(wallpaperBlur = it)) }
+            onSelect = { onSettingsChange(settings.copy(wallpaperBlur = it)) },
+            dense = true
         )
+    }
+
+    PersonalizationSection(
+        title = tr("Accent", "Акцент"),
+        subtitle = tr(
+            "Pick the color used for highlights and selected controls.",
+            "Выберите цвет подсветки и активных элементов."
+        )
+    ) {
+        AccentChoices(settings.accent) { onSettingsChange(settings.copy(accent = it)) }
     }
 
 }
@@ -523,10 +525,14 @@ private fun <T> SegmentedChoices(
 internal fun WallpaperPresetGrid(
     selected: HomeBackground,
     customUri: String?,
+    options: List<HomeBackground> = wallpaperPresetOptions(
+        darkTheme = MaterialTheme.colorScheme.background.luminance() < 0.5f,
+        selected = selected
+    ),
     onSelect: (HomeBackground) -> Unit
 ) {
-    HomeBackground.entries.chunked(2).forEachIndexed { rowIndex, rowItems ->
-        if (rowIndex > 0) Spacer(modifier = Modifier.height(8.dp))
+    options.chunked(2).forEachIndexed { rowIndex, rowItems ->
+        if (rowIndex > 0) Spacer(modifier = Modifier.height(9.dp))
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             rowItems.forEach { background ->
                 val active = selected == background
@@ -534,7 +540,7 @@ internal fun WallpaperPresetGrid(
                     onClick = { onSelect(background) },
                     modifier = Modifier
                         .weight(1f)
-                        .height(if (LocalIlyroUiDensity.current == UiDensity.COMPACT) 64.dp else 74.dp),
+                        .height(if (LocalIlyroUiDensity.current == UiDensity.COMPACT) 114.dp else 130.dp),
                     shape = RoundedCornerShape(16.dp),
                     color = Color.Transparent,
                     border = BorderStroke(
@@ -549,18 +555,7 @@ internal fun WallpaperPresetGrid(
                                 uriString = customUri,
                                 modifier = Modifier.fillMaxSize()
                             )
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            listOf(
-                                                Color.Transparent,
-                                                Color.Black.copy(alpha = 0.28f)
-                                            )
-                                        )
-                                    )
-                            )
+                            wallpaperCardScrim(background)
                         } else if (background == HomeBackground.CUSTOM) {
                             Box(
                                 modifier = Modifier
@@ -570,27 +565,17 @@ internal fun WallpaperPresetGrid(
                         } else {
                             BuiltInWallpaperPreview(
                                 background = background,
-                                modifier = Modifier.fillMaxSize()
+                                modifier = Modifier.fillMaxSize(),
+                                widePreview = true
                             )
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            listOf(
-                                                Color.Transparent,
-                                                Color.Black.copy(alpha = 0.34f)
-                                            )
-                                        )
-                                    )
-                            )
+                            wallpaperCardScrim(background)
                         }
 
                         Text(
                             homeBackgroundLabel(background),
                             modifier = Modifier
                                 .align(Alignment.BottomStart)
-                                .padding(if (LocalIlyroUiDensity.current == UiDensity.COMPACT) 8.dp else 10.dp),
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = wallpaperPreviewTextColor(background)
@@ -604,6 +589,25 @@ internal fun WallpaperPresetGrid(
 }
 
 @Composable
+private fun wallpaperCardScrim(background: HomeBackground) {
+    val bottomShade = when {
+        background.isLightWallpaper() -> 0.12f
+        background == HomeBackground.NONE -> 0f
+        else -> 0.48f
+    }
+    if (bottomShade <= 0f) return
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    listOf(Color.Transparent, Color.Black.copy(alpha = bottomShade))
+                )
+            )
+    )
+}
+
+@Composable
 private fun wallpaperPreviewBrush(background: HomeBackground): Brush = when (background) {
     HomeBackground.NONE -> Brush.linearGradient(listOf(MaterialTheme.colorScheme.background, MaterialTheme.colorScheme.background))
     HomeBackground.STILLWATER -> Brush.linearGradient(listOf(Color(0xFF0B111B), Color(0xFF243958)))
@@ -613,13 +617,23 @@ private fun wallpaperPreviewBrush(background: HomeBackground): Brush = when (bac
     HomeBackground.INK_WASH -> Brush.linearGradient(listOf(Color(0xFF101724), Color(0xFF344052)))
     HomeBackground.EMBER_DUNES -> Brush.linearGradient(listOf(Color(0xFF1D1425), Color(0xFF9B422E)))
     HomeBackground.PRISM_FLOW -> Brush.linearGradient(listOf(Color(0xFF080912), Color(0xFF27364F)))
+    HomeBackground.LIGHT_DAWN_LAKE -> Brush.linearGradient(listOf(Color(0xFFDDEBF5), Color(0xFF97B6CA)))
+    HomeBackground.LIGHT_OLIVE_GROVE -> Brush.linearGradient(listOf(Color(0xFFEAF0D8), Color(0xFF9EA879)))
+    HomeBackground.LIGHT_MEDITERRANEAN -> Brush.linearGradient(listOf(Color(0xFFE6F4F8), Color(0xFF86BFD0)))
+    HomeBackground.LIGHT_IVORY_DUNES -> Brush.linearGradient(listOf(Color(0xFFFFF0D9), Color(0xFFD8BFA8)))
+    HomeBackground.LIGHT_SPRING_LAKE -> Brush.linearGradient(listOf(Color(0xFFE5F0E9), Color(0xFFA9C1BB)))
+    HomeBackground.LIGHT_LIMESTONE -> Brush.linearGradient(listOf(Color(0xFFF4F0E8), Color(0xFFC8C0B4)))
     HomeBackground.CUSTOM -> Brush.linearGradient(
         listOf(Color(0xFF42464E), Color(0xFF727984), Color(0xFF343941))
     )
 }
 
 @Composable
-private fun wallpaperPreviewTextColor(background: HomeBackground): Color = Color.White
+private fun wallpaperPreviewTextColor(background: HomeBackground): Color = when {
+    background.isLightWallpaper() -> Color(0xFF18232D)
+    background == HomeBackground.NONE -> MaterialTheme.colorScheme.onBackground
+    else -> Color.White
+}
 
 @Composable
 private fun AccentChoices(selected: BrowserAccent, onSelect: (BrowserAccent) -> Unit) {
@@ -694,6 +708,12 @@ internal fun homeBackgroundLabel(background: HomeBackground): String = when (bac
     HomeBackground.INK_WASH -> tr("Ink wash", "Суми-э")
     HomeBackground.EMBER_DUNES -> tr("Ember dunes", "Янтарные дюны")
     HomeBackground.PRISM_FLOW -> tr("Prism flow", "Поток призмы")
+    HomeBackground.LIGHT_DAWN_LAKE -> tr("Dawn lake", "Рассветное озеро")
+    HomeBackground.LIGHT_OLIVE_GROVE -> tr("Olive grove", "Оливковая роща")
+    HomeBackground.LIGHT_MEDITERRANEAN -> tr("Mediterranean coast", "Средиземноморье")
+    HomeBackground.LIGHT_IVORY_DUNES -> tr("Ivory dunes", "Светлые дюны")
+    HomeBackground.LIGHT_SPRING_LAKE -> tr("Spring lake", "Весеннее озеро")
+    HomeBackground.LIGHT_LIMESTONE -> tr("Limestone arch", "Каменная арка")
     HomeBackground.CUSTOM -> tr("Your image", "Своё фото")
 }
 

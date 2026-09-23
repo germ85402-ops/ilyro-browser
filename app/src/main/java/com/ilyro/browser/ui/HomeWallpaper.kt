@@ -210,20 +210,27 @@ internal fun builtInWallpaperResource(background: HomeBackground, isTablet: Bool
         } else {
             R.drawable.wallpaper_phone_prism_flow
         }
+        HomeBackground.LIGHT_DAWN_LAKE -> R.drawable.wallpaper_light_dawn_lake
+        HomeBackground.LIGHT_OLIVE_GROVE -> R.drawable.wallpaper_light_olive_grove
+        HomeBackground.LIGHT_MEDITERRANEAN -> R.drawable.wallpaper_light_mediterranean
+        HomeBackground.LIGHT_IVORY_DUNES -> R.drawable.wallpaper_light_ivory_dunes
+        HomeBackground.LIGHT_SPRING_LAKE -> R.drawable.wallpaper_light_spring_lake
+        HomeBackground.LIGHT_LIMESTONE -> R.drawable.wallpaper_light_limestone
     }
 
 @Composable
 internal fun BuiltInWallpaperPreview(
     background: HomeBackground,
     modifier: Modifier = Modifier,
-    contentScale: ContentScale = ContentScale.Crop
+    contentScale: ContentScale = ContentScale.Crop,
+    widePreview: Boolean = false
 ) {
     if (background == HomeBackground.NONE) {
         Box(modifier.background(MaterialTheme.colorScheme.background))
         return
     }
 
-    val isTablet = LocalConfiguration.current.smallestScreenWidthDp >= 600
+    val isTablet = widePreview || LocalConfiguration.current.smallestScreenWidthDp >= 600
     val assetId = builtInWallpaperResource(background, isTablet)
 
     if (assetId != null) {
@@ -246,6 +253,12 @@ internal fun BuiltInWallpaperPreview(
         HomeBackground.INK_WASH -> listOf(Color(0xFF101724), Color(0xFF344052))
         HomeBackground.EMBER_DUNES -> listOf(Color(0xFF1D1425), Color(0xFF9B422E))
         HomeBackground.PRISM_FLOW -> listOf(Color(0xFF080912), Color(0xFF27364F))
+        HomeBackground.LIGHT_DAWN_LAKE -> listOf(Color(0xFFDDEBF5), Color(0xFF97B6CA))
+        HomeBackground.LIGHT_OLIVE_GROVE -> listOf(Color(0xFFEAF0D8), Color(0xFF9EA879))
+        HomeBackground.LIGHT_MEDITERRANEAN -> listOf(Color(0xFFE6F4F8), Color(0xFF86BFD0))
+        HomeBackground.LIGHT_IVORY_DUNES -> listOf(Color(0xFFFFF0D9), Color(0xFFD8BFA8))
+        HomeBackground.LIGHT_SPRING_LAKE -> listOf(Color(0xFFE5F0E9), Color(0xFFA9C1BB))
+        HomeBackground.LIGHT_LIMESTONE -> listOf(Color(0xFFF4F0E8), Color(0xFFC8C0B4))
         HomeBackground.CUSTOM -> listOf(Color(0xFF343941), Color(0xFF59616D))
     }
     Box(modifier.background(Brush.verticalGradient(fallbackColors)))

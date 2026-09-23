@@ -60,8 +60,48 @@ internal enum class HomeBackground {
     INK_WASH,
     EMBER_DUNES,
     PRISM_FLOW,
+    LIGHT_DAWN_LAKE,
+    LIGHT_OLIVE_GROVE,
+    LIGHT_MEDITERRANEAN,
+    LIGHT_IVORY_DUNES,
+    LIGHT_SPRING_LAKE,
+    LIGHT_LIMESTONE,
     CUSTOM
 }
+
+internal val LIGHT_WALLPAPER_PRESETS = listOf(
+    HomeBackground.LIGHT_DAWN_LAKE,
+    HomeBackground.LIGHT_OLIVE_GROVE,
+    HomeBackground.LIGHT_MEDITERRANEAN,
+    HomeBackground.LIGHT_IVORY_DUNES,
+    HomeBackground.LIGHT_SPRING_LAKE,
+    HomeBackground.LIGHT_LIMESTONE
+)
+
+internal val DARK_WALLPAPER_PRESETS = listOf(
+    HomeBackground.STILLWATER,
+    HomeBackground.PINE_DUSK,
+    HomeBackground.ALPINE_DAWN,
+    HomeBackground.INK_WASH,
+    HomeBackground.EMBER_DUNES,
+    HomeBackground.PRISM_FLOW
+)
+
+internal fun wallpaperPresetOptions(
+    darkTheme: Boolean,
+    selected: HomeBackground? = null
+): List<HomeBackground> {
+    val presets = if (darkTheme) DARK_WALLPAPER_PRESETS else LIGHT_WALLPAPER_PRESETS
+    return buildList {
+        add(HomeBackground.NONE)
+        addAll(presets)
+        add(HomeBackground.CUSTOM)
+        // Keep an older saved Obsidian selection visible until the user chooses a new preset.
+        if (selected == HomeBackground.OBSIDIAN && selected !in this) add(selected)
+    }
+}
+
+internal fun HomeBackground.isLightWallpaper(): Boolean = this in LIGHT_WALLPAPER_PRESETS
 
 internal enum class WallpaperFit { FILL, FIT, CENTER }
 
@@ -94,9 +134,9 @@ internal data class BrowserSettings(
     val showQuickAccess: Boolean = true,
     val shortcutSize: HomeShortcutSize = HomeShortcutSize.STANDARD,
     val showShortcutLabels: Boolean = true,
-    val homeBackground: HomeBackground = HomeBackground.STILLWATER,
+    val homeBackground: HomeBackground = HomeBackground.LIGHT_DAWN_LAKE,
     val customWallpaperUri: String? = null,
-    val useSeparateDarkBackground: Boolean = false,
+    val useSeparateDarkBackground: Boolean = true,
     val darkHomeBackground: HomeBackground = HomeBackground.STILLWATER,
     val darkCustomWallpaperUri: String? = null,
     val wallpaperFit: WallpaperFit = WallpaperFit.FILL,
@@ -277,9 +317,13 @@ internal object BrowserSettingsStore {
         showQuickAccess = prefs.getBoolean(KEY_SHOW_QUICK_ACCESS, true),
         shortcutSize = enumValueOrDefault(prefs.getString(KEY_SHORTCUT_SIZE, null), HomeShortcutSize.STANDARD),
         showShortcutLabels = prefs.getBoolean(KEY_SHOW_SHORTCUT_LABELS, true),
-        homeBackground = enumValueOrDefault(prefs.getString(KEY_HOME_BACKGROUND, null), HomeBackground.STILLWATER),
+        homeBackground = enumValueOrDefault(
+            prefs.getString(KEY_HOME_BACKGROUND, null),
+            HomeBackground.LIGHT_DAWN_LAKE
+        ),
         customWallpaperUri = prefs.getString(KEY_CUSTOM_WALLPAPER_URI, null),
-        useSeparateDarkBackground = prefs.getBoolean(KEY_SEPARATE_DARK_BACKGROUND, false),
+        // Separate light/dark backgrounds are now the default browser behavior.
+        useSeparateDarkBackground = true,
         darkHomeBackground = enumValueOrDefault(
             prefs.getString(KEY_DARK_HOME_BACKGROUND, null),
             HomeBackground.STILLWATER
@@ -324,7 +368,7 @@ internal object BrowserSettingsStore {
             .putBoolean(KEY_SHOW_SHORTCUT_LABELS, settings.showShortcutLabels)
             .putString(KEY_HOME_BACKGROUND, settings.homeBackground.name)
             .putString(KEY_CUSTOM_WALLPAPER_URI, settings.customWallpaperUri)
-            .putBoolean(KEY_SEPARATE_DARK_BACKGROUND, settings.useSeparateDarkBackground)
+            .putBoolean(KEY_SEPARATE_DARK_BACKGROUND, true)
             .putString(KEY_DARK_HOME_BACKGROUND, settings.darkHomeBackground.name)
             .putString(KEY_DARK_CUSTOM_WALLPAPER_URI, settings.darkCustomWallpaperUri)
             .putString(KEY_WALLPAPER_FIT, settings.wallpaperFit.name)
