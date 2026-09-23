@@ -83,7 +83,7 @@ class BrowserSettingsSyncCodecTest {
         assertEquals(AppLanguage.SYSTEM, restored.language)
         assertEquals(SearchEngine.GOOGLE, restored.searchEngine)
         assertEquals(BrowserTheme.SYSTEM, restored.theme)
-        assertEquals(HomeBackground.STILLWATER, restored.homeBackground)
+        assertEquals(HomeBackground.LIGHT_DAWN_LAKE, restored.homeBackground)
         assertEquals(HomeBackground.STILLWATER, restored.darkHomeBackground)
         assertTrue(restored.desktopMode)
         assertEquals(1.30f, restored.textScale)
