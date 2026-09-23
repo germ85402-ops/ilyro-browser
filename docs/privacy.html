@@ -4,10 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#080a0f" />
-    <meta name="description" content="ILYRO Browser Privacy Policy: how the Android browser handles local data, Google sign-in, Google Drive sync, permissions, and downloads." />
-    <title>ILYRO — Privacy Policy</title>
+    <meta name="description" content="ILYRO Browser Privacy Policy: how the Android browser handles local data, Google sign-in, Google Drive sync, permissions, and downloads." data-i18n-content="legal.privacyDescription" />
+    <title data-i18n="legal.privacyTitle">ILYRO — Privacy Policy</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260921-icon-system-1" />
+    <link rel="stylesheet" href="styles.css?v=20260923-site-polish-1" />
     <script>document.documentElement.classList.add('js');</script>
   </head>
   <body>
@@ -61,31 +61,35 @@
 <header class="site-header" id="top">
   <div class="header-inner">
     <a class="brand" href="index.html#top" aria-label="ILYRO, home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 38.9c-4.4-1.4-7.5-5.2-7.5-10.1 0-3.6 1.4-6.6 4-8.9-2.7-3.4-3.4-7-1.8-10.7 2.1 1.2 3.9 2.8 5.3 4.9 1.4-2.1 3.2-3.7 5.3-4.9 1.6 3.7.9 7.3-1.8 10.7 2.6 2.3 4 5.3 4 8.9 0 4.9-3.1 8.7-7.5 10.1Z" /><path class="mark-line" d="M20.7 12.7 16 8.4l-3.2-4.2M27.3 12.7 32 8.4l3.2-4.2M16 8.4l.2-4.8M32 8.4l-.2-4.8" /><path class="mark-cut" d="M20.5 25.2c1.1 1.2 2.3 1.8 3.5-1.8" /></svg></span><span class="brand-name">ILYRO</span></a>
-    <nav class="main-nav" id="main-nav" aria-label="Primary navigation">
-      <a href="index.html#features">Features</a>
-      <a href="index.html#screenshots">Screenshots</a>
-      <a href="index.html#download">Download</a>
+    <nav class="main-nav" id="main-nav" aria-label="Primary navigation" data-i18n-aria="nav.label">
+      <a href="index.html#features" data-i18n="nav.features">Features</a>
+      <a href="index.html#screenshots" data-i18n="nav.screenshots">Screenshots</a>
+      <a href="index.html#download" data-i18n="nav.download">Download</a>
     </nav>
     <div class="header-actions">
-      <button class="icon-button theme-toggle" id="theme-toggle" type="button" aria-label="Theme follows your device">
+      <div class="language-switcher" role="group" aria-label="Language" data-i18n-aria="language.label">
+        <button type="button" data-language="en" aria-pressed="true">EN</button>
+        <button type="button" data-language="ru" aria-pressed="false">RU</button>
+      </div>
+      <button class="icon-button theme-toggle" id="theme-toggle" type="button" aria-label="Theme follows your device" data-i18n-aria="theme.system">
         <svg class="icon icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.6"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path></svg>
         <svg class="icon icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.3 15.1A8.6 8.6 0 0 1 8.9 3.7 8.6 8.6 0 1 0 20.3 15.1Z"></path></svg>
       </button>
-      <a class="header-cta" href="index.html#download">Open project <svg class="ui-icon ui-icon-inline" aria-hidden="true"><use href="#icon-arrow-up-right"></use></svg></a>
-      <button class="icon-button menu-toggle" id="menu-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="main-nav"><span></span><span></span></button>
+      <a class="header-cta" href="index.html#download"><span data-i18n="legal.project">Open project</span> <svg class="ui-icon ui-icon-inline" aria-hidden="true"><use href="#icon-arrow-up-right"></use></svg></a>
+      <button class="icon-button menu-toggle" id="menu-toggle" type="button" aria-label="Open menu" data-i18n-aria="menu.open" aria-expanded="false" aria-controls="main-nav"><span></span><span></span></button>
     </div>
   </div>
 </header>
     <main class="legal-main">
       <section class="legal-page section-shell reveal is-visible" aria-labelledby="legal-title">
         <div class="eyebrow"><span class="eyebrow-dot"></span> ILYRO / LEGAL</div>
-        <h1 id="legal-title">Privacy<br /><span>Policy.</span></h1>
-        <p class="legal-lead">A clear description of what ILYRO stores locally, what can leave the device, and how optional Google account features work.</p>
-        <div class="legal-switch" aria-label="Legal pages">
-          <a class="is-active" href="privacy.html">Privacy Policy</a>
-          <a class="" href="terms.html">Terms of Service</a>
+        <h1 id="legal-title" data-i18n="legal.privacyHeading" data-i18n-mode="html">Privacy<br /><span>Policy.</span></h1>
+        <p class="legal-lead" data-i18n="legal.privacyLead">A clear description of what ILYRO stores locally, what can leave the device, and how optional Google account features work.</p>
+        <div class="legal-switch" aria-label="Legal pages" data-i18n-aria="legal.pages">
+          <a class="is-active" href="privacy.html" data-i18n="footer.privacy">Privacy Policy</a>
+          <a class="" href="terms.html" data-i18n="footer.terms">Terms of Service</a>
         </div>
-        <article class="legal-card"><p><em>Last updated: September 20, 2026</em></p>
+        <article class="legal-card" data-legal-language="en" lang="en"><p><em>Last updated: September 20, 2026</em></p>
 <p>This document describes the privacy behavior of the current ILYRO Browser beta/RC codebase. It should be reviewed again before public store distribution, especially if analytics, advertising, cloud services, account features, or other data flows are added later.</p>
 <h2>Summary</h2>
 <p>ILYRO is designed so ordinary browsing data stays on the user's device unless the user explicitly uses a feature that needs a network service, such as visiting a website, using a search engine, signing in with Google, or backing up browser data to Google Drive.</p>
@@ -127,15 +131,59 @@
 <h2>Changes to this policy</h2>
 <p>This policy must be updated when ILYRO adds or materially changes data collection, synchronization, analytics, advertising, account, or cloud functionality.</p>
 <h2>Contact</h2>
-<p>For privacy questions or support requests, open an issue at <a href="https://github.com/germ85402-ops/ilyro-browser/issues" target="_blank" rel="noreferrer">GitHub Issues</a>. Do not include passwords, authentication codes, browsing history, or other sensitive personal data in a public issue.</p></article>
+<p>For privacy questions or support requests, open an issue at <a href="https://github.com/germ85402-ops/ilyro-browser/issues" target="_blank" rel="noreferrer">GitHub Issues</a>. Do not include passwords, authentication codes, browsing history, or other sensitive personal data in a public issue.</p></article><article class="legal-card" data-legal-language="ru" lang="ru" hidden>
+<p><em>Последнее обновление: 20 сентября 2026 года</em></p>
+<p>В этом документе описано, как текущая бета-версия/RC-кодовая база ILYRO Browser обрабатывает данные. Перед публикацией в официальном магазине документ следует проверить ещё раз, особенно если позднее появятся аналитика, реклама, облачные сервисы, функции аккаунта или другие способы обработки данных.</p>
+<h2>Кратко</h2>
+<p>Обычные данные о просмотре сайтов остаются на устройстве пользователя, если он сам не использует функцию, которой нужен сетевой сервис: например, не открывает сайт, не выполняет поиск, не входит в аккаунт Google или не создаёт резервную копию данных браузера в Google Drive.</p>
+<p>В текущем коде ILYRO нет управляемых ILYRO средств аналитики, рекламных SDK, Crashlytics, Sentry или собственного сервера телеметрии.</p>
+<h2>Просмотр сайтов и данные сайтов</h2>
+<p>Веб-страницы загружаются через Mozilla GeckoView. Посещаемые пользователем сайты и сервисы могут получать стандартную информацию веб-запроса: запрошенный URL, IP-адрес, cookie, заголовки, сведения о возможностях браузера и данные, которые пользователь отправляет этим сайтам.</p>
+<p>Для работы браузера ILYRO хранит на устройстве, среди прочего:</p>
+<ul><li>историю просмотров, если она включена;</li><li>закладки и быстрые ссылки;</li><li>данные для восстановления сессии обычных вкладок;</li><li>настройки браузера и параметры персонализации;</li><li>разрешения сайтов и настройки для отдельных сайтов;</li><li>загрузки и их состояние.</li></ul>
+<p>В приватных вкладках используется отдельный приватный контекст Gecko. Посещения страниц в приватном режиме не добавляются в обычную историю ILYRO. Такие вкладки также не восстанавливаются вместе с обычной сессией и не включаются в резервную копию ILYRO в Drive.</p>
+<h2>Сохранённые пароли и передача данных</h2>
+<p>Сохранённые пароли находятся в закрытом хранилище приложения, зашифрованном с помощью AES-GCM. Ключ шифрования создаётся и хранится в Android Keystore: он не хранится в настройках ILYRO и не передаётся на серверы ILYRO.</p>
+<p>Пароли не включаются в синхронизацию ILYRO с Google Drive. Приложение отключает резервное копирование Android и задаёт отдельные правила извлечения данных для Android 12 и новее, исключающие данные приложения из облачной резервной копии и переноса между устройствами.</p>
+<p>Для просмотра или изменения сохранённого пароля требуется аутентификация Android, если на устройстве настроена блокировка экрана. Через короткое время показанный пароль скрывается автоматически.</p>
+<p>Импорт CSV-файла с паролями обрабатывается в памяти. ILYRO не сохраняет копию импортированного файла в открытом виде внутри приложения. Экспорт CSV — отдельное действие пользователя, требующее аутентификации устройства; файл с паролями в открытом виде сохраняется только в выбранное пользователем место. ILYRO не шифрует экспортированные CSV-файлы, поэтому храните их и передавайте с осторожностью.</p>
+<h2>Подсказки для поиска и адресной строки</h2>
+<p>При поиске запрос отправляется выбранному в ILYRO поисковому сервису. Если выбранный сервис предоставляет удалённые подсказки и эта функция используется, текст запроса может передаваться этому сервису для формирования подсказок.</p>
+<p>В приватных вкладках ILYRO не показывает подсказки на основе локальной истории и не отправляет удалённые запросы подсказок через адресную строку.</p>
+<h2>Аккаунт Google и синхронизация с Google Drive</h2>
+<p>Функции аккаунта Google необязательны. Если пользователь решит войти и разрешить синхронизацию, ILYRO может использовать аутентификацию Google и папку Google Drive <code>appDataFolder</code>, чтобы сохранить и восстановить копию данных браузера ILYRO.</p>
+<p>Текущая копия для синхронизации может включать:</p>
+<ul><li>настройки браузера;</li><li>историю просмотров;</li><li>закладки;</li><li>быстрые ссылки;</li><li>URL обычных вкладок, их закреплённое состояние, названия групп и индекс активной вкладки.</li></ul>
+<p>В текущий формат синхронизации намеренно не входят:</p>
+<ul><li>пароли;</li><li>cookie сайтов и авторизованные сессии на сайтах;</li><li>приватные вкладки;</li><li>загрузки и скачанные файлы;</li><li>сериализованное состояние страниц/сессии Gecko.</li></ul>
+<p>Для аутентификации Google и Google Drive действуют собственные условия и правила конфиденциальности Google.</p>
+<h2>Разрешения</h2>
+<p>ILYRO может запросить разрешение Android, когда оно нужно сайту или функции браузера: например, доступ к камере, микрофону, геопозиции, уведомлениям или файлам/камере. Перед выдачей поддерживаемых разрешений для сайта ILYRO/GeckoView показывает запрос.</p>
+<p>Разрешения также можно настраивать в системных настройках Android и в настройках сайтов ILYRO, если они доступны.</p>
+<p>Если пользователь сам выбирает установку скачанного APK, ILYRO может попросить Android разрешить установку приложений из ILYRO. Установку запускает и подтверждает пользователь; ILYRO не устанавливает APK без его участия.</p>
+<h2>Загрузки</h2>
+<p>Файлы, скачанные через ILYRO, сохраняются на устройстве пользователя. Для прямых загрузок и медиа/HLS-загрузок могут использоваться уведомления Android foreground service, чтобы показывать ход передачи активного файла.</p>
+<p>ILYRO не отправляет скачанные файлы на свой сервер.</p>
+<h2>Блокировка контента</h2>
+<p>В ILYRO встроена интеграция uBlock Origin для блокировки контента. uBlock Origin — сторонний проект с открытым исходным кодом. В зависимости от его поведения и настроек списки фильтров и связанные с ними материалы могут загружаться по сети.</p>
+<h2>Передача данных со стороны ILYRO</h2>
+<p>В текущей кодовой базе нет управляемых ILYRO рекламной сети, сборщика аналитики или сервера телеметрии, куда намеренно отправлялась бы обычная история просмотров.</p>
+<p>Сетевые данные всё же могут передаваться третьим сторонам, когда пользователь использует их сервисы: посещает сайты, пользуется выбранной поисковой системой, сервисами Google Account/Drive, инфраструктурой расширений и списков фильтров или другими запрошенными адресами.</p>
+<h2>Удаление данных</h2>
+<p>Пользователь может удалить поддерживаемые локальные данные браузера в настройках ILYRO. Локальные данные приложения также можно удалить в настройках Android. Данные синхронизации в Google Drive можно удалить через настройки аккаунта/синхронизации, если это действие доступно и авторизовано.</p>
+<h2>Изменения политики</h2>
+<p>Политику следует обновлять, когда ILYRO добавляет или существенно меняет сбор данных, синхронизацию, аналитику, рекламу, функции аккаунта или облачные функции.</p>
+<h2>Контакты</h2>
+<p>По вопросам конфиденциальности или поддержки создайте обращение в разделе <a href="https://github.com/germ85402-ops/ilyro-browser/issues" target="_blank" rel="noreferrer">GitHub Issues</a>. Не публикуйте в открытом обращении пароли, коды аутентификации, историю просмотров и другие чувствительные персональные данные.</p>
+</article>
       </section>
     </main>
     
 <footer class="site-footer section-shell">
-  <a class="brand footer-brand" href="index.html#top" aria-label="ILYRO, наверх"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 38.9c-4.4-1.4-7.5-5.2-7.5-10.1 0-3.6 1.4-6.6 4-8.9-2.7-3.4-3.4-7-1.8-10.7 2.1 1.2 3.9 2.8 5.3 4.9 1.4-2.1 3.2-3.7 5.3-4.9 1.6 3.7.9 7.3-1.8 10.7 2.6 2.3 4 5.3 4 8.9 0 4.9-3.1 8.7-7.5 10.1Z" /><path class="mark-line" d="M20.7 12.7 16 8.4l-3.2-4.2M27.3 12.7 32 8.4l3.2-4.2M16 8.4l.2-4.8M32 8.4l-.2-4.8" /><path class="mark-cut" d="M20.5 25.2c1.1 1.2 2.3 1.8 3.5-1.8" /></svg></span><span class="brand-name">ILYRO</span></a>
-  <div class="footer-links"><a href="https://github.com/germ85402-ops/ilyro-browser" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/germ85402-ops/ilyro-browser/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Changelog</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a></div>
-  <div class="footer-copy">© <span id="year"></span> ILYRO. Built for Android.</div>
+  <a class="brand footer-brand" href="index.html#top" aria-label="ILYRO, back to top" data-i18n-aria="brand.top"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 38.9c-4.4-1.4-7.5-5.2-7.5-10.1 0-3.6 1.4-6.6 4-8.9-2.7-3.4-3.4-7-1.8-10.7 2.1 1.2 3.9 2.8 5.3 4.9 1.4-2.1 3.2-3.7 5.3-4.9 1.6 3.7.9 7.3-1.8 10.7 2.6 2.3 4 5.3 4 8.9 0 4.9-3.1 8.7-7.5 10.1Z" /><path class="mark-line" d="M20.7 12.7 16 8.4l-3.2-4.2M27.3 12.7 32 8.4l3.2-4.2M16 8.4l.2-4.8M32 8.4l-.2-4.8" /><path class="mark-cut" d="M20.5 25.2c1.1 1.2 2.3 1.8 3.5-1.8" /></svg></span><span class="brand-name">ILYRO</span></a>
+  <div class="footer-links"><a href="https://github.com/germ85402-ops/ilyro-browser" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/germ85402-ops/ilyro-browser/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer" data-i18n="legal.changelog">Changelog</a><a href="privacy.html" data-i18n="footer.privacy">Privacy Policy</a><a href="terms.html" data-i18n="footer.terms">Terms of Service</a></div>
+  <div class="footer-copy">© <span id="year"></span> ILYRO. <span data-i18n="legal.builtFor">Built for Android.</span></div>
 </footer>
-    <script src="script.js?v=20260921-icon-system-1"></script>
+    <script src="script.js?v=20260923-site-polish-1"></script>
   </body>
 </html>

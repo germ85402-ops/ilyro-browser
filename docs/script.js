@@ -36,6 +36,7 @@
     'hero.title': 'ILYRO — браузер<br />для Android<br /><span>в твоём ритме</span>',
     'hero.lead': 'GeckoView, встроенная защита uBlock Origin,<br />удобные вкладки, быстрые загрузки<br />и гибкая персонализация.',
     'hero.tagsLabel': 'Ключевые характеристики',
+    'hero.syncTag': 'Синхронизация',
     'hero.artLabel': 'Главный экран браузера ILYRO',
     'hero.artAlt': 'Главный экран браузера ILYRO на фоне водопада',
     'hero.note': 'Больше, чем браузер.<br /><span>Свобода в каждом открытии.</span>',
@@ -45,9 +46,9 @@
     'benefits.menu.title': 'Быстрое меню',
     'benefits.menu.copy': 'Удобный доступ ко всем<br />возможностям',
     'benefits.custom.title': 'Персонализация',
-    'benefits.custom.copy': 'Темы, иконки, цвета.<br />Сделайте ILYRO своим',
+    'benefits.custom.copy': 'Темы, иконки, цвета.<br />Настраивай ILYRO под себя',
     'benefits.sync.title': 'Синхронизация',
-    'benefits.sync.copy': 'Ваши данные на всех<br />устройствах через Google',
+    'benefits.sync.copy': 'Твои данные на всех<br />устройствах через Google',
     'features.kicker': 'БОЛЬШЕ ВОЗМОЖНОСТЕЙ',
     'features.title': 'Почему ILYRO',
     'features.intro': 'Современный браузер, созданный для свободы.<br />Сочетает производительность, приватность и гибкость настроек.',
@@ -59,12 +60,13 @@
     'features.menu.copy': 'Быстрое меню с нужными действиями. Всё под рукой.',
     'features.custom.alt': 'Настройки внешнего вида ILYRO',
     'features.custom.title': 'Гибкая персонализация',
-    'features.custom.copy': 'Темы, иконки, цвета и многое другое. Ваш стиль — ваши правила.',
+    'features.custom.copy': 'Темы, иконки, цвета и многое другое. Твой стиль — твои правила.',
     'features.sync.alt': 'Аккаунт и синхронизация ILYRO',
     'features.sync.title': 'Всегда с вами',
-    'features.sync.copy': 'Синхронизация через Google. Закладки, настройки и история на всех устройствах.',
+    'features.sync.copy': 'Синхронизация через Google: закладки, настройки и история на всех устройствах.',
     'screenshots.title': 'Реальные скриншоты',
-    'screenshots.intro': 'Настоящий интерфейс. Никаких постановочных кадров — только живые скриншоты из приложения.',
+    'screenshots.intro': 'Настоящий интерфейс. Никаких постановочных кадров — только скриншоты из приложения.',
+    'screenshots.localeNote': 'Интерфейс приложения на скриншотах показан на русском языке.',
     'screenshots.link': 'Смотреть все скриншоты',
     'screenshots.newTab.alt': 'Новая вкладка ILYRO',
     'screenshots.newTab.title': 'Новая вкладка',
@@ -85,13 +87,29 @@
     'screenshots.account.title': 'Аккаунт',
     'screenshots.account.copy': 'Синхронизация данных',
     'download.title': 'Скачать ILYRO',
-    'download.lead': 'Начните пользоваться уже сегодня.',
+    'download.lead': 'Начни пользоваться уже сегодня.',
+    'download.compat': 'ARM64 · Android 8+',
+    'download.latest': 'Последняя сборка',
+    'download.prerelease': 'Тестовый релиз · Release Candidate',
+    'download.stable': 'Последний стабильный релиз',
     'download.releases': 'Релизы',
     'download.sha': 'SHA-256',
-    'download.note': 'Твой же мир.<br /><span>Больше свободы.</span>',
-    'footer.tagline': 'Открывайте мир по-своему.',
-    'footer.privacy': 'Privacy Policy',
-    'footer.terms': 'Terms of Service',
+    'download.note': 'Твой мир.<br /><span>Больше свободы.</span>',
+    'footer.tagline': 'Открывай мир по-своему.',
+    'footer.privacy': 'Политика конфиденциальности',
+    'footer.terms': 'Условия использования',
+    'legal.project': 'Открыть проект',
+    'legal.changelog': 'История изменений',
+    'legal.builtFor': 'Создан для Android.',
+    'legal.pages': 'Юридическая информация',
+    'legal.privacyTitle': 'ILYRO — Политика конфиденциальности',
+    'legal.privacyDescription': 'Политика конфиденциальности ILYRO Browser: как Android-браузер обрабатывает локальные данные, вход через Google, синхронизацию с Google Drive, разрешения и загрузки.',
+    'legal.privacyHeading': 'Политика<br /><span>конфиденциальности.</span>',
+    'legal.privacyLead': 'Как ILYRO хранит данные на устройстве, что может передаваться в сеть и как работают дополнительные функции аккаунта Google.',
+    'legal.termsTitle': 'ILYRO — Условия использования',
+    'legal.termsDescription': 'Условия использования ILYRO Browser: приложение для Android, сайт, сторонние сервисы, компоненты с открытым исходным кодом и добровольная поддержка.',
+    'legal.termsHeading': 'Условия<br /><span>использования.</span>',
+    'legal.termsLead': 'Правила и ответственность при использовании ILYRO Browser, сайта и общедоступных материалов проекта.',
     'footer.social': 'Ссылки проекта',
     'footer.rights': 'Все права защищены.'
   };
@@ -141,6 +159,16 @@
     languageButtons.forEach((button) => {
       const selected = button.dataset.language === nextLanguage;
       button.setAttribute('aria-pressed', String(selected));
+    });
+    document.querySelectorAll('[data-legal-language]').forEach((article) => {
+      article.hidden = article.dataset.legalLanguage !== nextLanguage;
+    });
+    document.querySelectorAll('[data-latest-release-status]').forEach((status) => {
+      const isPrerelease = status.dataset.isPrerelease !== 'false';
+      const copy = isPrerelease
+        ? (nextLanguage === 'ru' ? russianTranslations['download.prerelease'] : 'Release candidate · Pre-release')
+        : (nextLanguage === 'ru' ? russianTranslations['download.stable'] : 'Latest stable release');
+      status.textContent = copy;
     });
     if (persist && localizedPage) safeStorage.set('ilyro-language', nextLanguage);
     updateThemeLabel();
@@ -269,6 +297,9 @@
 
   const updateLatestApkLinks = async () => {
     const links = [...document.querySelectorAll('[data-latest-apk-link]')];
+    const checksumLinks = [...document.querySelectorAll('[data-latest-apk-checksum-link]')];
+    const versionLabels = [...document.querySelectorAll('[data-latest-release-version]')];
+    const releaseStatuses = [...document.querySelectorAll('[data-latest-release-status]')];
     if (!links.length) return;
 
     const releasesUrl = 'https://github.com/germ85402-ops/ilyro-browser/releases';
@@ -288,15 +319,24 @@
         release.assets.some((asset) => /^ILYRO-.*-arm64\.apk$/.test(asset.name))
       );
       const apk = latest?.assets?.find((asset) => /^ILYRO-.*-arm64\.apk$/.test(asset.name));
+      const checksum = apk && latest.assets.find((asset) => asset.name === `${apk.name}.sha256`);
 
       if (!apk?.browser_download_url) throw new Error('No ARM64 APK found');
       links.forEach((link) => {
         link.href = apk.browser_download_url;
         link.dataset.releaseTag = latest.tag_name || '';
       });
+      checksumLinks.forEach((link) => {
+        link.href = checksum?.browser_download_url || releasesUrl;
+        link.dataset.releaseTag = latest.tag_name || '';
+      });
+      versionLabels.forEach((label) => { label.textContent = latest.tag_name || apk.name; });
+      releaseStatuses.forEach((status) => { status.dataset.isPrerelease = String(Boolean(latest.prerelease)); });
+      applyLanguage(root.dataset.language || 'en', false);
     } catch {
       // Keep a useful fallback if the API is rate-limited or temporarily unavailable.
       links.forEach((link) => { link.href = releasesUrl; });
+      checksumLinks.forEach((link) => { link.href = releasesUrl; });
     }
   };
 

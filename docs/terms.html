@@ -4,10 +4,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#080a0f" />
-    <meta name="description" content="ILYRO Browser Terms of Service covering the Android application, website, third-party services, open-source components, and optional support." />
-    <title>ILYRO — Terms of Service</title>
+    <meta name="description" content="ILYRO Browser Terms of Service covering the Android application, website, third-party services, open-source components, and optional support." data-i18n-content="legal.termsDescription" />
+    <title data-i18n="legal.termsTitle">ILYRO — Terms of Service</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="styles.css?v=20260921-icon-system-1" />
+    <link rel="stylesheet" href="styles.css?v=20260923-site-polish-1" />
     <script>document.documentElement.classList.add('js');</script>
   </head>
   <body>
@@ -61,31 +61,35 @@
 <header class="site-header" id="top">
   <div class="header-inner">
     <a class="brand" href="index.html#top" aria-label="ILYRO, home"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 38.9c-4.4-1.4-7.5-5.2-7.5-10.1 0-3.6 1.4-6.6 4-8.9-2.7-3.4-3.4-7-1.8-10.7 2.1 1.2 3.9 2.8 5.3 4.9 1.4-2.1 3.2-3.7 5.3-4.9 1.6 3.7.9 7.3-1.8 10.7 2.6 2.3 4 5.3 4 8.9 0 4.9-3.1 8.7-7.5 10.1Z" /><path class="mark-line" d="M20.7 12.7 16 8.4l-3.2-4.2M27.3 12.7 32 8.4l3.2-4.2M16 8.4l.2-4.8M32 8.4l-.2-4.8" /><path class="mark-cut" d="M20.5 25.2c1.1 1.2 2.3 1.8 3.5-1.8" /></svg></span><span class="brand-name">ILYRO</span></a>
-    <nav class="main-nav" id="main-nav" aria-label="Primary navigation">
-      <a href="index.html#features">Features</a>
-      <a href="index.html#screenshots">Screenshots</a>
-      <a href="index.html#download">Download</a>
+    <nav class="main-nav" id="main-nav" aria-label="Primary navigation" data-i18n-aria="nav.label">
+      <a href="index.html#features" data-i18n="nav.features">Features</a>
+      <a href="index.html#screenshots" data-i18n="nav.screenshots">Screenshots</a>
+      <a href="index.html#download" data-i18n="nav.download">Download</a>
     </nav>
     <div class="header-actions">
-      <button class="icon-button theme-toggle" id="theme-toggle" type="button" aria-label="Theme follows your device">
+      <div class="language-switcher" role="group" aria-label="Language" data-i18n-aria="language.label">
+        <button type="button" data-language="en" aria-pressed="true">EN</button>
+        <button type="button" data-language="ru" aria-pressed="false">RU</button>
+      </div>
+      <button class="icon-button theme-toggle" id="theme-toggle" type="button" aria-label="Theme follows your device" data-i18n-aria="theme.system">
         <svg class="icon icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.6"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path></svg>
         <svg class="icon icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.3 15.1A8.6 8.6 0 0 1 8.9 3.7 8.6 8.6 0 1 0 20.3 15.1Z"></path></svg>
       </button>
-      <a class="header-cta" href="index.html#download">Open project <svg class="ui-icon ui-icon-inline" aria-hidden="true"><use href="#icon-arrow-up-right"></use></svg></a>
-      <button class="icon-button menu-toggle" id="menu-toggle" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="main-nav"><span></span><span></span></button>
+      <a class="header-cta" href="index.html#download"><span data-i18n="legal.project">Open project</span> <svg class="ui-icon ui-icon-inline" aria-hidden="true"><use href="#icon-arrow-up-right"></use></svg></a>
+      <button class="icon-button menu-toggle" id="menu-toggle" type="button" aria-label="Open menu" data-i18n-aria="menu.open" aria-expanded="false" aria-controls="main-nav"><span></span><span></span></button>
     </div>
   </div>
 </header>
     <main class="legal-main">
       <section class="legal-page section-shell reveal is-visible" aria-labelledby="legal-title">
         <div class="eyebrow"><span class="eyebrow-dot"></span> ILYRO / LEGAL</div>
-        <h1 id="legal-title">Terms of<br /><span>Service.</span></h1>
-        <p class="legal-lead">The rules and responsibilities that apply when using the ILYRO Browser and its public project resources.</p>
-        <div class="legal-switch" aria-label="Legal pages">
-          <a class="" href="privacy.html">Privacy Policy</a>
-          <a class="is-active" href="terms.html">Terms of Service</a>
+        <h1 id="legal-title" data-i18n="legal.termsHeading" data-i18n-mode="html">Terms of<br /><span>Service.</span></h1>
+        <p class="legal-lead" data-i18n="legal.termsLead">The rules and responsibilities that apply when using the ILYRO Browser and its public project resources.</p>
+        <div class="legal-switch" aria-label="Legal pages" data-i18n-aria="legal.pages">
+          <a class="" href="privacy.html" data-i18n="footer.privacy">Privacy Policy</a>
+          <a class="is-active" href="terms.html" data-i18n="footer.terms">Terms of Service</a>
         </div>
-        <article class="legal-card">
+        <article class="legal-card" data-legal-language="en" lang="en">
 <p><em>Effective date: September 20, 2026</em></p>
 
 <h2>1. About ILYRO</h2>
@@ -129,15 +133,47 @@
 
 <h2>12. Contact</h2>
 <p>For questions about these Terms or the project, open an issue in the <a href="https://github.com/germ85402-ops/ilyro-browser/issues" target="_blank" rel="noreferrer">ILYRO GitHub repository</a>. Do not post passwords, authentication codes, payment details, browsing history, or other sensitive personal data in a public issue.</p>
+</article><article class="legal-card" data-legal-language="ru" lang="ru" hidden>
+<p><em>Дата вступления в силу: 20 сентября 2026 года</em></p>
+<h2>1. О проекте ILYRO</h2>
+<p>ILYRO — независимый проект Android-браузера, который поддерживают Alex Agapitov и Habet Hayrapetyan. Эти Условия использования регулируют использование приложения ILYRO Browser, сайта ILYRO и связанных с проектом материалов.</p>
+<h2>2. Принятие условий</h2>
+<p>Устанавливая ILYRO, открывая его или пользуясь им, вы соглашаетесь с этими Условиями и <a href="privacy.html">Политикой конфиденциальности ILYRO</a>. Если вы не согласны, не используйте приложение или сайт. Если вы используете ILYRO от имени другого человека или организации, вы подтверждаете, что уполномочены принять эти Условия от их имени.</p>
+<h2>3. Сервис ILYRO</h2>
+<p>ILYRO — веб-браузер для Android на базе GeckoView с функциями просмотра сайтов, приватных вкладок, загрузок, блокировки контента, воспроизведения медиа, настройки внешнего вида и дополнительной синхронизации аккаунта или облака. По мере развития проекта функции могут меняться, временно приостанавливаться или прекращать работу.</p>
+<h2>4. Сторонние сайты и сервисы</h2>
+<p>ILYRO предоставляет доступ к сайтам и сервисам третьих сторон. У этих сервисов свои условия, политика конфиденциальности, материалы и правила безопасности. Вы сами решаете, какими сайтами и сервисами пользоваться, и отвечаете за соблюдение их правил.</p>
+<p>Если вы решите войти через Google или включить синхронизацию с Google Drive, Google будет обрабатывать данные по собственным условиям и правилам конфиденциальности. Обработка данных, к которым ILYRO получает доступ через эти функции, описана в Политике конфиденциальности.</p>
+<h2>5. Ваша ответственность</h2>
+<ul>
+<li>Используйте ILYRO только в соответствии с применимыми законами и правилами.</li>
+<li>Соблюдайте авторские права, лицензии, права на конфиденциальность и другие права владельцев сайтов и материалов.</li>
+<li>Не используйте ILYRO для распространения вредоносных программ, атак на системы, обхода средств безопасности или содействия незаконной деятельности.</li>
+<li>Поддерживайте разумный уровень защиты устройства, операционной системы, аккаунтов и способов аутентификации.</li>
+</ul>
+<h2>6. Открытый исходный код и сторонние компоненты</h2>
+<p>ILYRO включает компоненты с открытым исходным кодом и сторонние компоненты или использует их, в том числе Mozilla GeckoView и интеграцию uBlock Origin. На эти компоненты распространяются их собственные лицензии и уведомления. Применимые уведомления доступны в разделе <a href="https://github.com/germ85402-ops/ilyro-browser/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noreferrer">уведомлений о сторонних компонентах</a> и в исходном репозитории проекта.</p>
+<h2>7. Добровольная поддержка</h2>
+<p>В ILYRO может быть ссылка для добровольной поддержки через стороннюю платёжную платформу. Пожертвование не обязательно для использования браузера и не гарантирует премиум-функции, определённый уровень поддержки или будущую функциональность. Платёжные операции, квитанции, возвраты и платёжные данные обрабатывает сторонний поставщик по собственным условиям.</p>
+<h2>8. Доступность и обновления</h2>
+<p>ILYRO развивается как проект. Мы можем выпускать обновления, менять функции, исправлять ошибки или прекращать распространение версии. Мы не обещаем, что каждая функция всегда будет доступна, будет работать без перебоев или окажется совместимой с любым устройством, сайтом или версией Android.</p>
+<h2>9. Отказ от гарантий</h2>
+<p>В максимально допустимой применимым законом степени ILYRO предоставляется «как есть» и «по мере доступности», без каких-либо гарантий. Мы не гарантируем, что просмотр сайтов будет непрерывным, безошибочным, безопасным или подходящим для любой цели. Вы сами оцениваете загружаемые файлы, сайты и материалы, к которым решаете получить доступ.</p>
+<h2>10. Ограничение ответственности</h2>
+<p>В максимально допустимой применимым законом степени Alex Agapitov, Habet Hayrapetyan и проект ILYRO не несут ответственности за косвенный, случайный, специальный, последующий или штрафной ущерб, а также за потерю данных, прибыли, деловой репутации или доступа, возникшую в результате использования ILYRO или связанную с ним.</p>
+<h2>11. Изменения условий</h2>
+<p>Мы можем обновлять эти Условия по мере изменения проекта или его функций. Обновлённая версия будет опубликована на этой странице с новой датой вступления в силу. Если после обновления вы продолжаете пользоваться ILYRO, это означает ваше согласие с обновлёнными Условиями в пределах, допустимых законом.</p>
+<h2>12. Контакты</h2>
+<p>По вопросам об этих Условиях или проекте создайте обращение в <a href="https://github.com/germ85402-ops/ilyro-browser/issues" target="_blank" rel="noreferrer">репозитории ILYRO на GitHub</a>. Не публикуйте в открытом обращении пароли, коды аутентификации, платёжные данные, историю просмотров и другие чувствительные персональные данные.</p>
 </article>
       </section>
     </main>
     
 <footer class="site-footer section-shell">
-  <a class="brand footer-brand" href="index.html#top" aria-label="ILYRO, наверх"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 38.9c-4.4-1.4-7.5-5.2-7.5-10.1 0-3.6 1.4-6.6 4-8.9-2.7-3.4-3.4-7-1.8-10.7 2.1 1.2 3.9 2.8 5.3 4.9 1.4-2.1 3.2-3.7 5.3-4.9 1.6 3.7.9 7.3-1.8 10.7 2.6 2.3 4 5.3 4 8.9 0 4.9-3.1 8.7-7.5 10.1Z" /><path class="mark-line" d="M20.7 12.7 16 8.4l-3.2-4.2M27.3 12.7 32 8.4l3.2-4.2M16 8.4l.2-4.8M32 8.4l-.2-4.8" /><path class="mark-cut" d="M20.5 25.2c1.1 1.2 2.3 1.8 3.5-1.8" /></svg></span><span class="brand-name">ILYRO</span></a>
-  <div class="footer-links"><a href="https://github.com/germ85402-ops/ilyro-browser" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/germ85402-ops/ilyro-browser/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer">Changelog</a><a href="privacy.html">Privacy</a><a href="terms.html">Terms</a></div>
-  <div class="footer-copy">© <span id="year"></span> ILYRO. Built for Android.</div>
+  <a class="brand footer-brand" href="index.html#top" aria-label="ILYRO, back to top" data-i18n-aria="brand.top"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M24 38.9c-4.4-1.4-7.5-5.2-7.5-10.1 0-3.6 1.4-6.6 4-8.9-2.7-3.4-3.4-7-1.8-10.7 2.1 1.2 3.9 2.8 5.3 4.9 1.4-2.1 3.2-3.7 5.3-4.9 1.6 3.7.9 7.3-1.8 10.7 2.6 2.3 4 5.3 4 8.9 0 4.9-3.1 8.7-7.5 10.1Z" /><path class="mark-line" d="M20.7 12.7 16 8.4l-3.2-4.2M27.3 12.7 32 8.4l3.2-4.2M16 8.4l.2-4.8M32 8.4l-.2-4.8" /><path class="mark-cut" d="M20.5 25.2c1.1 1.2 2.3 1.8 3.5-1.8" /></svg></span><span class="brand-name">ILYRO</span></a>
+  <div class="footer-links"><a href="https://github.com/germ85402-ops/ilyro-browser" target="_blank" rel="noreferrer">GitHub</a><a href="https://github.com/germ85402-ops/ilyro-browser/blob/main/CHANGELOG.md" target="_blank" rel="noreferrer" data-i18n="legal.changelog">Changelog</a><a href="privacy.html" data-i18n="footer.privacy">Privacy Policy</a><a href="terms.html" data-i18n="footer.terms">Terms of Service</a></div>
+  <div class="footer-copy">© <span id="year"></span> ILYRO. <span data-i18n="legal.builtFor">Built for Android.</span></div>
 </footer>
-    <script src="script.js?v=20260921-icon-system-1"></script>
+    <script src="script.js?v=20260923-site-polish-1"></script>
   </body>
 </html>
