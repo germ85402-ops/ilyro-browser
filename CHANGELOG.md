@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.26.0-rc23 — release candidate
+
+- Measure the fullscreen omnibox suggestions panel against the Activity window and the same status-bar, navigation-bar, and keyboard insets as its field.
+- Keep the panel aligned above or below the field on the home page and websites, with either toolbar position, without stale height during keyboard transitions.
+- Add geometry regression coverage for top and bottom toolbars, visible and hidden keyboards, and system-bar safe areas.
+
 ## 0.26.0-rc22 — release candidate
 
 - Expand address suggestions into a full-width panel that fills the safe area above or below the focused field, follows the toolbar position, and keeps the keyboard usable.

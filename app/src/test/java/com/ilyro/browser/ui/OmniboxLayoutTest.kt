@@ -60,4 +60,67 @@ class OmniboxLayoutTest {
             )
         )
     }
+
+    @Test
+    fun suggestionsStayInsideSystemBarsAndAboveTheKeyboard() {
+        val windowHeight = 900
+        val statusBar = 28
+        val navigationBar = 24
+        val ime = 320
+
+        val belowTopToolbar = calculateOmniboxPopupAvailableHeight(
+            placeAbove = false,
+            anchorTop = 104,
+            anchorBottom = 160,
+            windowHeight = windowHeight,
+            imeBottom = ime,
+            verticalGap = 8,
+            safeTopInset = statusBar,
+            navigationBarBottomInset = navigationBar
+        )
+        assertEquals(412, belowTopToolbar)
+
+        val aboveBottomToolbar = calculateOmniboxPopupAvailableHeight(
+            placeAbove = true,
+            anchorTop = 500,
+            anchorBottom = 556,
+            windowHeight = windowHeight,
+            imeBottom = ime,
+            verticalGap = 8,
+            safeTopInset = statusBar,
+            navigationBarBottomInset = navigationBar
+        )
+        assertEquals(464, aboveBottomToolbar)
+
+        val y = calculateOmniboxPopupY(
+            placeAbove = true,
+            anchorTop = 500,
+            anchorBottom = 556,
+            popupHeight = aboveBottomToolbar,
+            windowHeight = windowHeight,
+            imeBottom = ime,
+            verticalGap = 8,
+            safeTopInset = statusBar,
+            navigationBarBottomInset = navigationBar
+        )
+        assertEquals(statusBar, y)
+        assert(y + aboveBottomToolbar <= windowHeight - ime)
+    }
+
+    @Test
+    fun hiddenKeyboardStillKeepsSuggestionsAboveNavigationBar() {
+        assertEquals(
+            684,
+            calculateOmniboxPopupAvailableHeight(
+                placeAbove = false,
+                anchorTop = 120,
+                anchorBottom = 160,
+                windowHeight = 900,
+                imeBottom = 0,
+                verticalGap = 8,
+                safeTopInset = 28,
+                navigationBarBottomInset = 24
+            )
+        )
+    }
 }
