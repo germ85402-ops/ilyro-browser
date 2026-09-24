@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.26.0-rc26 — release candidate
+
+- Group light and dark wallpapers behind a theme selector to make the wallpaper picker shorter and easier to scan.
+- Improve wallpaper card contrast and mark the currently selected image clearly.
+- Fix accent controls so a chosen accent updates the browser immediately; keep automatic wallpaper matching as the default and sync the preference.
+
 ## 0.26.0-rc25 — release candidate
 
 - Add six generated light-theme wallpapers and pair them with six dark-theme presets; the browser now switches to the matching saved background automatically when its theme changes.

@@ -16,6 +16,8 @@ internal fun rememberWallpaperAccent(
     settings: BrowserSettings,
     darkTheme: Boolean
 ): BrowserAccent {
+    if (!settings.accentFollowsWallpaper) return settings.resolveAccent(null)
+
     val context = LocalContext.current
     val background = if (darkTheme && settings.useSeparateDarkBackground) {
         settings.darkHomeBackground
@@ -29,7 +31,7 @@ internal fun rememberWallpaperAccent(
     }
 
     if (background != HomeBackground.CUSTOM) {
-        return background.wallpaperAccentPreset()
+        return settings.resolveAccent(background.wallpaperAccentPreset())
     }
 
     val detected by produceState(
@@ -41,7 +43,7 @@ internal fun rememberWallpaperAccent(
             detectWallpaperAccent(context.contentResolver, customUri)
         }
     }
-    return detected
+    return settings.resolveAccent(detected)
 }
 
 internal fun HomeBackground.wallpaperAccentPreset(): BrowserAccent = when (this) {

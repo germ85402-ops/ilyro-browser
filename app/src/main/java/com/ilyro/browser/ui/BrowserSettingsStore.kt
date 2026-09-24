@@ -129,6 +129,7 @@ internal data class BrowserSettings(
     val theme: BrowserTheme = BrowserTheme.SYSTEM,
     val appIcon: AppIcon = AppIcon.DEER,
     val accent: BrowserAccent = BrowserAccent.ILYRO,
+    val accentFollowsWallpaper: Boolean = true,
     val toolbarPosition: ToolbarPosition = ToolbarPosition.BOTTOM,
     val toolbarActions: Set<ToolbarAction> = setOf(ToolbarAction.TABS),
     val showQuickAccess: Boolean = true,
@@ -159,6 +160,12 @@ internal data class BrowserSettings(
 )
 
 internal const val MAX_CUSTOM_SEARCH_ENGINES = 20
+
+internal fun BrowserSettings.resolveAccent(wallpaperAccent: BrowserAccent?): BrowserAccent = when {
+    !accentFollowsWallpaper -> accent
+    wallpaperAccent != null -> wallpaperAccent
+    else -> BrowserAccent.ILYRO
+}
 
 internal fun BrowserSettings.selectedCustomSearchEngine(): CustomSearchEngine? =
     customSearchEngines.firstOrNull { it.id == customSearchEngineId }
@@ -196,6 +203,7 @@ internal object BrowserSettingsStore {
     private const val KEY_THEME = "settings_theme"
     private const val KEY_APP_ICON = "settings_app_icon"
     private const val KEY_ACCENT = "settings_accent"
+    private const val KEY_ACCENT_FOLLOWS_WALLPAPER = "settings_accent_follows_wallpaper"
     private const val KEY_TOOLBAR_POSITION = "settings_toolbar_position"
     private const val KEY_TOOLBAR_ACTIONS = "settings_toolbar_actions"
     private const val KEY_TOOLBAR_COMPACT_DEFAULT_MIGRATED = "settings_toolbar_compact_default_v2"
@@ -312,6 +320,7 @@ internal object BrowserSettingsStore {
         theme = enumValueOrDefault(prefs.getString(KEY_THEME, null), BrowserTheme.SYSTEM),
         appIcon = enumValueOrDefault(prefs.getString(KEY_APP_ICON, null), AppIcon.DEER),
         accent = enumValueOrDefault(prefs.getString(KEY_ACCENT, null), BrowserAccent.ILYRO),
+        accentFollowsWallpaper = prefs.getBoolean(KEY_ACCENT_FOLLOWS_WALLPAPER, true),
         toolbarPosition = enumValueOrDefault(prefs.getString(KEY_TOOLBAR_POSITION, null), ToolbarPosition.BOTTOM),
         toolbarActions = restoreToolbarActions(prefs),
         showQuickAccess = prefs.getBoolean(KEY_SHOW_QUICK_ACCESS, true),
@@ -360,6 +369,7 @@ internal object BrowserSettingsStore {
             .putString(KEY_THEME, settings.theme.name)
             .putString(KEY_APP_ICON, settings.appIcon.name)
             .putString(KEY_ACCENT, settings.accent.name)
+            .putBoolean(KEY_ACCENT_FOLLOWS_WALLPAPER, settings.accentFollowsWallpaper)
             .putString(KEY_TOOLBAR_POSITION, settings.toolbarPosition.name)
             .putStringSet(KEY_TOOLBAR_ACTIONS, settings.toolbarActions.map { it.name }.toSet())
             .putBoolean(KEY_TOOLBAR_COMPACT_DEFAULT_MIGRATED, true)
