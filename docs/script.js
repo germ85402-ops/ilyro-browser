@@ -4,6 +4,7 @@
   const themeToggle = document.querySelector('#theme-toggle');
   const menuToggle = document.querySelector('#menu-toggle');
   const mainNav = document.querySelector('#main-nav');
+  const themeColorMeta = document.querySelector('meta[name="theme-color"]');
   const year = document.querySelector('#year');
 
   const safeStorage = {
@@ -38,7 +39,7 @@
     'hero.tagsLabel': 'Ключевые характеристики',
     'hero.syncTag': 'Синхронизация',
     'hero.artLabel': 'Главный экран браузера ILYRO',
-    'hero.artAlt': 'Главный экран браузера ILYRO на фоне водопада',
+    'hero.artAlt': 'Главный экран браузера ILYRO с обоями Obsidian Arch',
     'hero.note': 'БРАУЗЕР<br /><span>БЕЗ ГРАНИЦ</span>',
     'benefits.label': 'Ключевые возможности',
     'benefits.shield.title': 'Защита',
@@ -176,6 +177,12 @@
 
   const savedThemeMode = safeStorage.get('ilyro-theme-mode');
   let themeMode = ['system', 'light', 'dark'].includes(savedThemeMode) ? savedThemeMode : 'system';
+  const systemThemeQuery = window.matchMedia('(prefers-color-scheme: light)');
+
+  const updateThemeColor = () => {
+    const isLight = themeMode === 'light' || (themeMode === 'system' && systemThemeQuery.matches);
+    themeColorMeta?.setAttribute('content', isLight ? '#f5f8fd' : '#071326');
+  };
 
   const updateThemeLabel = () => {
     const language = root.dataset.language === 'ru' ? 'ru' : 'en';
@@ -205,6 +212,7 @@
   const applyTheme = () => {
     if (themeMode === 'system') delete root.dataset.theme;
     else root.dataset.theme = themeMode;
+    updateThemeColor();
     updateThemeLabel();
   };
 
@@ -220,6 +228,10 @@
     themeMode = themeMode === 'system' ? 'light' : themeMode === 'light' ? 'dark' : 'system';
     safeStorage.set('ilyro-theme-mode', themeMode);
     applyTheme();
+  });
+
+  systemThemeQuery.addEventListener?.('change', () => {
+    if (themeMode === 'system') updateThemeColor();
   });
 
   const updateHeader = () => {

@@ -5178,3 +5178,601 @@ body.home-page {
     background: var(--home-surface);
   }
 }
+
+/* Obsidian Portal: selected tablet and phone directions */
+body.home-page {
+  --home-bg: #071326;
+  --home-bg-deep: #050e1d;
+  --home-surface: #0d1b30;
+  --home-surface-soft: #0a1729;
+  --home-line: rgba(132, 174, 227, 0.18);
+  --home-line-strong: rgba(84, 153, 255, 0.58);
+  --home-text: #f2f6fc;
+  --home-muted: #a5b4c9;
+  --home-green: #72aaff;
+  --home-green-soft: #9bc2ff;
+  --home-action: #246fd4;
+  --bg: var(--home-bg);
+  --bg-soft: var(--home-surface-soft);
+  --surface: rgba(13, 27, 48, 0.94);
+  --surface-strong: #0d1b30;
+  --line: var(--home-line);
+  --line-strong: var(--home-line-strong);
+  --text: var(--home-text);
+  --muted: var(--home-muted);
+  --muted-strong: #d4dfef;
+  --blue: #72aaff;
+  --blue-bright: #9bc2ff;
+  background:
+    radial-gradient(ellipse at 50% -18%, rgba(38, 107, 207, 0.2), transparent 43rem),
+    var(--home-bg);
+}
+
+.home-page .site-header {
+  border-bottom-color: var(--home-line);
+  background: color-mix(in srgb, var(--home-bg) 88%, transparent);
+}
+
+.home-page .main-nav,
+.home-page .button-outline,
+.home-page .header-cta,
+.home-page .theme-toggle,
+.home-page .menu-toggle {
+  color: var(--home-text);
+}
+
+.home-page .language-switcher button[aria-pressed='true'] {
+  background: rgba(69, 136, 231, 0.18);
+  color: var(--home-text);
+}
+
+.home-page .header-cta,
+.home-page .button-primary {
+  border-color: transparent;
+  background: var(--home-action);
+  color: #fff;
+}
+
+.home-page .header-cta:hover,
+.home-page .header-cta:focus-visible,
+.home-page .button-primary:hover,
+.home-page .button-primary:focus-visible {
+  background: #347fe5;
+  color: #fff;
+  box-shadow: 0 10px 28px rgba(35, 111, 212, 0.25);
+}
+
+.reference-overline,
+.reference-kicker,
+.reference-hero h1 span,
+.section-link,
+.tag-icon,
+.download-copy small,
+.hero-note span,
+.download-note span {
+  color: var(--home-green);
+}
+
+.home-page .button-outline {
+  border-color: var(--home-line);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.home-page .button-outline:hover,
+.home-page .button-outline:focus-visible {
+  border-color: var(--home-line-strong);
+  background: rgba(70, 133, 219, 0.1);
+  color: var(--home-text);
+}
+
+.release-pill {
+  border-color: rgba(104, 163, 242, 0.34);
+  background: rgba(104, 163, 242, 0.1);
+  color: #b8d5ff;
+}
+
+.reference-hero-art img {
+  border-color: var(--home-line);
+  box-shadow: 0 24px 58px rgba(0, 0, 0, 0.26);
+}
+
+.benefit-card:hover,
+.why-card:hover {
+  border-color: var(--home-line-strong);
+}
+
+.benefit-icon {
+  border-color: rgba(103, 162, 242, 0.2);
+  background: rgba(77, 142, 232, 0.1);
+}
+
+.reference-download {
+  background:
+    radial-gradient(ellipse at 92% 0, rgba(57, 125, 223, 0.11), transparent 48%),
+    var(--home-surface);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+  }
+
+  :root:not([data-theme]) body.home-page {
+    --home-bg: #f5f8fd;
+    --home-bg-deep: #edf3fb;
+    --home-surface: #ffffff;
+    --home-surface-soft: #edf3fb;
+    --home-line: rgba(26, 55, 91, 0.13);
+    --home-line-strong: rgba(41, 111, 204, 0.42);
+    --home-text: #101d2f;
+    --home-muted: #53677f;
+    --home-green: #2469cf;
+    --home-green-soft: #1b5dbd;
+    --home-action: #1e64c5;
+    --bg: var(--home-bg);
+    --bg-soft: var(--home-surface-soft);
+    --surface: rgba(255, 255, 255, 0.92);
+    --surface-strong: #fff;
+    --line: var(--home-line);
+    --line-strong: var(--home-line-strong);
+    --text: var(--home-text);
+    --muted: var(--home-muted);
+    --muted-strong: #31445b;
+    --blue: #2469cf;
+    --blue-bright: #1b5dbd;
+    background:
+      radial-gradient(ellipse at 50% -18%, rgba(83, 151, 239, 0.14), transparent 43rem),
+      var(--home-bg);
+  }
+
+  :root:not([data-theme]) .home-page .site-header {
+    background: color-mix(in srgb, var(--home-bg) 90%, transparent);
+  }
+
+  :root:not([data-theme]) .home-page .main-nav,
+  :root:not([data-theme]) .home-page .button-outline,
+  :root:not([data-theme]) .home-page .header-cta {
+    color: var(--home-text);
+  }
+
+  :root:not([data-theme]) .home-page .language-switcher button[aria-pressed='true'] {
+    background: #e4effe;
+    color: #17335b;
+  }
+
+  :root:not([data-theme]) .home-page .button-primary,
+  :root:not([data-theme]) .home-page .header-cta {
+    color: #fff;
+  }
+
+  :root:not([data-theme]) .home-page .reference-hero-art {
+    background-image:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(245, 248, 253, 0.88)),
+      url("assets/ilyro-dawn-lake-wallpaper.webp");
+  }
+
+  :root:not([data-theme]) .home-page .benefit-card:hover {
+    background: #f7faff;
+  }
+
+  :root:not([data-theme]) .home-page .why-card img,
+  :root:not([data-theme]) .home-page .reference-shot img {
+    background: #edf3fb;
+  }
+
+  :root:not([data-theme]) .home-page .footer-social a:hover,
+  :root:not([data-theme]) .home-page .footer-social a:focus-visible {
+    background: rgba(54, 120, 207, 0.08);
+  }
+}
+
+:root[data-theme='light'] body.home-page {
+  --home-bg: #f5f8fd;
+  --home-bg-deep: #edf3fb;
+  --home-surface: #fff;
+  --home-surface-soft: #edf3fb;
+  --home-line: rgba(26, 55, 91, 0.13);
+  --home-line-strong: rgba(41, 111, 204, 0.42);
+  --home-text: #101d2f;
+  --home-muted: #53677f;
+  --home-green: #2469cf;
+  --home-green-soft: #1b5dbd;
+  --home-action: #1e64c5;
+  --bg: var(--home-bg);
+  --bg-soft: var(--home-surface-soft);
+  --surface: rgba(255, 255, 255, 0.92);
+  --surface-strong: #fff;
+  --line: var(--home-line);
+  --line-strong: var(--home-line-strong);
+  --text: var(--home-text);
+  --muted: var(--home-muted);
+  --muted-strong: #31445b;
+  --blue: #2469cf;
+  --blue-bright: #1b5dbd;
+  background:
+    radial-gradient(ellipse at 50% -18%, rgba(83, 151, 239, 0.14), transparent 43rem),
+    var(--home-bg);
+}
+
+:root[data-theme='light'] .home-page .site-header {
+  background: color-mix(in srgb, var(--home-bg) 90%, transparent);
+}
+
+:root[data-theme='light'] .home-page .main-nav,
+:root[data-theme='light'] .home-page .button-outline,
+:root[data-theme='light'] .home-page .header-cta {
+  color: var(--home-text);
+}
+
+:root[data-theme='light'] .home-page .language-switcher button[aria-pressed='true'] {
+  background: #e4effe;
+  color: #17335b;
+}
+
+:root[data-theme='light'] .home-page .button-primary,
+:root[data-theme='light'] .home-page .header-cta {
+  color: #fff;
+}
+
+:root[data-theme='light'] .home-page .release-pill {
+  border-color: rgba(36, 105, 207, 0.22);
+  background: rgba(36, 105, 207, 0.08);
+  color: #315d94;
+}
+
+:root[data-theme='light'] .home-page .reference-hero-art {
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(245, 248, 253, 0.88)),
+    url("assets/ilyro-dawn-lake-wallpaper.webp");
+}
+
+:root[data-theme='light'] .home-page .benefit-card:hover {
+  background: #f7faff;
+}
+
+:root[data-theme='light'] .home-page .why-card img,
+:root[data-theme='light'] .home-page .reference-shot img {
+  background: #edf3fb;
+}
+
+@media (min-width: 700px) and (max-width: 860px) {
+  .home-page .header-inner {
+    min-height: 68px;
+    gap: 8px;
+  }
+
+  .home-page .brand {
+    gap: 8px;
+    font-size: 13px;
+    letter-spacing: 0.14em;
+  }
+
+  .home-page .brand-mark {
+    width: 34px;
+    height: 34px;
+    flex-basis: 34px;
+  }
+
+  .home-page .main-nav {
+    position: static;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: clamp(10px, 2vw, 19px);
+    margin: 0 auto 0 10px;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .home-page .main-nav a {
+    padding: 8px 0;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .home-page .header-actions {
+    gap: 5px;
+  }
+
+  .home-page .theme-toggle {
+    width: 34px;
+    min-width: 34px;
+    height: 34px;
+    padding: 0;
+  }
+
+  .home-page .theme-mode-label {
+    display: none;
+  }
+
+  .home-page .language-switcher button {
+    min-width: 26px;
+    padding: 0 5px;
+    font-size: 9px;
+  }
+
+  .home-page .header-cta {
+    display: inline-flex;
+    min-height: 36px;
+    border-radius: 999px;
+    padding: 0 11px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  .home-page .menu-toggle {
+    display: none;
+  }
+
+  .reference-hero {
+    gap: 16px;
+    padding-top: 34px;
+    padding-bottom: 22px;
+  }
+
+  .reference-hero-copy {
+    max-width: 700px;
+    margin: 0 auto;
+  }
+
+  .reference-hero h1 {
+    max-width: 700px;
+    margin-top: 14px;
+    font-size: clamp(2.7rem, 7.4vw, 4rem);
+  }
+
+  .reference-lead {
+    max-width: 600px;
+    margin-top: 14px;
+  }
+
+  .reference-hero-art {
+    width: 100%;
+    padding: 0;
+  }
+
+  .reference-hero-art img {
+    aspect-ratio: 760 / 520;
+    border-radius: 16px;
+  }
+
+  .hero-note {
+    display: none;
+  }
+
+  .benefit-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  .benefit-card {
+    min-height: 142px;
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: 9px;
+    padding: 13px 9px;
+    text-align: center;
+  }
+
+  .benefit-card > div {
+    min-width: 0;
+  }
+
+  .benefit-card strong {
+    font-size: 11px;
+  }
+
+  .benefit-card small {
+    display: block;
+    margin-top: 4px;
+    font-size: 9px;
+    line-height: 1.4;
+  }
+
+  .reference-section {
+    padding-top: 66px;
+  }
+
+  .why-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reference-shot-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 699px) {
+  .home-page .main-nav {
+    background: color-mix(in srgb, var(--home-surface) 96%, transparent);
+  }
+}
+
+@media (max-width: 620px) {
+  .reference-hero {
+    gap: 0;
+    padding-top: 21px;
+    padding-bottom: 18px;
+  }
+
+  .reference-hero-art {
+    order: -1;
+    width: calc(100% + 28px);
+    max-width: none;
+    height: clamp(270px, 84vw, 330px);
+    align-self: auto;
+    justify-content: center;
+    margin: -21px -14px 22px;
+    overflow: hidden;
+    border: 0;
+    border-bottom: 1px solid var(--home-line);
+    border-radius: 0 0 25px 25px;
+    padding: 22px 14px 0;
+    background-image:
+      radial-gradient(ellipse at 50% 44%, rgba(44, 124, 228, 0.27), transparent 58%),
+      linear-gradient(180deg, rgba(6, 19, 38, 0.18), rgba(6, 19, 38, 0.86)),
+      url("assets/ilyro-obsidian-phone-wallpaper.webp");
+    background-position: center, center, center 43%;
+    background-size: cover;
+  }
+
+  .reference-hero-art img {
+    width: 100%;
+    max-width: 560px;
+    aspect-ratio: 760 / 520;
+    align-self: flex-end;
+    border-radius: 17px 17px 0 0;
+    object-fit: contain;
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.28);
+  }
+
+  .home-page .reference-overline,
+  .home-page .hero-note,
+  .home-page .hero-release,
+  .home-page .hero-tags,
+  .home-page .hero-actions .button-outline {
+    display: none;
+  }
+
+  .reference-hero-copy {
+    order: 0;
+  }
+
+  .reference-hero h1 {
+    max-width: 460px;
+    margin-top: 1px;
+    font-size: clamp(2.15rem, 9.4vw, 2.8rem);
+    line-height: 1.02;
+  }
+
+  .reference-lead {
+    max-width: 490px;
+    margin-top: 14px;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+
+  .reference-lead br {
+    display: none;
+  }
+
+  .home-page .hero-actions {
+    margin-top: 19px;
+  }
+
+  .home-page .hero-actions .button-primary {
+    min-height: 52px;
+    justify-content: center;
+    border-radius: 14px;
+    font-size: 14px;
+  }
+
+  .benefit-strip {
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .benefit-card {
+    min-height: 80px;
+    gap: 13px;
+    border-radius: 15px;
+    padding: 12px 14px;
+  }
+
+  .benefit-icon {
+    width: 46px;
+    height: 46px;
+    flex-basis: 46px;
+    border-radius: 14px;
+  }
+
+  .benefit-card strong {
+    font-size: 14px;
+  }
+
+  .benefit-card small {
+    margin-top: 1px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .reference-section,
+  .real-screenshots {
+    padding-top: 56px;
+  }
+
+  .reference-download {
+    background:
+      radial-gradient(ellipse at 90% 0, rgba(57, 125, 223, 0.1), transparent 48%),
+      var(--home-surface);
+  }
+}
+
+@media (prefers-color-scheme: light) and (max-width: 620px) {
+  :root:not([data-theme]) .home-page .reference-hero-art {
+    background-image:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(245, 248, 253, 0.83)),
+      url("assets/ilyro-dawn-lake-wallpaper.webp");
+    background-position: center, center, center 47%;
+  }
+}
+
+:root[data-theme='light'] .home-page .reference-hero-art {
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(245, 248, 253, 0.83)),
+    url("assets/ilyro-dawn-lake-wallpaper.webp");
+  background-position: center, center, center 47%;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) .home-page .reference-overline,
+  :root:not([data-theme]) .home-page .reference-kicker {
+    color: var(--home-green);
+  }
+
+  :root:not([data-theme]) .home-page .header-cta {
+    border-color: transparent;
+    background: var(--home-action);
+    color: #fff;
+  }
+
+  :root:not([data-theme]) .home-page .header-cta:hover,
+  :root:not([data-theme]) .home-page .header-cta:focus-visible {
+    background: #347fe5;
+    color: #fff;
+  }
+
+  :root:not([data-theme]) .home-page .benefit-icon {
+    border-color: rgba(36, 105, 207, 0.16);
+    background: rgba(42, 116, 220, 0.09);
+    color: var(--home-green);
+  }
+
+  :root:not([data-theme]) .home-page .benefit-icon-bolt,
+  :root:not([data-theme]) .home-page .benefit-icon-palette,
+  :root:not([data-theme]) .home-page .benefit-icon-sync {
+    color: var(--home-green);
+  }
+
+  :root:not([data-theme]) .home-page .release-pill {
+    border-color: rgba(36, 105, 207, 0.22);
+    background: rgba(36, 105, 207, 0.08);
+    color: #315d94;
+  }
+}
+
+:root:not([data-theme]) .home-page .benefit-icon {
+  border-color: rgba(84, 153, 255, 0.22);
+  background: rgba(63, 131, 229, 0.11);
+  color: var(--home-green);
+}
+
+:root:not([data-theme]) .home-page .benefit-icon-bolt,
+:root:not([data-theme]) .home-page .benefit-icon-palette,
+:root:not([data-theme]) .home-page .benefit-icon-sync {
+  color: var(--home-green);
+}
