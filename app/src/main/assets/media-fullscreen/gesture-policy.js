@@ -13,6 +13,16 @@
       state.scale <= 1.01;
   }
 
+  function disablesPullToRefresh(url) {
+    try {
+      const current = new URL(url);
+      return /(^|\.)youtube\.com$/i.test(current.hostname) &&
+        /^\/shorts(?:\/|$)/i.test(current.pathname);
+    } catch (_) {
+      return false;
+    }
+  }
+
   function blocksRefreshTarget(state) {
     return !!state && !!(state.formControl || state.frame || state.editable);
   }
@@ -32,5 +42,5 @@
     return alreadyScrolled || trapsVerticalOverscroll;
   }
 
-  return Object.freeze({ isAtTop, blocksNestedScroll, blocksRefreshTarget });
+  return Object.freeze({ isAtTop, blocksNestedScroll, blocksRefreshTarget, disablesPullToRefresh });
 });

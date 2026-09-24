@@ -57,12 +57,14 @@
   function cancel() { if (gesture) send(0); gesture = null; }
   document.addEventListener('touchstart', event => {
     cancel();
+    if (policy.disablesPullToRefresh(window.location.href)) return;
     if (event.touches.length !== 1 || !atTop() || nestedScroll(event.composedPath())) return;
     const touch = event.touches[0];
     gesture = { x: touch.clientX, y: touch.clientY, progress: 0 };
   }, { capture: true, passive: true });
   document.addEventListener('touchmove', event => {
     if (!gesture) return;
+    if (policy.disablesPullToRefresh(window.location.href)) { cancel(); return; }
     // The scrollable ancestor check is intentionally done only on touchstart.
     // getComputedStyle() on every touchmove forces expensive style work on YouTube.
     if (event.touches.length !== 1 || !atTop()) { cancel(); return; }
@@ -77,7 +79,8 @@
   }, { capture: true, passive: true });
   document.addEventListener('touchend', event => {
     if (!gesture) return;
-    const refresh = event.touches.length === 0 && gesture.progress >= 1 && atTop();
+    const refresh = event.touches.length === 0 && gesture.progress >= 1 && atTop() &&
+      !policy.disablesPullToRefresh(window.location.href);
     gesture = null;
     send(0, refresh);
   }, { capture: true, passive: true });
