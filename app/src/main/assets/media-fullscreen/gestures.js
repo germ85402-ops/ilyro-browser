@@ -37,7 +37,11 @@
   function nestedScroll(path) {
     return path.some(node => {
       if (!(node instanceof Element)) return false;
-      if (node.matches('input,textarea,select,video,iframe,[contenteditable="true"]')) return true;
+      if (policy.blocksRefreshTarget({
+        formControl: node.matches('input,textarea,select'),
+        frame: node.matches('iframe'),
+        editable: node.isContentEditable
+      })) return true;
       if (node === document.scrollingElement || node === document.body || node === document.documentElement) return false;
 
       const css = getComputedStyle(node);
@@ -46,8 +50,7 @@
         clientHeight: node.clientHeight,
         scrollTop: node.scrollTop,
         overflowY: css.overflowY,
-        overscrollBehaviorY: css.overscrollBehaviorY,
-        touchAction: css.touchAction
+        overscrollBehaviorY: css.overscrollBehaviorY
       });
     });
   }

@@ -31,6 +31,12 @@ assert.equal(policy.isAtTop({
   scale: 1.2
 }), false);
 
+// Keep refresh away from text editing and embedded frames, but allow video surfaces.
+assert.equal(policy.blocksRefreshTarget({ formControl: true }), true);
+assert.equal(policy.blocksRefreshTarget({ frame: true }), true);
+assert.equal(policy.blocksRefreshTarget({ editable: true }), true);
+assert.equal(policy.blocksRefreshTarget({ video: true }), false);
+
 const baseScroller = {
   scrollHeight: 800,
   clientHeight: 400,
@@ -40,10 +46,17 @@ const baseScroller = {
   touchAction: 'auto'
 };
 
-assert.equal(policy.blocksNestedScroll({ ...baseScroller, overflowY: 'auto' }), true);
-assert.equal(policy.blocksNestedScroll({ ...baseScroller, scrollTop: 12 }), true);
+// A nested scroller at its top edge cannot consume a downward refresh pull.
+assert.equal(policy.blocksNestedScroll({ ...baseScroller, overflowY: 'auto' }), false);
+assert.equal(policy.blocksNestedScroll({ ...baseScroller, overflowY: 'auto', touchAction: 'pan-y' }), false);
+
+// Preserve the nested scroller's gesture when it can scroll back toward its top.
+assert.equal(policy.blocksNestedScroll({ ...baseScroller, overflowY: 'auto', scrollTop: 12 }), true);
+assert.equal(policy.blocksNestedScroll({ ...baseScroller, scrollTop: -12 }), true);
+
+// Explicit overscroll containment and non-top-level scroll states still own the pull.
 assert.equal(policy.blocksNestedScroll({ ...baseScroller, overscrollBehaviorY: 'contain' }), true);
-assert.equal(policy.blocksNestedScroll({ ...baseScroller, touchAction: 'pan-y' }), true);
+assert.equal(policy.blocksNestedScroll({ ...baseScroller, overscrollBehaviorY: 'none' }), true);
 assert.equal(policy.blocksNestedScroll(baseScroller), false);
 assert.equal(policy.blocksNestedScroll({ ...baseScroller, scrollHeight: 400 }), false);
 
