@@ -16,8 +16,8 @@
   function disablesPullToRefresh(url) {
     try {
       const current = new URL(url);
-      return /(^|\\.)youtube\\.com$/i.test(current.hostname) &&
-        /^\\/shorts(?:\\/|$)/i.test(current.pathname);
+      return /(^|\.)youtube\.com$/i.test(current.hostname) &&
+        /^\/shorts(?:\/|$)/i.test(current.pathname);
     } catch (_) {
       return false;
     }
