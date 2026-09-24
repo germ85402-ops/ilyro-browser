@@ -455,13 +455,14 @@ private fun QuickAccessPanel(
                 maxWidth < 900.dp -> 6
                 else -> 8
             }
-            val columns = when (settings.shortcutSize) {
+            val requestedColumns = when (settings.shortcutSize) {
                 HomeShortcutSize.SMALL -> (baseColumns + 1).coerceAtMost(9)
                 HomeShortcutSize.STANDARD -> baseColumns
-                HomeShortcutSize.LARGE -> (baseColumns - 1).coerceAtLeast(if (maxWidth < 360.dp) 3 else 3)
+                HomeShortcutSize.LARGE -> (baseColumns - 1).coerceAtLeast(3)
             }
             val itemCount = links.size
-            val tileHeight = when (settings.shortcutSize) {
+            val columns = if (itemCount in 3 until requestedColumns) itemCount else requestedColumns
+            val baseTileHeight = when (settings.shortcutSize) {
                 HomeShortcutSize.SMALL -> if (metrics.isNarrowPhone) 62 else if (dense) 66 else 72
                 HomeShortcutSize.STANDARD -> when {
                     metrics.isNarrowPhone -> 72
@@ -471,6 +472,26 @@ private fun QuickAccessPanel(
                     else -> 92
                 }
                 HomeShortcutSize.LARGE -> if (metrics.isNarrowPhone) 86 else if (dense) 96 else 104
+            }
+            val editIconHeight = when (settings.shortcutSize) {
+                HomeShortcutSize.SMALL -> if (metrics.isNarrowPhone) 36 else 40
+                HomeShortcutSize.STANDARD -> if (metrics.isNarrowPhone) 42 else 46
+                HomeShortcutSize.LARGE -> if (metrics.isNarrowPhone) 48 else 52
+            }
+            val editControlHeight = if (metrics.isNarrowPhone) 36 else 40
+            val editLabelHeight = if (settings.showShortcutLabels) 20 else 0
+            val editSpacingHeight = if (settings.showShortcutLabels) {
+                if (metrics.isNarrowPhone) 8 else 12
+            } else {
+                if (metrics.isNarrowPhone) 4 else 6
+            }
+            val editVerticalPadding = if (metrics.isNarrowPhone) 8 else 12
+            val editTileHeight = editIconHeight + editControlHeight +
+                editLabelHeight + editSpacingHeight + editVerticalPadding
+            val tileHeight = if (editMode) {
+                baseTileHeight.coerceAtLeast(editTileHeight)
+            } else {
+                baseTileHeight
             }
 
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -690,7 +711,14 @@ private fun QuickSiteCard(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 5.dp, vertical = if (narrow) 5.dp else 7.dp),
+                    .padding(
+                        horizontal = if (editMode) 3.dp else 5.dp,
+                        vertical = if (editMode) {
+                            if (narrow) 4.dp else 6.dp
+                        } else {
+                            if (narrow) 5.dp else 7.dp
+                        }
+                    ),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
@@ -716,31 +744,6 @@ private fun QuickSiteCard(
                         }
                     }
 
-                    if (editMode) {
-                        Surface(
-                            onClick = onEdit,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .size(if (narrow) 22.dp else 24.dp),
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            border = BorderStroke(
-                                1.dp,
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.22f)
-                            ),
-                            tonalElevation = 0.dp,
-                            shadowElevation = 1.dp
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Rounded.Edit,
-                                    contentDescription = tr("Edit quick link", "Изменить быстрый сайт"),
-                                    modifier = Modifier.size(12.dp),
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
-                                )
-                            }
-                        }
-                    }
                 }
                 if (showLabel) {
                     Spacer(modifier = Modifier.height(if (narrow) 4.dp else 6.dp))
@@ -752,36 +755,66 @@ private fun QuickSiteCard(
                         fontWeight = FontWeight.Medium
                     )
                 }
-            }
-
-            if (editMode) {
-                Surface(
-                    onClick = onRemove,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(1.dp)
-                        .size(if (narrow) 30.dp else 34.dp),
-                    shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f),
-                    border = BorderStroke(
-                        1.dp,
-                        MaterialTheme.colorScheme.outlineVariant.copy(
-                            alpha = IlyroVisualTokens.SubtleBorderAlpha
+                if (editMode) {
+                    Spacer(modifier = Modifier.height(if (narrow) 4.dp else 6.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        QuickSiteActionButton(
+                            icon = Icons.Rounded.Edit,
+                            description = tr("Edit quick link", "Изменить быстрый сайт"),
+                            destructive = false,
+                            narrow = narrow,
+                            modifier = Modifier.weight(1f),
+                            onClick = onEdit
                         )
-                    ),
-                    tonalElevation = 0.dp,
-                    shadowElevation = 1.dp
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            Icons.Rounded.Close,
-                            contentDescription = tr("Remove quick link", "Удалить быстрый сайт"),
-                            modifier = Modifier.size(16.dp),
-                            tint = MaterialTheme.colorScheme.onSurface
+                        QuickSiteActionButton(
+                            icon = Icons.Rounded.Close,
+                            description = tr("Remove quick link", "Удалить быстрый сайт"),
+                            destructive = true,
+                            narrow = narrow,
+                            modifier = Modifier.weight(1f),
+                            onClick = onRemove
                         )
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun QuickSiteActionButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    destructive: Boolean,
+    narrow: Boolean,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
+    val tint = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+    Surface(
+        onClick = onClick,
+        modifier = modifier.height(if (narrow) 36.dp else 40.dp),
+        shape = RoundedCornerShape(IlyroVisualTokens.SmallRadius),
+        color = if (destructive) {
+            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.40f)
+        } else {
+            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+        },
+        border = BorderStroke(1.dp, tint.copy(alpha = 0.22f)),
+        tonalElevation = 0.dp,
+        shadowElevation = 0.dp
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = icon,
+                contentDescription = description,
+                modifier = Modifier.size(IlyroVisualTokens.SmallIconSize),
+                tint = tint
+            )
         }
     }
 }

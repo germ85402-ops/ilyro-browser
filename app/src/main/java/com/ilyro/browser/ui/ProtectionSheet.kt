@@ -113,6 +113,7 @@ internal fun ProtectionSheet(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = if (dense) 680.dp else 760.dp)
+                    .stabilizeBottomSheetFling()
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = metrics.horizontalPadding)
             ) {
