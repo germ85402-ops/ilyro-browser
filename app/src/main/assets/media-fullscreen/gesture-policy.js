@@ -13,18 +13,24 @@
       state.scale <= 1.01;
   }
 
-  function blocksNestedScroll(state) {
-    if (!state) return false;
-    const scrollRange = state.scrollHeight - state.clientHeight;
-    if (scrollRange <= 1) return false;
-
-    const overflowScrollable = /(auto|scroll|overlay)/.test(state.overflowY || '');
-    const alreadyScrolled = state.scrollTop > 1;
-    const trapsVerticalOverscroll = /(contain|none)/.test(state.overscrollBehaviorY || '');
-    const ownsVerticalPan = /(^|\s)pan-y(\s|$)/.test(state.touchAction || '');
-
-    return overflowScrollable || alreadyScrolled || trapsVerticalOverscroll || ownsVerticalPan;
+  function blocksRefreshTarget(state) {
+    return !!state && !!(state.formControl || state.frame || state.editable);
   }
 
-  return Object.freeze({ isAtTop, blocksNestedScroll });
+  function blocksNestedScroll(state) {
+    if (!state) return false;
+    const scrollRange = Number(state.scrollHeight) - Number(state.clientHeight);
+    if (!Number.isFinite(scrollRange) || scrollRange <= 1) return false;
+
+    // A nested scroller at its top edge cannot consume a downward pull. Allow the
+    // browser refresh gesture there, but preserve ownership away from the edge and
+    // for containers that explicitly contain vertical overscroll.
+    const scrollTop = Number(state.scrollTop);
+    const alreadyScrolled = Number.isFinite(scrollTop) && Math.abs(scrollTop) > 1;
+    const trapsVerticalOverscroll = /(contain|none)/.test(state.overscrollBehaviorY || '');
+
+    return alreadyScrolled || trapsVerticalOverscroll;
+  }
+
+  return Object.freeze({ isAtTop, blocksNestedScroll, blocksRefreshTarget });
 });
