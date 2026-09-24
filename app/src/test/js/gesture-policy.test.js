@@ -24,6 +24,25 @@ assert.equal(policy.isAtTop({
   scale: 1
 }), false);
 
+for (const url of [
+  'https://youtube.com/shorts/video-id',
+  'https://www.youtube.com/shorts/video-id?t=4',
+  'https://m.youtube.com/shorts/video-id',
+  'https://youtube.com/shorts'
+]) {
+  assert.equal(policy.disablesPullToRefresh(url), true, url);
+}
+
+for (const url of [
+  'https://youtube.com/watch?v=video-id',
+  'https://youtube.com.evil.com/shorts/video-id',
+  'https://notyoutube.com/shorts/video-id',
+  'https://example.com/shorts/video-id',
+  'not a url'
+]) {
+  assert.equal(policy.disablesPullToRefresh(url), false, url);
+}
+
 assert.equal(policy.isAtTop({
   scrollTop: 0,
   windowScrollY: 0,

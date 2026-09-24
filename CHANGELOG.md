@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.26.0-rc28 — release candidate
+
+- Keep pull-to-refresh from capturing YouTube Shorts' downward swipe, which Shorts uses to return to the previous video.
+- Keep pull-to-refresh available everywhere else, including regular YouTube watch pages.
+- Update the bundled gesture helper to 1.8.6 and cover YouTube Shorts URL matching with regression tests.
+
 ## 0.26.0-rc27 — release candidate
 
 - Restore pull-to-refresh on video surfaces such as YouTube Shorts.
