@@ -50,7 +50,7 @@
         clientHeight: node.clientHeight,
         scrollTop: node.scrollTop,
         overflowY: css.overflowY,
-        overscrollBehaviorY: css.overscrollBehaviorY,
+        overscrollBehaviorY: css.overscrollBehaviorY
       });
     });
   }

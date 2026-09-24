@@ -1,12 +1,12 @@
+# Changelog
+
+## Unreleased
+
 ## 0.26.0-rc27 — release candidate
 
 - Restore pull-to-refresh on video surfaces such as YouTube Shorts.
 - Allow a deliberate downward refresh when a nested scroller is already at its top edge, while preserving gestures for scrollers that can consume the pull or contain overscroll.
 - Update the bundled gesture helper to 1.8.5 and add edge ownership regression coverage.
-
-# Changelog
-
-## Unreleased
 
 ## 0.26.0-rc26 — release candidate
 
