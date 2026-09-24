@@ -19,14 +19,36 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+
+/**
+ * Stops a scrollable sheet child's leftover fling from bouncing the modal sheet
+ * at a scroll boundary. Pointer drag deltas still reach the sheet, so dragging
+ * the sheet to dismiss it remains available.
+ */
+@Composable
+internal fun Modifier.stabilizeBottomSheetFling(): Modifier {
+    val connection = remember {
+        object : NestedScrollConnection {
+            override suspend fun onPostFling(
+                consumed: Velocity,
+                available: Velocity
+            ): Velocity = Velocity(0f, available.y)
+        }
+    }
+    return nestedScroll(connection)
+}
 
 @Composable
 internal fun MenuQuickAction(

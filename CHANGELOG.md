@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.26.0-rc29 — release candidate
+
+- Keep scrollable bottom sheets from bouncing when a nested fling reaches the edge of their content, while preserving direct swipe-to-dismiss.
+- Give the wallpaper and link sheets one stable expanded anchor for more predictable opening and closing.
+- Move Quick Access edit and remove actions below each shortcut, and distribute near-full rows across the available width.
+
 ## 0.26.0-rc28 — release candidate
 
 - Keep pull-to-refresh from capturing YouTube Shorts' downward swipe, which Shorts uses to return to the previous video.

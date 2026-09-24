@@ -2670,6 +2670,7 @@ private fun BrowserScreen(
                     Column(
                         modifier = Modifier
                             .weight(1f, fill = false)
+                            .stabilizeBottomSheetFling()
                             .verticalScroll(menuScrollState)
                             .padding(horizontal = 4.dp, vertical = 6.dp),
                         verticalArrangement = Arrangement.spacedBy(5.dp)
