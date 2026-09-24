@@ -269,6 +269,32 @@
     revealItems.forEach((item) => item.classList.add('is-visible'));
   }
 
+  const motionPreference = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+  const motionItems = document.querySelectorAll('[data-motion-reveal]');
+  if (motionItems.length && 'IntersectionObserver' in window && !motionPreference?.matches) {
+    motionItems.forEach((item) => {
+      const siblings = [...item.parentElement.children].filter((sibling) => sibling.hasAttribute('data-motion-reveal'));
+      const stagger = Math.min(siblings.indexOf(item), 4) * 70;
+      item.style.setProperty('--motion-delay', `${stagger}ms`);
+    });
+
+    const motionObserver = new IntersectionObserver((entries, observer) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add('is-motion-visible');
+        observer.unobserve(entry.target);
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -36px' });
+    root.classList.add('motion-ready');
+    motionItems.forEach((item) => motionObserver.observe(item));
+
+    motionPreference?.addEventListener?.('change', (event) => {
+      if (!event.matches) return;
+      root.classList.remove('motion-ready');
+      motionObserver.disconnect();
+    });
+  }
+
   const mockupStates = {
     start: {
       kicker: 'A CALMER WAY TO BROWSE',

@@ -31,3 +31,11 @@ References: selected tablet direction 2 and phone direction 5, each shown in lig
 The responsive browser frame reserves 15 CSS pixels for its scrollbar, so checked content widths were 753 px for the 768 px tablet frame and 375 px for the 390 px phone frame.
 
 Preview: http://terminal.local:4173/
+
+### Motion pass — 2026-09-24
+
+- Hero copy and browser artwork enter with a short stagger; feature and screenshot cards reveal once as they enter the viewport.
+- Download content reveals on scroll; buttons respond to press/hover, the hero image tilts slightly on desktop hover, and desktop navigation gets a short underline.
+- Verified on desktop, phone (390 px frame; 375 px content), and tablet (768 px frame; 753 px content). No horizontal overflow; feature, screenshot, and download reveals reached full opacity after scrolling.
+- `prefers-reduced-motion` skips the scroll observer and disables entrance animations. The current browser session uses `no-preference`; the reduced-motion branch was checked in code rather than simulated in the browser.
+- No page-origin console errors or warnings were recorded during browser checks.
