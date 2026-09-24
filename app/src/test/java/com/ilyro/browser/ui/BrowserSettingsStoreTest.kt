@@ -27,6 +27,7 @@ class BrowserSettingsStoreTest {
             theme = BrowserTheme.DARK,
             appIcon = AppIcon.PINK_DARK,
             accent = BrowserAccent.VIOLET,
+            accentFollowsWallpaper = false,
             toolbarPosition = ToolbarPosition.TOP,
             toolbarActions = setOf(ToolbarAction.BACK, ToolbarAction.FORWARD, ToolbarAction.TABS),
             showQuickAccess = false,
@@ -106,7 +107,20 @@ class BrowserSettingsStoreTest {
         assertEquals(UiDensity.STANDARD, restored.uiDensity)
         assertTrue(restored.onlineSearchSuggestionsEnabled)
         assertTrue(restored.useSeparateDarkBackground)
+        assertTrue(restored.accentFollowsWallpaper)
         assertEquals(HomeBackground.LIGHT_DAWN_LAKE, restored.homeBackground)
+    }
+
+    @Test
+    fun manualAccentOverridesWallpaperAccentOnlyWhenAutoMatchingIsOff() {
+        val settings = BrowserSettings(
+            accent = BrowserAccent.VIOLET,
+            accentFollowsWallpaper = false
+        )
+
+        assertEquals(BrowserAccent.VIOLET, settings.resolveAccent(BrowserAccent.FOREST))
+        assertEquals(BrowserAccent.FOREST, settings.copy(accentFollowsWallpaper = true)
+            .resolveAccent(BrowserAccent.FOREST))
     }
 
     @Test

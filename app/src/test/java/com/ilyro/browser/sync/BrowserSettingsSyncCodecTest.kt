@@ -3,6 +3,7 @@ package com.ilyro.browser.sync
 import com.ilyro.browser.ui.AppIcon
 import com.ilyro.browser.ui.AppLanguage
 import com.ilyro.browser.ui.BrowserSettings
+import com.ilyro.browser.ui.BrowserAccent
 import com.ilyro.browser.ui.BrowserTheme
 import com.ilyro.browser.ui.CustomSearchEngine
 import com.ilyro.browser.ui.HomeBackground
@@ -30,6 +31,8 @@ class BrowserSettingsSyncCodecTest {
             customSearchEngineId = "kagi",
             theme = BrowserTheme.DARK,
             appIcon = AppIcon.PINK_DARK,
+            accent = BrowserAccent.FOREST,
+            accentFollowsWallpaper = false,
             adBlockingEnabled = false,
             darkWebsitesEnabled = true,
             historyEnabled = false,
@@ -88,6 +91,7 @@ class BrowserSettingsSyncCodecTest {
         assertTrue(restored.desktopMode)
         assertEquals(1.30f, restored.textScale)
         assertTrue(restored.adBlockingEnabled)
+        assertTrue(restored.accentFollowsWallpaper)
         assertTrue(restored.onlineSearchSuggestionsEnabled)
         assertFalse(restored.darkWebsitesEnabled)
         assertTrue(restored.historyEnabled)

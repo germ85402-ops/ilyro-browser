@@ -52,6 +52,7 @@ internal object BrowserSettingsSyncCodec {
         .put("theme", settings.theme.name)
         .put("appIcon", settings.appIcon.name)
         .put("accent", settings.accent.name)
+        .put("accentFollowsWallpaper", settings.accentFollowsWallpaper)
         .put("toolbarPosition", settings.toolbarPosition.name)
         .put("toolbarActions", settings.toolbarActions.joinToString(",") { it.name })
         .put("showQuickAccess", settings.showQuickAccess)
@@ -112,6 +113,10 @@ internal object BrowserSettingsSyncCodec {
             theme = enumOrDefault(json.optString("theme"), defaults.theme),
             appIcon = enumOrDefault(json.optString("appIcon"), defaults.appIcon),
             accent = enumOrDefault(json.optString("accent"), defaults.accent),
+            accentFollowsWallpaper = json.optBoolean(
+                "accentFollowsWallpaper",
+                defaults.accentFollowsWallpaper
+            ),
             toolbarPosition = enumOrDefault(json.optString("toolbarPosition"), defaults.toolbarPosition),
             toolbarActions = json.optString("toolbarActions")
                 .split(',')
