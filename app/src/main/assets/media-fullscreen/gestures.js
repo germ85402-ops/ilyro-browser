@@ -79,7 +79,8 @@
   }, { capture: true, passive: true });
   document.addEventListener('touchend', event => {
     if (!gesture) return;
-    const refresh = event.touches.length === 0 && gesture.progress >= 1 && atTop();
+    const refresh = event.touches.length === 0 && gesture.progress >= 1 && atTop() &&
+      !policy.disablesPullToRefresh(window.location.href);
     gesture = null;
     send(0, refresh);
   }, { capture: true, passive: true });
