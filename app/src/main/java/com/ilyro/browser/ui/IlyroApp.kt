@@ -508,7 +508,7 @@ private fun BrowserScreen(
                 firstRefresh = false
             } else {
                 // Batch progress callbacks that arrive together before reading another snapshot.
-                delay(75L)
+                delay(200L)
             }
             while (downloadRefreshRequests.tryReceive().isSuccess) {
                 // snapshot() returns the latest state, so intermediate requests can be merged.
