@@ -75,6 +75,23 @@ class HlsPlaylistParserTest {
     }
 
     @Test
+    fun masterPlaylist_doesNotAssignNextVariantsUrlToIncompleteVariant() {
+        val playlist = """
+            #EXTM3U
+            #EXT-X-STREAM-INF:BANDWIDTH=900000,RESOLUTION=854x480
+            #EXT-X-STREAM-INF:BANDWIDTH=3500000,RESOLUTION=1920x1080
+            #EXT-X-VERSION:6
+            video/1080.m3u8
+        """.trimIndent()
+
+        val variants = parseHlsMasterVariants(playlist, "https://media.example.com/master.m3u8")
+
+        assertEquals(1, variants.size)
+        assertEquals(1920, variants.single().width)
+        assertEquals("https://media.example.com/video/1080.m3u8", variants.single().url)
+    }
+
+    @Test
     fun mediaPlaylist_parsesInitSegmentByteRangesAndVodState() {
         val playlist = """
             #EXTM3U

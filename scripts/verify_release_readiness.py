@@ -40,8 +40,12 @@ def main() -> int:
         "docs/privacy.html",
         "docs/terms.html",
     )
-    for relative in required_files:
-        require((ROOT / relative).is_file(), f"missing required file: {relative}")
+    missing_files = [relative for relative in required_files if not (ROOT / relative).is_file()]
+    if missing_files:
+        print("Release readiness check failed:", file=sys.stderr)
+        for relative in missing_files:
+            print(f"- missing required file: {relative}", file=sys.stderr)
+        return 1
 
     gradle = read("app/build.gradle.kts")
     version_match = re.search(r'versionName\s*=\s*"([^"]+)"', gradle)

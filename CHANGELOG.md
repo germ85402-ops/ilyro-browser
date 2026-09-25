@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.26.0-rc32 — release candidate
+
+- Match system Autofill passwords to the actual website scheme and host; do not assume HTTPS when the scheme is unavailable.
+- Limit the history favicon cache to avoid unbounded bitmap memory use.
+- Ignore incomplete HLS variants instead of associating them with the next variant's URL.
+- Stream extension checksum verification and improve missing-file release diagnostics.
+
 ## 0.26.0-rc31 — release candidate
 
 - Coalesce bursts of download progress updates so they share a single current-state snapshot.

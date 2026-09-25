@@ -14,8 +14,7 @@ android {
     compileSdk { version = release(37) { minorApiLevel = 2 } }
     defaultConfig {
         applicationId = "com.ilyro.browser"; minSdk = 26; targetSdk = 36
-        versionCode = 169; versionName = "0.26.0-rc31"
-        // rc31 metadata synchronized with README and CHANGELOG.
+        versionCode = 170; versionName = "0.26.0-rc32"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         manifestPlaceholders["appLabel"] = "ILYRO"
         ndk { abiFilters += "arm64-v8a" }
@@ -48,11 +47,11 @@ kotlin {
 
 // Kotlin/Compose browser source is canonical in git. preBuild validates the
 // Gecko/Compose overlay contract but never rewrites application source.
-val prepareBundledAdBlock by tasks.registering(Exec::class) {
+val prepareBundledAdBlock = tasks.register<Exec>("prepareBundledAdBlock") {
     workingDir = rootDir
     commandLine("python3", rootProject.file("scripts/prepare_ublock.py").absolutePath)
 }
-val verifyNativeGeckoOverlayContract by tasks.registering(Exec::class) {
+val verifyNativeGeckoOverlayContract = tasks.register<Exec>("verifyNativeGeckoOverlayContract") {
     workingDir = rootDir
     commandLine("python3", rootProject.file("scripts/verify_native_gecko_overlay_contract.py").absolutePath)
     dependsOn(prepareBundledAdBlock)

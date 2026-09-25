@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.text.format.DateUtils
+import android.util.LruCache
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -58,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -584,28 +586,35 @@ private fun relativeVisitTime(timestamp: Long): String {
 
 private object HistoryFaviconCache {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val bitmaps = mutableMapOf<String, Bitmap>()
-    private val attempted = mutableSetOf<String>()
+    private val bitmaps = object : LruCache<String, Bitmap>(8 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
+    }
+    private val attempted = linkedSetOf<String>()
     private val inFlight = mutableMapOf<String, Deferred<Bitmap?>>()
 
     @Synchronized
-    fun peek(url: String): Bitmap? = bitmaps[url]
+    fun peek(url: String): Bitmap? = bitmaps.get(url)
 
     suspend fun loadOnce(url: String): Bitmap? {
         val job = synchronized(this) {
-            bitmaps[url]?.let { return it }
+            bitmaps.get(url)?.let { return it }
             inFlight[url]?.let { return@synchronized it }
             if (url in attempted) return null
 
             attempted.add(url)
-            scope.async {
-                val loaded = fetchHistoryFavicon(url)
-                synchronized(this@HistoryFaviconCache) {
-                    if (loaded != null) bitmaps[url] = loaded
-                    inFlight.remove(url)
+            if (attempted.size > 256) attempted.remove(attempted.first())
+            scope.async(start = CoroutineStart.LAZY) {
+                try {
+                    val loaded = fetchHistoryFavicon(url)
+                    if (loaded != null) {
+                        bitmaps.put(url, loaded)
+                        synchronized(this@HistoryFaviconCache) { attempted.remove(url) }
+                    }
+                    loaded
+                } finally {
+                    synchronized(this@HistoryFaviconCache) { inFlight.remove(url) }
                 }
-                loaded
-            }.also { inFlight[url] = it }
+            }.also { inFlight[url] = it; it.start() }
         }
         return job.await()
     }

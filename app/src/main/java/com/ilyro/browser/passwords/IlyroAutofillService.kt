@@ -40,10 +40,10 @@ class IlyroAutofillService : AutofillService() {
             return
         }
 
-        // Use the domain of the field that is actually being filled. Taking the first web domain
+        // Use the origin of the field that is actually being filled. Taking the first web domain
         // found anywhere in the structure would offer a credential to a third-party iframe.
-        val domain = autofillDomainFor(passwordField?.domain, usernameField?.domain)
-        if (domain.isNullOrBlank()) {
+        val origin = autofillOriginFor(passwordField?.origin, usernameField?.origin)
+        if (origin.isNullOrBlank()) {
             callback.onSuccess(null)
             return
         }
@@ -51,7 +51,7 @@ class IlyroAutofillService : AutofillService() {
         val credentials = try {
             PasswordManagerService.vault(this)
                 .snapshot()
-                .filter { passwordDomainMatches(it.origin, domain) }
+                .filter { passwordDomainMatches(it.origin, origin) }
         } catch (error: Exception) {
             Log.e(TAG, "Unable to read saved passwords for Autofill", error)
             callback.onFailure(
@@ -145,22 +145,17 @@ class IlyroAutofillService : AutofillService() {
         val candidates = collectCandidates(structure)
         val usernameField = candidates.firstOrNull { isUsernameField(it.node) }
         val passwordField = candidates.firstOrNull { isPasswordField(it.node) }
-        val domain = autofillDomainFor(passwordField?.domain, usernameField?.domain)
+        val origin = autofillOriginFor(passwordField?.origin, usernameField?.origin)
         val username = usernameField?.node?.autofillValue?.textValue?.toString()
             ?.trim()
             .orEmpty()
         val password = passwordField?.node?.autofillValue?.textValue?.toString()
             .orEmpty()
-        if (domain.isNullOrBlank() || password.isEmpty()) {
+        if (origin.isNullOrBlank() || password.isEmpty()) {
             callback.onSuccess()
             return
         }
 
-        val origin = if (domain.startsWith("http://") || domain.startsWith("https://")) {
-            domain
-        } else {
-            "https://" + domain
-        }
         try {
             PasswordManagerService.vault(this).upsert(
                 PasswordCredential(
@@ -185,7 +180,7 @@ class IlyroAutofillService : AutofillService() {
 
     private data class Candidate(
         val node: AssistStructure.ViewNode,
-        val domain: String?
+        val origin: String?
     )
 
     private fun collectCandidates(structure: AssistStructure): List<Candidate> {
@@ -199,14 +194,20 @@ class IlyroAutofillService : AutofillService() {
 
     private fun collectNode(
         node: AssistStructure.ViewNode,
-        inheritedDomain: String?,
+        inheritedOrigin: String?,
         result: MutableList<Candidate>
     ) {
-        val domain = readWebDomain(node) ?: inheritedDomain
-        result += Candidate(node, domain)
+        val domain = readWebDomain(node)
+        val origin = if (domain == null) inheritedOrigin else {
+            val scheme = runCatching {
+                node.javaClass.getMethod("getWebScheme").invoke(node) as? String
+            }.getOrNull()?.lowercase()
+            if (scheme == "http" || scheme == "https") "$scheme://$domain" else null
+        }
+        result += Candidate(node, origin)
         for (index in 0 until node.childCount) {
             node.getChildAt(index)?.let { child ->
-                collectNode(child, domain, result)
+                collectNode(child, origin, result)
             }
         }
     }
@@ -241,14 +242,14 @@ class IlyroAutofillService : AutofillService() {
 }
 
 /**
- * Resolves the single web domain a fill/save request belongs to.
+ * Resolves the single web origin a fill/save request belongs to.
  *
- * A request is only trusted when the username and password fields agree on their domain. That
+ * A request is only trusted when the username and password fields agree on their origin. That
  * keeps a third-party frame on the page from receiving a credential saved for the top-level site.
  */
-internal fun autofillDomainFor(passwordDomain: String?, usernameDomain: String?): String? {
-    val password = passwordDomain?.trim()?.takeIf { it.isNotBlank() }
-    val username = usernameDomain?.trim()?.takeIf { it.isNotBlank() }
+internal fun autofillOriginFor(passwordOrigin: String?, usernameOrigin: String?): String? {
+    val password = passwordOrigin?.trim()?.takeIf { it.isNotBlank() }
+    val username = usernameOrigin?.trim()?.takeIf { it.isNotBlank() }
     if (password != null && username != null && !password.equals(username, ignoreCase = true)) {
         return null
     }
