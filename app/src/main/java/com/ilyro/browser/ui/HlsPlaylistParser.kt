@@ -45,7 +45,9 @@ internal fun parseHlsMasterVariants(text: String, baseUrl: String): List<HlsMast
         val line = lines[index]
         if (!line.startsWith("#EXT-X-STREAM-INF:", ignoreCase = true)) continue
         val attributes = parseHlsAttributes(line.substringAfter(':'))
-        val uriLine = lines.drop(index + 1).firstOrNull { !it.startsWith('#') } ?: continue
+        val uriLine = lines.subList(index + 1, lines.size).asSequence()
+            .takeWhile { !it.startsWith("#EXT-X-STREAM-INF:", ignoreCase = true) }
+            .firstOrNull { !it.startsWith('#') } ?: continue
         val resolved = resolveHlsUrl(baseUrl, uriLine) ?: continue
         val bandwidth = attributes["AVERAGE-BANDWIDTH"]?.toLongOrNull()
             ?: attributes["BANDWIDTH"]?.toLongOrNull()

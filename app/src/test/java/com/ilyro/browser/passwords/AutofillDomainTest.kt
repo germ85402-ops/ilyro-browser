@@ -6,21 +6,23 @@ import org.junit.Test
 
 class AutofillDomainTest {
     @Test
-    fun autofillDomainAcceptsFieldsThatAgree() {
-        assertEquals("example.com", autofillDomainFor("example.com", "example.com"))
-        assertEquals("example.com", autofillDomainFor("example.com", null))
-        assertEquals("example.com", autofillDomainFor(null, "example.com"))
-        assertEquals("example.com", autofillDomainFor("example.com", "EXAMPLE.COM"))
+    fun autofillOriginAcceptsFieldsThatAgree() {
+        assertEquals("https://example.com", autofillOriginFor("https://example.com", "https://example.com"))
+        assertEquals("https://example.com", autofillOriginFor("https://example.com", null))
+        assertEquals("https://example.com", autofillOriginFor(null, "https://example.com"))
+        assertEquals("https://example.com", autofillOriginFor("https://example.com", "https://EXAMPLE.COM"))
+        assertEquals("http://example.com", autofillOriginFor("http://example.com", "http://example.com"))
     }
 
     @Test
-    fun autofillDomainIsRefusedForCrossOriginFields() {
-        assertNull(autofillDomainFor("ads.tracker.test", "example.com"))
+    fun autofillOriginIsRefusedForCrossOriginFields() {
+        assertNull(autofillOriginFor("https://ads.tracker.test", "https://example.com"))
+        assertNull(autofillOriginFor("http://example.com", "https://example.com"))
     }
 
     @Test
-    fun autofillDomainIsRefusedWithoutAnyDomain() {
-        assertNull(autofillDomainFor(null, null))
-        assertNull(autofillDomainFor("  ", ""))
+    fun autofillOriginIsRefusedWithoutAnyOrigin() {
+        assertNull(autofillOriginFor(null, null))
+        assertNull(autofillOriginFor("  ", ""))
     }
 }

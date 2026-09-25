@@ -46,7 +46,8 @@ with tempfile.TemporaryDirectory(prefix="ilyro-ubo-") as tmp_dir:
     with urllib.request.urlopen(request, timeout=45) as response, archive.open("wb") as output:
         shutil.copyfileobj(response, output)
 
-    digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+    with archive.open("rb") as source:
+        digest = hashlib.file_digest(source, "sha256").hexdigest()
     if digest != SHA256:
         raise SystemExit(
             f"uBlock Origin checksum mismatch: expected {SHA256}, got {digest}"
