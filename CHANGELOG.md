@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 0.26.0-rc30 — release candidate
+
+- Keep quick-access labels readable across shortcut sizes, including while editing.
+- Make shortcut edit and remove controls quieter and more compact.
+
 ## 0.26.0-rc29 — release candidate
 
 - Keep scrollable bottom sheets from bouncing when a nested fling reaches the edge of their content, while preserving direct swipe-to-dismiss.

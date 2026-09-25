@@ -63,8 +63,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -462,7 +464,7 @@ private fun QuickAccessPanel(
             }
             val itemCount = links.size
             val columns = if (itemCount in 3 until requestedColumns) itemCount else requestedColumns
-            val baseTileHeight = when (settings.shortcutSize) {
+            val configuredTileHeight = when (settings.shortcutSize) {
                 HomeShortcutSize.SMALL -> if (metrics.isNarrowPhone) 62 else if (dense) 66 else 72
                 HomeShortcutSize.STANDARD -> when {
                     metrics.isNarrowPhone -> 72
@@ -478,8 +480,22 @@ private fun QuickAccessPanel(
                 HomeShortcutSize.STANDARD -> if (metrics.isNarrowPhone) 42 else 46
                 HomeShortcutSize.LARGE -> if (metrics.isNarrowPhone) 48 else 52
             }
-            val editControlHeight = if (metrics.isNarrowPhone) 36 else 40
-            val editLabelHeight = if (settings.showShortcutLabels) 20 else 0
+            val labelHeight = if (settings.showShortcutLabels) {
+                (36f * LocalDensity.current.fontScale).toInt()
+            } else {
+                0
+            }
+            val normalLabelSpacing = if (settings.showShortcutLabels) {
+                if (metrics.isNarrowPhone) 4 else 6
+            } else {
+                0
+            }
+            val normalVerticalPadding = if (metrics.isNarrowPhone) 10 else 14
+            val baseTileHeight = configuredTileHeight.coerceAtLeast(
+                editIconHeight + labelHeight + normalLabelSpacing + normalVerticalPadding
+            )
+
+            val editControlHeight = 32
             val editSpacingHeight = if (settings.showShortcutLabels) {
                 if (metrics.isNarrowPhone) 8 else 12
             } else {
@@ -487,7 +503,7 @@ private fun QuickAccessPanel(
             }
             val editVerticalPadding = if (metrics.isNarrowPhone) 8 else 12
             val editTileHeight = editIconHeight + editControlHeight +
-                editLabelHeight + editSpacingHeight + editVerticalPadding
+                labelHeight + editSpacingHeight + editVerticalPadding
             val tileHeight = if (editMode) {
                 baseTileHeight.coerceAtLeast(editTileHeight)
             } else {
@@ -749,9 +765,11 @@ private fun QuickSiteCard(
                     Spacer(modifier = Modifier.height(if (narrow) 4.dp else 6.dp))
                     Text(
                         text = site.label,
-                        maxLines = 1,
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                         textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 16.sp),
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -759,14 +777,13 @@ private fun QuickSiteCard(
                     Spacer(modifier = Modifier.height(if (narrow) 4.dp else 6.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         QuickSiteActionButton(
                             icon = Icons.Rounded.Edit,
                             description = tr("Edit quick link", "Изменить быстрый сайт"),
                             destructive = false,
-                            narrow = narrow,
                             modifier = Modifier.weight(1f),
                             onClick = onEdit
                         )
@@ -774,7 +791,6 @@ private fun QuickSiteCard(
                             icon = Icons.Rounded.Close,
                             description = tr("Remove quick link", "Удалить быстрый сайт"),
                             destructive = true,
-                            narrow = narrow,
                             modifier = Modifier.weight(1f),
                             onClick = onRemove
                         )
@@ -790,21 +806,23 @@ private fun QuickSiteActionButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     description: String,
     destructive: Boolean,
-    narrow: Boolean,
     modifier: Modifier,
     onClick: () -> Unit
 ) {
-    val tint = if (destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+    val tint = if (destructive) {
+        MaterialTheme.colorScheme.error.copy(alpha = 0.76f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f)
+    }
     Surface(
         onClick = onClick,
-        modifier = modifier.height(if (narrow) 36.dp else 40.dp),
+        modifier = modifier.height(32.dp),
         shape = RoundedCornerShape(IlyroVisualTokens.SmallRadius),
-        color = if (destructive) {
-            MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.40f)
-        } else {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-        },
-        border = BorderStroke(1.dp, tint.copy(alpha = 0.22f)),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.34f),
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.38f)
+        ),
         tonalElevation = 0.dp,
         shadowElevation = 0.dp
     ) {
@@ -812,7 +830,7 @@ private fun QuickSiteActionButton(
             Icon(
                 imageVector = icon,
                 contentDescription = description,
-                modifier = Modifier.size(IlyroVisualTokens.SmallIconSize),
+                modifier = Modifier.size(16.dp),
                 tint = tint
             )
         }
