@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 0.26.0-rc31 — release candidate
+
+- Coalesce bursts of download progress updates so they share a single current-state snapshot.
+
 ## 0.26.0-rc30 — release candidate
 
 - Keep quick-access labels readable across shortcut sizes, including while editing.

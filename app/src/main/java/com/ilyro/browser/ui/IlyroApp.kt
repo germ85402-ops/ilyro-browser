@@ -161,6 +161,7 @@ import com.ilyro.browser.ExternalNavigationCoordinator
 import com.ilyro.browser.NativeBrowserHostCoordinator
 import com.ilyro.browser.BrowserUiCommandCoordinator
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -492,20 +493,31 @@ private fun BrowserScreen(
             DownloadKeepAliveService.hasActiveDownloads()
     }
 
+    val downloadRefreshRequests = remember(downloadController) {
+        Channel<Unit>(capacity = Channel.CONFLATED)
+    }
     val refreshDownloads: () -> Unit = {
-        browserScope.launch {
+        downloadRefreshRequests.trySend(Unit)
+    }
+
+    LaunchedEffect(downloadController, downloadRefreshRequests) {
+        var firstRefresh = true
+        downloadRefreshRequests.trySend(Unit)
+        while (downloadRefreshRequests.receiveCatching().isSuccess) {
+            if (firstRefresh) {
+                firstRefresh = false
+            } else {
+                // Batch progress callbacks that arrive together before reading another snapshot.
+                delay(200L)
+            }
+            while (downloadRefreshRequests.tryReceive().isSuccess) {
+                // snapshot() returns the latest state, so intermediate requests can be merged.
+            }
             val latest = withContext(Dispatchers.IO) {
                 runCatching { downloadController.snapshot() }.getOrDefault(emptyList())
             }
             applyDownloadsSnapshot(latest)
         }
-    }
-
-    LaunchedEffect(downloadController) {
-        val latest = withContext(Dispatchers.IO) {
-            runCatching { downloadController.snapshot() }.getOrDefault(emptyList())
-        }
-        applyDownloadsSnapshot(latest)
     }
     var pendingMoveDownload by remember { mutableStateOf<DownloadUiItem?>(null) }
 
