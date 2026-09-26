@@ -1,0 +1,22 @@
+name: Publish 0.26.0
+
+on:
+  push:
+    branches: [main]
+    paths: [".github/workflows/publish-0260-once.yml"]
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tag reviewed commit and dispatch signed release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f ref='refs/tags/v0.26.0' -f sha="$GITHUB_SHA"
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref v0.26.0

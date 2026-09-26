@@ -100,6 +100,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -407,17 +408,31 @@ private fun BrowserScreen(
         BrowserEngine.applyPreferredColorScheme(settings.theme)
     }
 
+    val prefs = remember { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
+    val startupData by produceState<BrowserStartupData?>(null, prefs) {
+        value = withContext(Dispatchers.IO) {
+            val legacyUrl = prefs.getString(PREF_LAST_URL, HOME_URL) ?: HOME_URL
+            BrowserStartupData(
+                session = if (settings.restoreTabs) TabSessionStore.restore(prefs, legacyUrl)
+                    else RestoredTabSession(listOf(HOME_URL), listOf(null), listOf(TabSessionMetadata()), 0),
+                bookmarks = BookmarkStore.restore(prefs).sortedByDescending { it.createdAt },
+                history = HistoryStore.restore(prefs),
+                quickLinks = QuickLinkStore.restore(prefs)
+            )
+        }
+    }
+
     // Do not restore/open web sessions until bundled extensions have reached their requested
     // startup state. This prevents a previously-enabled Dark Reader from touching pages for a
     // moment before the saved "off" setting is applied, and guarantees the media detector is
     // attached to the final WebExtension instance before YouTube starts loading.
-    if (!BrowserEngine.startupExtensionsReady) {
+    if (!BrowserEngine.startupExtensionsReady || startupData == null) {
         // Keep this placeholder transparent: GeckoView is Activity-owned and the project
         // contract forbids an opaque BrowserScreen root from covering it.
         Box(modifier = Modifier.fillMaxSize())
         return
     }
-    val prefs = remember { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE) }
+    val restoredData = checkNotNull(startupData)
     val downloadController = remember(runtime) { DownloadController(context, prefs, runtime) }
     val downloads = remember { mutableStateListOf<DownloadUiItem>() }
     val currentSettings by rememberUpdatedState(settings)
@@ -640,14 +655,7 @@ private fun BrowserScreen(
                 ).show()
             }
         }
-    val legacyUrl = remember { prefs.getString(PREF_LAST_URL, HOME_URL) ?: HOME_URL }
-    val restoredSession = remember {
-        if (settings.restoreTabs) {
-            TabSessionStore.restore(prefs, legacyUrl)
-        } else {
-            RestoredTabSession(urls = listOf(HOME_URL), states = listOf(null), metadata = listOf(TabSessionMetadata()), activeIndex = 0)
-        }
-    }
+    val restoredSession = restoredData.session
     val desiredWebColorScheme = if (darkTheme) "dark" else "light"
     val forceFreshRestoredWebContent = remember {
         // SessionState can contain a document created under the previous color scheme.
@@ -658,8 +666,8 @@ private fun BrowserScreen(
         prefs.edit().putString(PREF_RESTORED_WEB_COLOR_SCHEME, desiredWebColorScheme).apply()
     }
 
-    val restoredBookmarks = remember { BookmarkStore.restore(prefs) }
-    val restoredHistory = remember { HistoryStore.restore(prefs) }
+    val restoredBookmarks = restoredData.bookmarks
+    val restoredHistory = restoredData.history
 
     DisposableEffect(downloadController) {
         ExtensionHostBridge.initialize(runtime)
@@ -760,7 +768,7 @@ private fun BrowserScreen(
     }
     val bookmarks = remember {
         mutableStateListOf<BookmarkItem>().apply {
-            addAll(restoredBookmarks.sortedByDescending { it.createdAt })
+            addAll(restoredBookmarks)
         }
     }
     val history = remember {
@@ -770,7 +778,7 @@ private fun BrowserScreen(
     }
     val quickLinks = remember {
         mutableStateListOf<QuickLink>().apply {
-            addAll(QuickLinkStore.restore(prefs))
+            addAll(restoredData.quickLinks)
         }
     }
 
@@ -854,22 +862,14 @@ private fun BrowserScreen(
         lastAppliedDarkTheme = darkTheme
         BrowserEngine.applyPreferredColorScheme(settings.theme)
 
+        tabs.forEach { it.requestThemeReload() }
+    }
+
+    LaunchedEffect(activeTab.id, activeTab.needsThemeReload, activeTab.isFullScreen, readerModeActive) {
         val activity = context.findActivity()
         val inPictureInPicture = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             activity?.isInPictureInPictureMode == true
-
-        tabs.forEach { tab ->
-            val canReloadForTheme =
-                tab.session.isOpen() &&
-                    tab.url != HOME_URL &&
-                    tab.readerArticle == null &&
-                    !tab.isFullScreen &&
-                    !(inPictureInPicture && tab.id == activeTab.id)
-
-            if (canReloadForTheme) {
-                tab.session.reload()
-            }
-        }
+        if (!inPictureInPicture) activeTab.reloadThemeIfNeeded()
     }
 
     LaunchedEffect(textScaleReloadRevision) {
@@ -1100,6 +1100,9 @@ private fun BrowserScreen(
                         tabs.forEach { candidate ->
                             candidate.applyActiveState(candidate.id == activeTabId)
                         }
+                        val inPip = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                            context.findActivity()?.isInPictureInPictureMode == true
+                        if (!inPip) selectedTab?.reloadThemeIfNeeded()
                         ProtectionBridge.setActiveSession(selectedTab?.session)
                         if (selectedTab != null && !isHome && !readerModeActive) {
                             NativeBrowserHostCoordinator.render(selectedTab.session)

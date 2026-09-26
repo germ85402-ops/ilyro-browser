@@ -156,31 +156,36 @@ internal fun TabOverviewSheet(
         }
     }
 
-    val groups = tabs
+    val groups = remember(tabs) {
+        tabs
         .mapNotNull { it.groupName?.trim()?.takeIf(String::isNotBlank) }
         .distinct()
         .sorted()
+    }
     val queryValue = query.trim()
 
-    val sectionTabs = when (section) {
-        TabOverviewSection.NORMAL -> tabs.filterNot { it.isPrivate }
-        TabOverviewSection.PRIVATE -> tabs.filter { it.isPrivate }
-        TabOverviewSection.GROUPS -> tabs.filter { !it.groupName.isNullOrBlank() }
-    }
-
-    val visibleTabs = sectionTabs
-        .filter { tab ->
-            (section != TabOverviewSection.GROUPS || selectedGroup == null || tab.groupName == selectedGroup) &&
-                (queryValue.isBlank() ||
-                    tab.title.contains(queryValue, ignoreCase = true) ||
-                    tab.host.contains(queryValue, ignoreCase = true) ||
-                    tab.groupName.orEmpty().contains(queryValue, ignoreCase = true))
+    val visibleTabs = remember(tabs, section, selectedGroup, queryValue) {
+        val sectionTabs = when (section) {
+            TabOverviewSection.NORMAL -> tabs.filterNot { it.isPrivate }
+            TabOverviewSection.PRIVATE -> tabs.filter { it.isPrivate }
+            TabOverviewSection.GROUPS -> tabs.filter { !it.groupName.isNullOrBlank() }
         }
-        .sortedWith(
-            compareByDescending<TabOverviewItem> { it.isPinned }
-                .thenBy { it.groupName.orEmpty().lowercase() }
-                .thenByDescending { it.selected }
-        )
+
+        sectionTabs
+            .filter { tab ->
+                (section != TabOverviewSection.GROUPS || selectedGroup == null || tab.groupName == selectedGroup) &&
+                    (queryValue.isBlank() ||
+                        tab.title.contains(queryValue, ignoreCase = true) ||
+                        tab.host.contains(queryValue, ignoreCase = true) ||
+                        tab.groupName.orEmpty().contains(queryValue, ignoreCase = true))
+            }
+            .sortedWith(
+                compareByDescending<TabOverviewItem> { it.isPinned }
+                    .thenBy { it.groupName.orEmpty().lowercase() }
+                    .thenByDescending { it.selected }
+            )
+
+    }
 
     val baseColumns = when (metrics.windowClass) {
         IlyroWindowClass.COMPACT -> if (metrics.isNarrowPhone) 1 else 2

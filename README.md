@@ -2,7 +2,7 @@
 
 ILYRO is an independent Android browser built with Kotlin, Jetpack Compose, and Mozilla GeckoView.
 
-> Current status: **0.26.0-rc32**. This is a release candidate, not the final stable release.
+> Current status: **0.26.0**. This is a release candidate, not the final stable release.
 
 ## Highlights
 

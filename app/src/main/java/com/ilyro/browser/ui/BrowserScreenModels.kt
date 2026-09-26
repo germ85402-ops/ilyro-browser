@@ -22,3 +22,11 @@ internal data class RestorableTabSnapshot(
     val states: List<String?>,
     val metadata: List<TabSessionMetadata>
 )
+
+/** Loaded before the interactive browser is created, so autosave cannot overwrite unread data. */
+internal data class BrowserStartupData(
+    val session: RestoredTabSession,
+    val bookmarks: List<BookmarkItem>,
+    val history: List<HistoryItem>,
+    val quickLinks: List<QuickLink>
+)
