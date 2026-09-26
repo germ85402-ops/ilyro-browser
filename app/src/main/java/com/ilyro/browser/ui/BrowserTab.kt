@@ -101,6 +101,21 @@ internal class BrowserTab(
         private set
     private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private var sessionOpened = false
+    private var activeRequested = false
+    private var focusedRequested = false
+    private var closed = false
+    var needsThemeReload by mutableStateOf(false)
+        private set
+
+    fun requestThemeReload() {
+        if (session.isOpen() && url != HOME_URL) needsThemeReload = true
+    }
+
+    fun reloadThemeIfNeeded() {
+        if (!needsThemeReload || !activeRequested || isFullScreen || readerArticle != null) return
+        needsThemeReload = false
+        session.reload()
+    }
     private var lastSessionStateSerializedAt = 0L
     private var pendingSessionState: GeckoSession.SessionState? = null
     private var sessionStatePublishScheduled = false
@@ -258,6 +273,7 @@ internal class BrowserTab(
 
         session.setProgressDelegate(object : GeckoSession.ProgressDelegate {
             override fun onPageStart(session: GeckoSession, url: String) {
+                needsThemeReload = false
                 NativeBrowserHostCoordinator.coverUntilFirstPaint(session)
                 MediaDetectorBridge.clear(session)
                 this@BrowserTab.translationState = null
@@ -345,7 +361,7 @@ internal class BrowserTab(
      * content surface for every background tab during cold start.
      */
     fun openIfNeeded() {
-        if (sessionOpened || session.isOpen()) return
+        if (closed || sessionOpened || session.isOpen()) return
         sessionOpened = true
         try {
             session.open(runtime)
@@ -367,6 +383,8 @@ internal class BrowserTab(
     }
 
     fun applyActiveState(active: Boolean) {
+        activeRequested = active
+        focusedRequested = active
         if (!sessionOpened && !session.isOpen()) return
         session.setActive(active)
         session.setFocused(active)
@@ -376,6 +394,7 @@ internal class BrowserTab(
     }
 
     fun setFocused(focused: Boolean) {
+        focusedRequested = focused
         if (sessionOpened || session.isOpen()) {
             session.setFocused(focused)
         }
@@ -390,10 +409,10 @@ internal class BrowserTab(
     private var processRecoveryInProgress = false
 
     private fun recoverAfterProcessFailure(failedSession: GeckoSession) {
-        if (failedSession !== session) return
+        if (closed || failedSession !== session) return
 
         mainHandler.post {
-            if (processRecoveryInProgress) return@post
+            if (closed || processRecoveryInProgress) return@post
             processRecoveryInProgress = true
             loadProgress = 0
             isLoading = true
@@ -420,7 +439,11 @@ internal class BrowserTab(
                 } else if (url != HOME_URL) {
                     failedSession.loadUri(url)
                 }
-                failedSession.setActive(true)
+                failedSession.setActive(activeRequested)
+                failedSession.setFocused(focusedRequested)
+                failedSession.setPriorityHint(
+                    if (activeRequested) GeckoSession.PRIORITY_HIGH else GeckoSession.PRIORITY_DEFAULT
+                )
             }.isSuccess
 
             if (!recovered) {
@@ -492,6 +515,9 @@ internal class BrowserTab(
     }
 
     fun close(clearPrivateData: Boolean = true) {
+        closed = true
+        activeRequested = false
+        focusedRequested = false
         PageGestureBridge.unbind(session)
         MediaDetectorBridge.unbind(session)
         GeckoMediaSessionBridge.unbind(session)

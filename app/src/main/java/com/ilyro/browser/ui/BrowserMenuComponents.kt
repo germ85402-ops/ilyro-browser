@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -63,7 +64,7 @@ internal fun MenuQuickAction(
 
     Surface(
         onClick = onClick,
-        modifier = modifier.height(height),
+        modifier = modifier.heightIn(min = height),
         shape = RoundedCornerShape(IlyroVisualTokens.CardRadius),
         color = if (privateAccent) {
             MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.68f)
@@ -93,7 +94,7 @@ internal fun MenuQuickAction(
             )
             Text(
                 text = label,
-                maxLines = 1,
+                softWrap = true,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold
             )
@@ -530,7 +531,7 @@ internal fun QuickMenuTile(
     val compact = LocalIlyroUiDensity.current == UiDensity.COMPACT
     Surface(
         onClick = onClick,
-        modifier = modifier.height(if (compact) 68.dp else 78.dp),
+        modifier = modifier.heightIn(min = if (compact) 68.dp else 78.dp),
         shape = RoundedCornerShape(if (compact) 16.dp else 18.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.58f),
         border = BorderStroke(
@@ -556,7 +557,7 @@ internal fun QuickMenuTile(
                 modifier = Modifier.padding(top = if (compact) 4.dp else 7.dp),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Medium,
-                maxLines = 1,
+                softWrap = true,
                 overflow = TextOverflow.Ellipsis,
                 textAlign = TextAlign.Center
             )
@@ -576,7 +577,7 @@ internal fun QuickMenuFooterAction(
     Surface(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier.height(if (compact) 54.dp else 64.dp),
+        modifier = modifier.heightIn(min = if (compact) 54.dp else 64.dp),
         shape = RoundedCornerShape(if (compact) 14.dp else 16.dp),
         color = Color.Transparent,
         tonalElevation = 0.dp,
@@ -599,7 +600,7 @@ internal fun QuickMenuFooterAction(
                 style = MaterialTheme.typography.labelSmall,
                 color = if (enabled) MaterialTheme.colorScheme.onSurface
                 else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.34f),
-                maxLines = 1,
+                softWrap = true,
                 overflow = TextOverflow.Ellipsis
             )
         }

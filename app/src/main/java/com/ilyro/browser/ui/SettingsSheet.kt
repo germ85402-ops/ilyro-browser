@@ -15,6 +15,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,6 +30,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -40,6 +44,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Lock
@@ -47,6 +53,7 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -76,6 +83,10 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -115,6 +126,7 @@ internal fun SettingsSheet(
     onClearSiteData: () -> Unit
 ) {
     var selectedName by rememberSaveable { mutableStateOf<String?>(null) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     var clearAction by remember { mutableStateOf<ClearAction?>(null) }
 
     Dialog(
@@ -126,6 +138,7 @@ internal fun SettingsSheet(
             dismissOnClickOutside = false
         )
     ) {
+        val focusManager = LocalFocusManager.current
         IlyroSystemBarAppearance()
         Surface(
                 modifier = Modifier.fillMaxSize(),
@@ -139,7 +152,7 @@ internal fun SettingsSheet(
             ) {
                 IlyroWallpaperBackdrop(settings)
 
-                val wide = maxWidth >= 600.dp
+                val wide = maxWidth >= 600.dp && LocalDensity.current.fontScale < 1.5f
                 val selected = selectedName?.let { SettingsCategory.valueOf(it) }
                 val category = selected ?: SettingsCategory.GENERAL
                 val back: () -> Unit = {
@@ -192,7 +205,9 @@ internal fun SettingsSheet(
                                 SettingsSidebar(
                                     current = SettingsCategory.GENERAL,
                                     wide = false,
-                                    onSelect = { selectedName = it.name },
+                                    onSelect = { focusManager.clearFocus(); selectedName = it.name },
+                                    query = searchQuery,
+                                    onQueryChange = { searchQuery = it },
                                     modifier = Modifier.fillMaxSize()
                                 )
                             } else {
@@ -216,8 +231,10 @@ internal fun SettingsSheet(
                             SettingsSidebar(
                                 current = category,
                                 wide = true,
-                                onSelect = { selectedName = it.name },
-                                modifier = Modifier.width(224.dp).fillMaxHeight()
+                                onSelect = { focusManager.clearFocus(); selectedName = it.name },
+                                    query = searchQuery,
+                                    onQueryChange = { searchQuery = it },
+                                modifier = Modifier.width(256.dp).fillMaxHeight()
                             )
 
                             Box(
@@ -450,6 +467,8 @@ private fun SettingsSidebar(
     current: SettingsCategory,
     wide: Boolean,
     onSelect: (SettingsCategory) -> Unit,
+    query: String,
+    onQueryChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val dense = LocalIlyroUiDensity.current == UiDensity.COMPACT
@@ -470,7 +489,33 @@ private fun SettingsSidebar(
             .padding(horizontal = if (wide) 12.dp else 14.dp, vertical = if (dense) 5.dp else 8.dp),
         verticalArrangement = Arrangement.spacedBy(if (dense) 3.dp else 5.dp)
     ) {
-        categories.forEach { item ->
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text(tr("Search settings", "Поиск настроек")) },
+            leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+            trailingIcon = if (query.isNotEmpty()) ({
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(Icons.Rounded.Close, contentDescription = tr("Clear", "Очистить"))
+                }
+            }) else null,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            shape = RoundedCornerShape(16.dp)
+        )
+        val matches = categories.filter { item ->
+            val text = "${item.title()} ${item.subtitle()} ${item.searchTerms()}"
+            query.trim().split(Regex("\\s+")).all { text.contains(it, ignoreCase = true) }
+        }
+        if (matches.isEmpty()) {
+            Text(
+                tr("No matching settings", "Настройки не найдены"),
+                modifier = Modifier.padding(14.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        matches.forEach { item ->
             val selected = wide && current == item
             Surface(
                 onClick = { onSelect(item) },
@@ -542,7 +587,7 @@ private fun SettingsSidebar(
             }
         }
 
-        SidebarSupportCard(
+        if (query.isBlank()) SidebarSupportCard(
             onClick = {
                 context.startActivity(
                     Intent(
@@ -553,6 +598,16 @@ private fun SettingsSidebar(
             }
         )
     }
+}
+
+private fun SettingsCategory.searchTerms(): String = when (this) {
+    SettingsCategory.GENERAL -> "language search engine default startup restore tabs язык поиск поисковик по умолчанию запуск восстановление вкладок"
+    SettingsCategory.APPEARANCE -> "theme dark light wallpaper accent font text size toolbar icon density animation тема темная тёмная светлая обои акцент шрифт текст размер панель иконка плотность анимация"
+    SettingsCategory.BROWSING -> "desktop downloads mobile data computer загрузки мобильная сеть компьютер версия сайтов"
+    SettingsCategory.PRIVACY -> "https cookies tracking private security куки отслеживание приватность безопасность инкогнито"
+    SettingsCategory.DATA -> "history bookmarks downloads clear cache storage история закладки загрузки очистить кэш кеш данные"
+    SettingsCategory.ACCOUNT -> "google sync account backup синхронизация аккаунт резервная копия"
+    SettingsCategory.ABOUT -> "version developer support privacy policy terms версия разработчик поддержка политика условия"
 }
 
 private fun SettingsCategory.icon(): ImageVector = when (this) {
@@ -954,14 +1009,15 @@ internal fun ChoiceRow(title: String, selected: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .heightIn(min = 48.dp)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        RadioButton(selected = selected, onClick = onClick)
+        RadioButton(selected = selected, onClick = null)
         Text(
             title,
-            modifier = Modifier.padding(start = 8.dp),
+            modifier = Modifier.weight(1f).padding(start = 8.dp),
             style = MaterialTheme.typography.bodyLarge
         )
     }
@@ -978,7 +1034,7 @@ internal fun ToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange)
             .padding(horizontal = 14.dp, vertical = if (dense) 10.dp else 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -992,7 +1048,7 @@ internal fun ToggleRow(
             )
         }
         Spacer(modifier = Modifier.width(12.dp))
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.26.0
+
+- Preserve background-tab activity and focus when recovering a Gecko process; ignore recovery after final closure.
+- Defer background-tab theme refresh until selection instead of reloading every open page.
+- Read saved tabs, bookmarks, history and quick links off the UI thread before enabling autosave.
+- Cancel superseded suggestion requests, cap response size and reuse recent results within the omnibox.
+- Cache tab overview filtering and sorting between input changes.
+- Add settings search with English/Russian keywords, a clear action and an empty result state.
+- Let quick-menu labels wrap and tiles grow with larger fonts; use single-column settings at large font scales.
+- Make settings switches and radio choices single accessible controls.
+
 ## 0.26.0-rc32 — release candidate
 
 - Match system Autofill passwords to the actual website scheme and host; do not assume HTTPS when the scheme is unavailable.

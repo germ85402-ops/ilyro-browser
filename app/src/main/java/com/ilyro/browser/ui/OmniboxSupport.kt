@@ -1168,14 +1168,28 @@ private fun rememberOmniboxSuggestions(
 ): List<OmniboxSuggestion> {
     var remoteSuggestions by remember(searchEngine) { mutableStateOf<List<String>>(emptyList()) }
     val trimmed = query.trim()
+    // The cache belongs to this omnibox only, and is cleared when remote requests are disabled.
+    val remoteCache = remember(searchEngine) { linkedMapOf<String, Pair<Long, List<String>>>() }
 
     LaunchedEffect(expanded, trimmed, searchEngine, allowRemote) {
         remoteSuggestions = emptyList()
+        if (!allowRemote) remoteCache.clear()
         if (!expanded || !allowRemote || trimmed.length < 2 || looksLikeNavigation(trimmed)) {
             return@LaunchedEffect
         }
+        val cached = remoteCache[trimmed]
+        if (cached != null && android.os.SystemClock.elapsedRealtime() - cached.first < 60_000L) {
+            remoteSuggestions = cached.second
+            return@LaunchedEffect
+        }
         delay(180L)
-        remoteSuggestions = fetchRemoteSuggestions(searchEngine, trimmed)
+        val fetched = fetchRemoteSuggestions(searchEngine, trimmed)
+        remoteSuggestions = fetched
+        if (fetched.isNotEmpty()) {
+            remoteCache.remove(trimmed)
+            remoteCache[trimmed] = android.os.SystemClock.elapsedRealtime() to fetched
+            while (remoteCache.size > 24) remoteCache.remove(remoteCache.keys.first())
+        }
     }
 
     return buildOmniboxSuggestions(
@@ -1201,34 +1215,19 @@ private suspend fun fetchSearchEngineIcon(engine: SearchEngine): Bitmap? =
     }
 
 
-private suspend fun fetchRemoteSuggestions(engine: SearchEngine, query: String): List<String> =
-    withContext(Dispatchers.IO) {
+private suspend fun fetchRemoteSuggestions(engine: SearchEngine, query: String): List<String> {
         val encoded = URLEncoder.encode(query, StandardCharsets.UTF_8.toString())
         val endpoint = when (engine) {
             SearchEngine.GOOGLE -> "https://suggestqueries.google.com/complete/search?client=firefox&q=$encoded"
             SearchEngine.YANDEX -> "https://suggest.yandex.ru/suggest-ya.cgi?v=4&part=$encoded"
             SearchEngine.DUCKDUCKGO -> "https://duckduckgo.com/ac/?q=$encoded&type=list"
             SearchEngine.BING -> "https://api.bing.com/osjson.aspx?query=$encoded"
-            SearchEngine.BRAVE -> return@withContext emptyList()
+            SearchEngine.BRAVE -> return emptyList()
         }
 
-        runCatching {
-            val connection = (URL(endpoint).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 1600
-                readTimeout = 1800
-                requestMethod = "GET"
-                setRequestProperty("Accept", "application/json")
-                setRequestProperty("User-Agent", "ILYRO/0.16 Android")
-            }
-            try {
-                if (connection.responseCode !in 200..299) return@runCatching emptyList<String>()
-                val payload = connection.inputStream.bufferedReader().use { it.readText() }
-                parseSuggestionPayload(engine, payload)
-            } finally {
-                connection.disconnect()
-            }
-        }.getOrDefault(emptyList())
-    }
+    val payload = fetchSuggestionPayload(endpoint) ?: return emptyList()
+    return runCatching { parseSuggestionPayload(engine, payload) }.getOrDefault(emptyList())
+}
 
 private fun parseSuggestionPayload(engine: SearchEngine, payload: String): List<String> {
     val root = JSONArray(payload)
