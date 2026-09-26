@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -126,7 +127,6 @@ internal fun SettingsSheet(
 ) {
     var selectedName by rememberSaveable { mutableStateOf<String?>(null) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
-    val focusManager = LocalFocusManager.current
     var clearAction by remember { mutableStateOf<ClearAction?>(null) }
 
     Dialog(
@@ -138,6 +138,7 @@ internal fun SettingsSheet(
             dismissOnClickOutside = false
         )
     ) {
+        val focusManager = LocalFocusManager.current
         IlyroSystemBarAppearance()
         Surface(
                 modifier = Modifier.fillMaxSize(),
@@ -233,7 +234,7 @@ internal fun SettingsSheet(
                                 onSelect = { focusManager.clearFocus(); selectedName = it.name },
                                     query = searchQuery,
                                     onQueryChange = { searchQuery = it },
-                                modifier = Modifier.width(224.dp).fillMaxHeight()
+                                modifier = Modifier.width(256.dp).fillMaxHeight()
                             )
 
                             Box(
@@ -1008,6 +1009,7 @@ internal fun ChoiceRow(title: String, selected: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .heightIn(min = 48.dp)
             .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
             .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
