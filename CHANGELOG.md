@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 0.26.1
+
+- Remove obsolete one-shot publish workflows from the repository.
+- Add bug report and feature request issue templates.
+- Create the release tag and start the signed release workflow automatically when `versionName` changes on `main`.
+
 ## 0.26.0
 
 - Preserve background-tab activity and focus when recovering a Gecko process; ignore recovery after final closure.
