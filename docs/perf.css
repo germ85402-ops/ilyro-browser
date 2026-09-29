@@ -1,0 +1,16 @@
+/* Performance overrides: lighter blur, no CPU-generated noise, GPU-friendly animation hints. */
+.site-noise { display: none; }
+
+.site-header,
+.ambient,
+.floating-shield,
+.floating-tabs { backdrop-filter: blur(10px); }
+
+.floating-shield,
+.floating-tabs { will-change: transform; }
+
+@media (max-width: 720px) {
+  .ambient,
+  .floating-shield,
+  .floating-tabs { backdrop-filter: none; }
+}

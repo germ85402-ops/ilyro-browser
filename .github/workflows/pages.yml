@@ -35,6 +35,14 @@ jobs:
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
+      - name: Optimize website images
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y --no-install-recommends imagemagick >/dev/null
+          mogrify -resize '1200x>' -quality 82 -strip docs/screenshots/*.jpg docs/assets/*.jpg
+          mogrify -resize '512x512>' -strip docs/assets/ilyro-app-icon.png
+          du -sh docs
+
       - name: Upload website
         uses: actions/upload-pages-artifact@v4
         with:
