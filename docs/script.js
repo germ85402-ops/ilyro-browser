@@ -349,13 +349,21 @@
     const apiUrl = 'https://api.github.com/repos/germ85402-ops/ilyro-browser/releases?per_page=20';
 
     try {
-      const response = await fetch(apiUrl, {
-        headers: { Accept: 'application/vnd.github+json' },
-        cache: 'no-store'
-      });
-      if (!response.ok) throw new Error('GitHub Releases request failed');
-
-      const releases = await response.json();
+      let releases = null;
+      try {
+        const cached = JSON.parse(window.sessionStorage.getItem('ilyro-releases') || 'null');
+        if (cached && Date.now() - cached.time < 10 * 60 * 1000 && Array.isArray(cached.data)) releases = cached.data;
+      } catch { /* cache is optional */ }
+      if (!releases) {
+        const response = await fetch(apiUrl, {
+          headers: { Accept: 'application/vnd.github+json' }
+        });
+        if (!response.ok) throw new Error('GitHub Releases request failed');
+        releases = await response.json();
+        try {
+          window.sessionStorage.setItem('ilyro-releases', JSON.stringify({ time: Date.now(), data: releases }));
+        } catch { /* storage may be blocked */ }
+      }
       const latest = releases.find((release) =>
         !release.draft &&
         Array.isArray(release.assets) &&
