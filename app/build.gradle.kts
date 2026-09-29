@@ -83,7 +83,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-auth:21.5.0")
     implementation("androidx.work:work-runtime-ktx:2.11.2")
     // Stable GeckoView release published by Mozilla's Maven repository.
-    implementation("org.mozilla.geckoview:geckoview:155.0.20260903215306")
+    implementation("org.mozilla.geckoview:geckoview:156.0.20260921121718")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20260814")
     androidTestImplementation("androidx.test:core:1.7.0")
